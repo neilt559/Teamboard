@@ -15,7 +15,6 @@ export async function GET() {
     const tasks = await sql`SELECT id, project_id, title, assignee_id, due_date, status
                             FROM tasks ORDER BY position ASC, id ASC`;
     return NextResponse.json({
-      _v: 'nocache1',
       people: people.rows,
       projects: projects.rows,
       tasks: tasks.rows,
