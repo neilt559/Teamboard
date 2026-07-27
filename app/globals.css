@@ -172,6 +172,31 @@ tbody tr:hover .row-x { opacity: 1; }
 .restore-btn { border: none; background: none; color: var(--ink-2); font-size: 16px; cursor: pointer; margin-right: 4px; }
 .restore-btn:hover { color: var(--lime-dark); }
 
+/* ---------- teams (sidebar) ---------- */
+.team { margin-bottom: 4px; }
+.team-head { display: flex; align-items: center; gap: 4px; padding: 6px 6px; border-radius: 6px; }
+.team-head:hover { background: #f1f1f2; }
+.team-caret { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 10px; width: 16px; padding: 0; }
+.team-name { flex: 1; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.team-add, .team-x { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 15px; line-height: 1; width: 18px; opacity: 0; }
+.team-head:hover .team-add, .team-head:hover .team-x { opacity: 1; }
+.team-add:hover { color: var(--lime-dark); }
+.team-x:hover { color: #e2445c; }
+.team .proj { margin-left: 12px; }
+.team-empty { margin: 2px 0 6px 24px; font-size: 12px; color: var(--muted); }
+.team-select-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.team-select { border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 13px; background: #fff; color: var(--text); }
+
+/* ---------- task notes ---------- */
+.row-actions { white-space: nowrap; text-align: right; }
+.notes-btn { border: none; background: none; cursor: pointer; font-size: 14px; opacity: .45; padding: 3px 5px; border-radius: 6px; margin-right: 2px; }
+tbody tr:hover .notes-btn { opacity: 1; }
+.notes-btn.has-notes { opacity: 1; background: #f3f4ec; box-shadow: inset 0 0 0 1px #dfe2b0; }
+.task-notes-row td { background: #fafbf3; padding: 6px 14px 12px 14px; }
+.task-notes-label { display: block; font-size: 11px; font-weight: 600; color: var(--ink-2); margin: 2px 0 6px; }
+.task-notes-area { width: 100%; min-height: 54px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--text); resize: vertical; background: #fff; }
+.task-notes-area:focus { outline: none; border-color: var(--lime); }
+
 /* ---------- mobile ---------- */
 .menu-btn { display: none; padding: 6px 10px; font-size: 16px; }
 @media (max-width: 720px) {

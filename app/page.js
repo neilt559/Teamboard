@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
 
 const STATUSES = {
   not_started: { label: 'Not Started', color: '#c4c4c4' },
@@ -27,13 +27,15 @@ async function api(path, opts) {
 }
 
 export default function Page() {
-  const [data, setData] = useState({ people: [], projects: [], tasks: [] });
+  const [data, setData] = useState({ people: [], teams: [], projects: [], tasks: [] });
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [collapsedTeams, setCollapsedTeams] = useState({});
+  const [expandedTask, setExpandedTask] = useState(null);
   const guard = useRef(0); // skip background refreshes briefly after a local edit
 
   const load = useCallback(async (force = false) => {
@@ -65,13 +67,46 @@ export default function Page() {
 
   const touch = () => { guard.current = Date.now() + 2500; };
 
-  async function addProject() {
+  // ---- teams ----
+  async function addTeam() {
+    const name = prompt('New team name', 'New Team');
+    if (name === null) return;
+    touch();
+    try { await api('/api/teams', { method: 'POST', body: JSON.stringify({ name: name.trim() || 'New Team' }) }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  async function renameTeam(team) {
+    const name = prompt('Rename team', team.name);
+    if (name === null || name.trim() === '' || name === team.name) return;
+    setData((d) => ({ ...d, teams: d.teams.map((x) => (x.id === team.id ? { ...x, name } : x)) }));
+    touch();
+    try { await api(`/api/teams/${team.id}`, { method: 'PATCH', body: JSON.stringify({ name }) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function deleteTeam(team) {
+    const projCount = data.projects.filter((p) => String(p.team_id) === String(team.id)).length;
+    const extra = projCount ? ` and its ${projCount} project${projCount > 1 ? 's' : ''} (and all their tasks)` : '';
+    if (!confirm(`Delete team “${team.name}”${extra}? This can’t be undone.`)) return;
+    setData((d) => ({
+      ...d,
+      teams: d.teams.filter((x) => x.id !== team.id),
+      projects: d.projects.filter((p) => String(p.team_id) !== String(team.id)),
+    }));
+    touch();
+    try { await api(`/api/teams/${team.id}`, { method: 'DELETE' }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  function toggleTeam(id) { setCollapsedTeams((c) => ({ ...c, [id]: !c[id] })); }
+
+  // ---- projects ----
+  async function addProject(teamId) {
     const name = prompt('New project name', 'New Project');
     if (name === null) return;
     touch();
     try {
-      await api('/api/projects', { method: 'POST', body: JSON.stringify({ name: name.trim() || 'New Project' }) });
+      const np = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name: name.trim() || 'New Project', team_id: teamId }) });
       await load(true);
+      if (np && np.id) { setSelected(np.id); setCollapsedTeams((c) => ({ ...c, [teamId]: false })); setSidebarOpen(false); }
     } catch (e) { setError(e.message); }
   }
   async function renameProject(p) {
@@ -83,7 +118,7 @@ export default function Page() {
     catch (e) { setError(e.message); }
   }
   async function deleteProject(p) {
-    if (!confirm(`Delete "${p.name}" and all of its tasks?`)) return;
+    if (!confirm(`Delete “${p.name}” and all of its tasks?`)) return;
     setData((d) => ({
       ...d,
       projects: d.projects.filter((x) => x.id !== p.id),
@@ -93,6 +128,20 @@ export default function Page() {
     try { await api(`/api/projects/${p.id}`, { method: 'DELETE' }); await load(true); }
     catch (e) { setError(e.message); }
   }
+  async function saveProjectNotes(id, notes) {
+    setData((d) => ({ ...d, projects: d.projects.map((p) => (p.id === id ? { ...p, notes } : p)) }));
+    touch();
+    try { await api(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ notes }) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function moveProject(id, teamId) {
+    setData((d) => ({ ...d, projects: d.projects.map((p) => (p.id === id ? { ...p, team_id: teamId } : p)) }));
+    touch();
+    try { await api(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ team_id: teamId }) }); }
+    catch (e) { setError(e.message); }
+  }
+
+  // ---- tasks ----
   async function addTask() {
     if (selected === null) return;
     touch();
@@ -111,9 +160,7 @@ export default function Page() {
   function changeStatus(id, status) {
     updateTask(id, status === 'done' ? { status, archived: true } : { status });
   }
-  function restoreTask(id) {
-    updateTask(id, { archived: false });
-  }
+  function restoreTask(id) { updateTask(id, { archived: false }); }
   async function deleteTask(id) {
     if (!confirm('Delete this task? This can’t be undone.')) return;
     setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
@@ -121,12 +168,8 @@ export default function Page() {
     try { await api(`/api/tasks/${id}`, { method: 'DELETE' }); }
     catch (e) { setError(e.message); }
   }
-  async function saveNotes(id, notes) {
-    setData((d) => ({ ...d, projects: d.projects.map((p) => (p.id === id ? { ...p, notes } : p)) }));
-    touch();
-    try { await api(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ notes }) }); }
-    catch (e) { setError(e.message); }
-  }
+
+  // ---- people ----
   async function addPerson(name, color) {
     touch();
     try { await api('/api/people', { method: 'POST', body: JSON.stringify({ name, color }) }); await load(true); }
@@ -155,36 +198,53 @@ export default function Page() {
     <>
       <header className="app-header">
         <div className="brand">
-          <button className="menu-btn btn-ghost" onClick={() => setSidebarOpen((s) => !s)} aria-label="Toggle projects">☰</button>
+          <button className="menu-btn btn-ghost" onClick={() => setSidebarOpen((s) => !s)} aria-label="Toggle teams">☰</button>
           <span className="dot" /> TeamBoard <small>shared project board</small>
         </div>
         <div className="header-actions">
           <button className="btn btn-ghost" onClick={() => setPeopleOpen(true)}>👥 People ({data.people.length})</button>
-          <button className="btn btn-lime" onClick={addProject}>+ New Project</button>
+          <button className="btn btn-lime" onClick={addTeam}>+ New Team</button>
         </div>
       </header>
 
       <div className="layout">
         <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-          <h2>Projects <button className="add-mini" onClick={addProject} aria-label="Add project">+</button></h2>
-          {data.projects.map((p) => {
-            const count = data.tasks.filter((t) => t.project_id === p.id && !t.archived).length;
+          <h2>Teams <button className="add-mini" onClick={addTeam} aria-label="Add team">+</button></h2>
+          {data.teams.map((team) => {
+            const teamProjects = data.projects.filter((p) => String(p.team_id) === String(team.id));
+            const collapsed = collapsedTeams[team.id];
             return (
-              <div
-                key={p.id}
-                className={`proj ${String(p.id) === String(selected) ? 'active' : ''}`}
-                onClick={() => { setSelected(p.id); setSidebarOpen(false); }}
-                onDoubleClick={() => renameProject(p)}
-                title="Double-click to rename"
-              >
-                <span className="name">{p.name}</span>
-                <span className="count">{count}</span>
-                <button className="x" onClick={(e) => { e.stopPropagation(); deleteProject(p); }} aria-label="Delete project">×</button>
+              <div key={team.id} className="team">
+                <div className="team-head">
+                  <button className="team-caret" onClick={() => toggleTeam(team.id)} aria-label="Collapse team">{collapsed ? '▶' : '▼'}</button>
+                  <span className="team-name" onDoubleClick={() => renameTeam(team)} title="Double-click to rename">{team.name}</span>
+                  <button className="team-add" title="Add project to this team" onClick={() => addProject(team.id)}>+</button>
+                  <button className="team-x" title="Delete team" onClick={() => deleteTeam(team)}>×</button>
+                </div>
+                {!collapsed && teamProjects.map((p) => {
+                  const count = data.tasks.filter((t) => t.project_id === p.id && !t.archived).length;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`proj ${String(p.id) === String(selected) ? 'active' : ''}`}
+                      onClick={() => { setSelected(p.id); setSidebarOpen(false); }}
+                      onDoubleClick={() => renameProject(p)}
+                      title="Double-click to rename"
+                    >
+                      <span className="name">{p.name}</span>
+                      <span className="count">{count}</span>
+                      <button className="x" onClick={(e) => { e.stopPropagation(); deleteProject(p); }} aria-label="Delete project">×</button>
+                    </div>
+                  );
+                })}
+                {!collapsed && teamProjects.length === 0 && (
+                  <p className="team-empty">No projects — click <b>+</b> to add one.</p>
+                )}
               </div>
             );
           })}
-          {!data.projects.length && loaded && (
-            <p style={{ color: '#8a8788', fontSize: 13, padding: '0 8px' }}>No projects yet.</p>
+          {!data.teams.length && loaded && (
+            <p style={{ color: '#8a8788', fontSize: 13, padding: '0 8px' }}>No teams yet. Click + to add one.</p>
           )}
         </aside>
 
@@ -192,7 +252,7 @@ export default function Page() {
           {error && (
             <div className={`banner ${isSetup ? 'setup' : ''}`}>
               {isSetup ? (
-                <>⚠️ <b>Database not connected yet.</b> In your Vercel project open <b>Storage → Create Database → Postgres</b>, connect it to this project, then redeploy. The tables build themselves on first load.</>
+                <>⚠️ <b>Database not connected yet.</b> In your Vercel project open <b>Storage → Create Database → Postgres</b>, connect it to this project, then redeploy.</>
               ) : (
                 <>⚠️ {error}</>
               )}
@@ -201,9 +261,18 @@ export default function Page() {
 
           {!project && loaded && !error && (
             <div className="empty">
-              <h3>Create your first project</h3>
-              <p>Click “+ New Project”, then add tasks, owners, and due dates.</p>
-              <button className="btn btn-lime" onClick={addProject}>+ New Project</button>
+              {data.teams.length === 0 ? (
+                <>
+                  <h3>Create your first team</h3>
+                  <p>Teams group your projects. Add a team, then add projects inside it.</p>
+                  <button className="btn btn-lime" onClick={addTeam}>+ New Team</button>
+                </>
+              ) : (
+                <>
+                  <h3>Add a project</h3>
+                  <p>Click the <b>+</b> next to a team in the sidebar to add a project, then add tasks.</p>
+                </>
+              )}
             </div>
           )}
 
@@ -213,18 +282,23 @@ export default function Page() {
                 <h1>{project.name}</h1>
                 <div className="progress" title={`${pct}% done`}><span style={{ width: `${pct}%` }} /></div>
                 <span className="progress-label">{doneCount}/{allTasks.length} done</span>
+                <label className="team-select-wrap">Team
+                  <select className="team-select" value={project.team_id ?? ''} onChange={(e) => moveProject(project.id, e.target.value)}>
+                    {data.teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+                  </select>
+                </label>
                 <div className="spacer" />
                 <button className="btn btn-lime" onClick={addTask}>+ Add Task</button>
               </div>
 
               <div className="notes-panel">
-                <label className="notes-label">📝 Shared notes <span>· visible to your whole team</span></label>
+                <label className="notes-label">📝 Project notes <span>· visible to your whole team</span></label>
                 <textarea
                   key={project.id}
                   className="notes-area"
                   defaultValue={project.notes || ''}
-                  placeholder="Type notes here for the team — plans, links, reminders…"
-                  onBlur={(e) => { if ((e.target.value || '') !== (project.notes || '')) saveNotes(project.id, e.target.value); }}
+                  placeholder="Notes for this project — plans, links, reminders…"
+                  onBlur={(e) => { if ((e.target.value || '') !== (project.notes || '')) saveProjectNotes(project.id, e.target.value); }}
                 />
               </div>
 
@@ -234,65 +308,87 @@ export default function Page() {
                     <thead>
                       <tr>
                         <th style={{ width: '40%' }}>Task</th>
-                        <th style={{ width: '22%' }}>Owner</th>
-                        <th style={{ width: '16%' }}>Due date</th>
-                        <th style={{ width: '18%' }}>Status</th>
-                        <th style={{ width: '4%' }} />
+                        <th style={{ width: '20%' }}>Owner</th>
+                        <th style={{ width: '15%' }}>Due date</th>
+                        <th style={{ width: '17%' }}>Status</th>
+                        <th style={{ width: '8%' }} />
                       </tr>
                     </thead>
                     <tbody>
                       {tasks.map((t) => {
                         const owner = data.people.find((p) => String(p.id) === String(t.assignee_id));
                         const st = STATUSES[t.status] || STATUSES.not_started;
+                        const expanded = expandedTask === t.id;
                         return (
-                          <tr key={t.id}>
-                            <td>
-                              <input
-                                className="task-title"
-                                defaultValue={t.title}
-                                placeholder="Untitled task"
-                                onBlur={(e) => { if (e.target.value !== t.title) updateTask(t.id, { title: e.target.value }); }}
-                              />
-                            </td>
-                            <td>
-                              <div className="cell-owner">
-                                {owner ? (
-                                  <span className="avatar" style={{ background: owner.color }}>{initials(owner.name)}</span>
-                                ) : (
-                                  <span className="avatar" style={{ background: '#dcdcdc', color: '#8a8788' }}>–</span>
-                                )}
+                          <Fragment key={t.id}>
+                            <tr>
+                              <td>
+                                <input
+                                  className="task-title"
+                                  defaultValue={t.title}
+                                  placeholder="Untitled task"
+                                  onBlur={(e) => { if (e.target.value !== t.title) updateTask(t.id, { title: e.target.value }); }}
+                                />
+                              </td>
+                              <td>
+                                <div className="cell-owner">
+                                  {owner ? (
+                                    <span className="avatar" style={{ background: owner.color }}>{initials(owner.name)}</span>
+                                  ) : (
+                                    <span className="avatar" style={{ background: '#dcdcdc', color: '#8a8788' }}>–</span>
+                                  )}
+                                  <select
+                                    className="owner-select"
+                                    value={t.assignee_id ?? ''}
+                                    onChange={(e) => updateTask(t.id, { assignee_id: e.target.value || null })}
+                                  >
+                                    <option value="">Unassigned</option>
+                                    {data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                  </select>
+                                </div>
+                              </td>
+                              <td>
+                                <input
+                                  type="date"
+                                  className="date-input"
+                                  value={t.due_date ?? ''}
+                                  onChange={(e) => updateTask(t.id, { due_date: e.target.value || null })}
+                                />
+                              </td>
+                              <td>
                                 <select
-                                  className="owner-select"
-                                  value={t.assignee_id ?? ''}
-                                  onChange={(e) => updateTask(t.id, { assignee_id: e.target.value || null })}
+                                  className="status-select"
+                                  value={t.status}
+                                  style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}
+                                  onChange={(e) => changeStatus(t.id, e.target.value)}
                                 >
-                                  <option value="">Unassigned</option>
-                                  {data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                  {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
                                 </select>
-                              </div>
-                            </td>
-                            <td>
-                              <input
-                                type="date"
-                                className="date-input"
-                                value={t.due_date ?? ''}
-                                onChange={(e) => updateTask(t.id, { due_date: e.target.value || null })}
-                              />
-                            </td>
-                            <td>
-                              <select
-                                className="status-select"
-                                value={t.status}
-                                style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}
-                                onChange={(e) => changeStatus(t.id, e.target.value)}
-                              >
-                                {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
-                              </select>
-                            </td>
-                            <td>
-                              <button className="row-x" title="Delete task" onClick={() => deleteTask(t.id)}>×</button>
-                            </td>
-                          </tr>
+                              </td>
+                              <td className="row-actions">
+                                <button
+                                  className={`notes-btn ${(t.notes || '').trim() ? 'has-notes' : ''}`}
+                                  title={(t.notes || '').trim() ? 'Task notes (has notes)' : 'Add task notes'}
+                                  onClick={() => setExpandedTask(expanded ? null : t.id)}
+                                >📝</button>
+                                <button className="row-x" title="Delete task" onClick={() => deleteTask(t.id)}>×</button>
+                              </td>
+                            </tr>
+                            {expanded && (
+                              <tr className="task-notes-row">
+                                <td colSpan={5}>
+                                  <label className="task-notes-label">Notes for “{t.title || 'this task'}”</label>
+                                  <textarea
+                                    key={t.id}
+                                    className="task-notes-area"
+                                    defaultValue={t.notes || ''}
+                                    placeholder="Details, blockers, links — everyone on the team can see this."
+                                    onBlur={(e) => { if ((e.target.value || '') !== (t.notes || '')) updateTask(t.id, { notes: e.target.value }); }}
+                                  />
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
                         );
                       })}
                       {!tasks.length && (
@@ -322,7 +418,7 @@ export default function Page() {
                               return (
                                 <tr key={t.id} className="archived-row">
                                   <td style={{ width: '40%' }}><span className="archived-title">{t.title || 'Untitled task'}</span></td>
-                                  <td style={{ width: '22%' }}>
+                                  <td style={{ width: '20%' }}>
                                     <div className="cell-owner">
                                       {owner ? (
                                         <span className="avatar" style={{ background: owner.color }}>{initials(owner.name)}</span>
@@ -332,11 +428,11 @@ export default function Page() {
                                       <span className="archived-owner">{owner ? owner.name : 'Unassigned'}</span>
                                     </div>
                                   </td>
-                                  <td style={{ width: '16%' }} className="archived-due">{t.due_date || '—'}</td>
-                                  <td style={{ width: '18%' }}>
+                                  <td style={{ width: '15%' }} className="archived-due">{t.due_date || '—'}</td>
+                                  <td style={{ width: '17%' }}>
                                     <span className="status-pill" style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}>{st.label}</span>
                                   </td>
-                                  <td style={{ width: '4%', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                                  <td style={{ width: '8%', whiteSpace: 'nowrap', textAlign: 'right' }}>
                                     <button className="restore-btn" title="Restore to the board" onClick={() => restoreTask(t.id)}>↩</button>
                                     <button className="row-x" title="Delete task" onClick={() => deleteTask(t.id)}>×</button>
                                   </td>

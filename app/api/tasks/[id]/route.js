@@ -26,8 +26,11 @@ export async function PATCH(req, { params }) {
     if ('archived' in b) {
       await sql`UPDATE tasks SET archived=${!!b.archived} WHERE id=${id}`;
     }
+    if ('notes' in b) {
+      await sql`UPDATE tasks SET notes=${(b.notes ?? '').slice(0, 5000)} WHERE id=${id}`;
+    }
     const r = await sql`
-      SELECT id, project_id, title, assignee_id, due_date, status, archived
+      SELECT id, project_id, title, assignee_id, due_date, status, archived, notes
       FROM tasks WHERE id=${id}`;
     return NextResponse.json(r.rows[0] || {});
   } catch (e) {
