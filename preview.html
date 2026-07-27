@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TeamBoard — design preview</title>
+<style>
+  :root{
+    --ink:#5B5859;--ink-2:#6f6c6d;--ink-hover:#474445;--lime:#CBCE00;--lime-dark:#b3b600;
+    --on-lime:#2b2a1f;--bg:#f5f6f8;--panel:#fff;--line:#e7e7e8;--text:#2f2e2e;--muted:#8a8788;
+  }
+  *{box-sizing:border-box}html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
+  .note{background:#fffbe6;border-bottom:1px solid #ffe58f;color:#7a5c00;font-size:12.5px;padding:8px 16px;text-align:center}
+  .app-header{display:flex;align-items:center;justify-content:space-between;background:var(--ink);color:#fff;padding:0 20px;height:56px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px}
+  .brand .dot{width:16px;height:16px;border-radius:5px;background:var(--lime);box-shadow:0 0 0 3px rgba(203,206,0,.25)}
+  .brand small{font-weight:500;opacity:.65;font-size:12px;margin-left:4px}
+  .header-actions{display:flex;align-items:center;gap:10px}
+  .btn{border:none;border-radius:8px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer}
+  .btn-lime{background:var(--lime);color:var(--on-lime)}
+  .btn-ghost{background:rgba(255,255,255,.12);color:#fff}
+  .layout{display:flex;min-height:520px}
+  .sidebar{width:250px;flex:0 0 250px;background:var(--panel);border-right:1px solid var(--line);padding:16px 12px}
+  .sidebar h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:6px 8px 12px;display:flex;justify-content:space-between;align-items:center}
+  .add-mini{background:var(--ink);color:#fff;border:none;border-radius:6px;width:24px;height:24px;font-size:16px;display:grid;place-items:center;cursor:pointer}
+  .proj{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;border-left:3px solid transparent;margin-bottom:2px}
+  .proj.active{background:#f3f4ec;border-left-color:var(--lime);font-weight:600}
+  .proj .name{flex:1;font-size:14px}
+  .proj .count{font-size:11px;color:var(--muted);background:#eee;border-radius:10px;padding:1px 7px}
+  .main{flex:1;padding:24px 28px;min-width:0}
+  .proj-head{display:flex;align-items:center;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+  .proj-head h1{margin:0;font-size:24px;color:var(--ink)}
+  .progress{height:8px;background:#e9e9ea;border-radius:6px;overflow:hidden;width:180px}
+  .progress>span{display:block;height:100%;background:var(--lime)}
+  .progress-label{font-size:12px;color:var(--muted)}
+  .spacer{flex:1}
+  .board{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .board-scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;min-width:640px}
+  thead th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--line);background:#fafafa}
+  tbody td{padding:8px 14px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
+  .task-title{border:1px solid transparent;background:transparent;border-radius:6px;padding:7px 8px;width:100%;font-size:14px}
+  .cell-owner{display:flex;align-items:center;gap:8px}
+  .avatar{width:26px;height:26px;border-radius:50%;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;flex:0 0 26px}
+  .owner-select,.date-input{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px;background:#fff;color:var(--text)}
+  .status-select{border:none;border-radius:6px;padding:8px 10px;font-size:13px;font-weight:600;appearance:none;text-align:center;min-width:130px;width:100%;color:#fff}
+  .add-task-btn{width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--ink-2);font-weight:600;font-size:13px;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="note">Static design preview — this shows the look &amp; feel. The real app (once deployed to Vercel) saves to a shared database so your whole team edits the same board live.</div>
+
+  <header class="app-header">
+    <div class="brand"><span class="dot"></span> TeamBoard <small>shared project board</small></div>
+    <div class="header-actions">
+      <button class="btn btn-ghost">👥 People (4)</button>
+      <button class="btn btn-lime">+ New Project</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Projects <button class="add-mini">+</button></h2>
+      <div class="proj active"><span class="name">Website Redesign</span><span class="count">4</span></div>
+      <div class="proj"><span class="name">Q3 Marketing</span><span class="count">3</span></div>
+      <div class="proj"><span class="name">Field Survey — Elkhart</span><span class="count">6</span></div>
+    </aside>
+
+    <main class="main">
+      <div class="proj-head">
+        <h1>Website Redesign</h1>
+        <div class="progress"><span style="width:25%"></span></div>
+        <span class="progress-label">1/4 done</span>
+        <div class="spacer"></div>
+        <button class="btn btn-lime">+ Add Task</button>
+      </div>
+
+      <div class="board"><div class="board-scroll">
+        <table>
+          <thead><tr>
+            <th style="width:40%">Task</th><th style="width:22%">Owner</th>
+            <th style="width:16%">Due date</th><th style="width:18%">Status</th><th style="width:4%"></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><input class="task-title" value="Draft the new homepage layout"></td>
+              <td><div class="cell-owner"><span class="avatar" style="background:#0086c0">SM</span>
+                <select class="owner-select"><option>Sara Miller</option></select></div></td>
+              <td><input type="date" class="date-input" value="2026-08-05"></td>
+              <td><select class="status-select" style="background:#00c875"><option>Done</option></select></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td><input class="task-title" value="Wire up the contact form"></td>
+              <td><div class="cell-owner"><span class="avatar" style="background:#a25ddc">JT</span>
+                <select class="owner-select"><option>Jamal Turner</option></select></div></td>
+              <td><input type="date" class="date-input" value="2026-08-12"></td>
+              <td><select class="status-select" style="background:#fdab3d"><option>Working on it</option></select></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td><input class="task-title" value="Get logo files from client"></td>
+              <td><div class="cell-owner"><span class="avatar" style="background:#e2445c">RK</span>
+                <select class="owner-select"><option>Rita Kwan</option></select></div></td>
+              <td><input type="date" class="date-input" value="2026-08-01"></td>
+              <td><select class="status-select" style="background:#e2445c"><option>Stuck</option></select></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td><input class="task-title" value="Set up analytics"></td>
+              <td><div class="cell-owner"><span class="avatar" style="background:#dcdcdc;color:#8a8788">–</span>
+                <select class="owner-select"><option>Unassigned</option></select></div></td>
+              <td><input type="date" class="date-input" value=""></td>
+              <td><select class="status-select" style="background:#c4c4c4;color:#3a3a3a"><option>Not Started</option></select></td>
+              <td></td>
+            </tr>
+            <tr><td colspan="5" style="padding:0"><button class="add-task-btn">+ Add task</button></td></tr>
+          </tbody>
+        </table>
+      </div></div>
+    </main>
+  </div>
+</body>
+</html>
