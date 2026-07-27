@@ -17,6 +17,7 @@ export async function GET() {
     const diag = await sql`SELECT current_database() AS db, (SELECT count(*) FROM projects) AS pc`;
     const hostOf = (u) => { try { return new URL(u).host; } catch { return null; } };
     return NextResponse.json({
+      _build: 'http-v3',
       people: people.rows,
       projects: projects.rows,
       tasks: tasks.rows,
