@@ -153,6 +153,25 @@ tbody tr:hover .row-x { opacity: 1; }
 .link-x { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; }
 .link-x:hover { color: #e2445c; }
 
+/* ---------- shared notes ---------- */
+.notes-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; }
+.notes-label { display: block; font-size: 12px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.notes-label span { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.notes-area { width: 100%; min-height: 70px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--text); resize: vertical; background: #fffdf5; }
+.notes-area:focus { outline: none; border-color: var(--lime); background: #fff; }
+
+/* ---------- archive ---------- */
+.archive { margin-top: 16px; }
+.archive-toggle { background: none; border: none; color: var(--ink-2); font-weight: 600; font-size: 13px; padding: 8px 4px; }
+.archive-toggle:hover { color: var(--ink); }
+.archive-board { margin-top: 8px; }
+.archived-title { font-size: 14px; color: var(--ink-2); text-decoration: line-through; text-decoration-color: #c9c9c9; }
+.archived-owner { font-size: 13px; color: var(--ink-2); }
+.archived-due { font-size: 13px; color: var(--muted); }
+.status-pill { display: inline-block; border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; }
+.restore-btn { border: none; background: none; color: var(--ink-2); font-size: 16px; cursor: pointer; margin-right: 4px; }
+.restore-btn:hover { color: var(--lime-dark); }
+
 /* ---------- mobile ---------- */
 .menu-btn { display: none; padding: 6px 10px; font-size: 16px; }
 @media (max-width: 720px) {

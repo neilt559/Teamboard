@@ -8,10 +8,14 @@ export async function PATCH(req, { params }) {
   try {
     await ensureSchema();
     const { id } = await params;
-    const { name } = await req.json();
-    const r = await sql`
-      UPDATE projects SET name=${(name || '').slice(0, 200)}
-      WHERE id=${id} RETURNING id, name`;
+    const b = await req.json();
+    if ('name' in b) {
+      await sql`UPDATE projects SET name=${(b.name || '').slice(0, 200)} WHERE id=${id}`;
+    }
+    if ('notes' in b) {
+      await sql`UPDATE projects SET notes=${(b.notes ?? '').slice(0, 5000)} WHERE id=${id}`;
+    }
+    const r = await sql`SELECT id, name, notes FROM projects WHERE id=${id}`;
     return NextResponse.json(r.rows[0] || {});
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });

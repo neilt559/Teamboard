@@ -33,6 +33,7 @@ export default function Page() {
   const [loaded, setLoaded] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const guard = useRef(0); // skip background refreshes briefly after a local edit
 
   const load = useCallback(async (force = false) => {
@@ -106,10 +107,24 @@ export default function Page() {
     try { await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); }
     catch (e) { setError(e.message); }
   }
+  // Marking a task Done also archives it (moves it out of the active list).
+  function changeStatus(id, status) {
+    updateTask(id, status === 'done' ? { status, archived: true } : { status });
+  }
+  function restoreTask(id) {
+    updateTask(id, { archived: false });
+  }
   async function deleteTask(id) {
+    if (!confirm('Delete this task? This can’t be undone.')) return;
     setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
     touch();
     try { await api(`/api/tasks/${id}`, { method: 'DELETE' }); }
+    catch (e) { setError(e.message); }
+  }
+  async function saveNotes(id, notes) {
+    setData((d) => ({ ...d, projects: d.projects.map((p) => (p.id === id ? { ...p, notes } : p)) }));
+    touch();
+    try { await api(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ notes }) }); }
     catch (e) { setError(e.message); }
   }
   async function addPerson(name, color) {
@@ -129,9 +144,11 @@ export default function Page() {
   }
 
   const project = data.projects.find((p) => String(p.id) === String(selected)) || null;
-  const tasks = data.tasks.filter((t) => String(t.project_id) === String(selected));
-  const doneCount = tasks.filter((t) => t.status === 'done').length;
-  const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
+  const allTasks = data.tasks.filter((t) => String(t.project_id) === String(selected));
+  const tasks = allTasks.filter((t) => !t.archived);
+  const archivedTasks = allTasks.filter((t) => t.archived);
+  const doneCount = allTasks.filter((t) => t.status === 'done').length;
+  const pct = allTasks.length ? Math.round((doneCount / allTasks.length) * 100) : 0;
   const isSetup = error && /POSTGRES_URL|connection string|connect/i.test(error);
 
   return (
@@ -151,7 +168,7 @@ export default function Page() {
         <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
           <h2>Projects <button className="add-mini" onClick={addProject} aria-label="Add project">+</button></h2>
           {data.projects.map((p) => {
-            const count = data.tasks.filter((t) => t.project_id === p.id).length;
+            const count = data.tasks.filter((t) => t.project_id === p.id && !t.archived).length;
             return (
               <div
                 key={p.id}
@@ -195,9 +212,20 @@ export default function Page() {
               <div className="proj-head">
                 <h1>{project.name}</h1>
                 <div className="progress" title={`${pct}% done`}><span style={{ width: `${pct}%` }} /></div>
-                <span className="progress-label">{doneCount}/{tasks.length} done</span>
+                <span className="progress-label">{doneCount}/{allTasks.length} done</span>
                 <div className="spacer" />
                 <button className="btn btn-lime" onClick={addTask}>+ Add Task</button>
+              </div>
+
+              <div className="notes-panel">
+                <label className="notes-label">📝 Shared notes <span>· visible to your whole team</span></label>
+                <textarea
+                  key={project.id}
+                  className="notes-area"
+                  defaultValue={project.notes || ''}
+                  placeholder="Type notes here for the team — plans, links, reminders…"
+                  onBlur={(e) => { if ((e.target.value || '') !== (project.notes || '')) saveNotes(project.id, e.target.value); }}
+                />
               </div>
 
               <div className="board">
@@ -256,7 +284,7 @@ export default function Page() {
                                 className="status-select"
                                 value={t.status}
                                 style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}
-                                onChange={(e) => updateTask(t.id, { status: e.target.value })}
+                                onChange={(e) => changeStatus(t.id, e.target.value)}
                               >
                                 {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
                               </select>
@@ -277,6 +305,51 @@ export default function Page() {
                   </table>
                 </div>
               </div>
+
+              {archivedTasks.length > 0 && (
+                <div className="archive">
+                  <button className="archive-toggle" onClick={() => setShowArchived((s) => !s)}>
+                    🗄 Archived ({archivedTasks.length}) {showArchived ? '▲' : '▼'}
+                  </button>
+                  {showArchived && (
+                    <div className="board archive-board">
+                      <div className="board-scroll">
+                        <table>
+                          <tbody>
+                            {archivedTasks.map((t) => {
+                              const owner = data.people.find((p) => String(p.id) === String(t.assignee_id));
+                              const st = STATUSES[t.status] || STATUSES.done;
+                              return (
+                                <tr key={t.id} className="archived-row">
+                                  <td style={{ width: '40%' }}><span className="archived-title">{t.title || 'Untitled task'}</span></td>
+                                  <td style={{ width: '22%' }}>
+                                    <div className="cell-owner">
+                                      {owner ? (
+                                        <span className="avatar" style={{ background: owner.color }}>{initials(owner.name)}</span>
+                                      ) : (
+                                        <span className="avatar" style={{ background: '#dcdcdc', color: '#8a8788' }}>–</span>
+                                      )}
+                                      <span className="archived-owner">{owner ? owner.name : 'Unassigned'}</span>
+                                    </div>
+                                  </td>
+                                  <td style={{ width: '16%' }} className="archived-due">{t.due_date || '—'}</td>
+                                  <td style={{ width: '18%' }}>
+                                    <span className="status-pill" style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}>{st.label}</span>
+                                  </td>
+                                  <td style={{ width: '4%', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                                    <button className="restore-btn" title="Restore to the board" onClick={() => restoreTask(t.id)}>↩</button>
+                                    <button className="row-x" title="Delete task" onClick={() => deleteTask(t.id)}>×</button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </main>

@@ -23,8 +23,11 @@ export async function PATCH(req, { params }) {
     if ('status' in b) {
       await sql`UPDATE tasks SET status=${b.status || 'not_started'} WHERE id=${id}`;
     }
+    if ('archived' in b) {
+      await sql`UPDATE tasks SET archived=${!!b.archived} WHERE id=${id}`;
+    }
     const r = await sql`
-      SELECT id, project_id, title, assignee_id, due_date, status
+      SELECT id, project_id, title, assignee_id, due_date, status, archived
       FROM tasks WHERE id=${id}`;
     return NextResponse.json(r.rows[0] || {});
   } catch (e) {
