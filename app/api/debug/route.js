@@ -41,6 +41,16 @@ export async function GET() {
       (SELECT count(*) FROM people) AS people`;
     info.counts = counts.rows[0];
 
+    // Compare sequential vs concurrent (Promise.all) row reads to confirm cause.
+    const seq = await sql`SELECT id FROM projects ORDER BY position ASC, id ASC`;
+    info.seqProjectRows = seq.rows.length;
+    const [pa, pb] = await Promise.all([
+      sql`SELECT id FROM people ORDER BY id ASC`,
+      sql`SELECT id FROM projects ORDER BY position ASC, id ASC`,
+    ]);
+    info.concProjectRows = pb.rows.length;
+    info.concPeopleRows = pa.rows.length;
+
     await sql`DELETE FROM projects WHERE id=${id}`;
   } catch (e) {
     info.error = e.message;

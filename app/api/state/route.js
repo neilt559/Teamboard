@@ -8,12 +8,12 @@ export const runtime = 'nodejs';
 export async function GET() {
   try {
     await ensureSchema();
-    const [people, projects, tasks] = await Promise.all([
-      sql`SELECT id, name, color FROM people ORDER BY lower(name) ASC, id ASC`,
-      sql`SELECT id, name FROM projects ORDER BY position ASC, id ASC`,
-      sql`SELECT id, project_id, title, assignee_id, due_date, status
-          FROM tasks ORDER BY position ASC, id ASC`,
-    ]);
+    // Run sequentially, not via Promise.all: the @vercel/postgres pooled `sql`
+    // helper can return empty rowsets when several queries fire concurrently.
+    const people = await sql`SELECT id, name, color FROM people ORDER BY lower(name) ASC, id ASC`;
+    const projects = await sql`SELECT id, name FROM projects ORDER BY position ASC, id ASC`;
+    const tasks = await sql`SELECT id, project_id, title, assignee_id, due_date, status
+                            FROM tasks ORDER BY position ASC, id ASC`;
     return NextResponse.json({
       people: people.rows,
       projects: projects.rows,
