@@ -29,6 +29,42 @@ function IconRestore() {
   return (<svg {...svgProps}><path d="M3 12a9 9 0 1 0 2.6-6.3" /><path d="M3 4v4h4" /></svg>);
 }
 
+// Normalize a typed hex ("5b5859", "#ABC", "#5B5859") to "#rrggbb", or null if invalid.
+function normHex(s) {
+  if (!s) return null;
+  let h = String(s).trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{3}$/.test(h)) h = h.split('').map((c) => c + c).join('');
+  if (/^[0-9a-fA-F]{6}$/.test(h)) return '#' + h.toLowerCase();
+  return null;
+}
+function toHex(v) { return normHex(v) || '#5b5859'; }
+
+function ColorControl({ value, onChange }) {
+  const [local, setLocal] = useState(toHex(value));
+  const timer = useRef(null);
+  useEffect(() => { setLocal(toHex(value)); }, [value]);
+  const pick = (c) => {
+    setLocal(c); // instant preview while dragging
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => onChange(c), 250); // save once they settle
+  };
+  return (
+    <div className="color-control">
+      <input type="color" className="color-picker" value={local} onChange={(e) => pick(e.target.value)} title="Pick a color" />
+      <input
+        type="text"
+        className="hex-input"
+        key={value}
+        defaultValue={value}
+        maxLength={7}
+        placeholder="#5B5859"
+        onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+        onBlur={(e) => { const v = normHex(e.target.value); if (v && v !== normHex(value)) onChange(v); else e.target.value = value; }}
+      />
+    </div>
+  );
+}
+
 async function api(path, opts) {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
   if (!res.ok) {
@@ -264,6 +300,12 @@ export default function Page() {
   async function addPerson(name, color) {
     touch();
     try { await api('/api/people', { method: 'POST', body: JSON.stringify({ name, color }) }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  async function updatePerson(id, patch) {
+    setData((d) => ({ ...d, people: d.people.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
+    touch();
+    try { await api(`/api/people/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); }
     catch (e) { setError(e.message); }
   }
   async function deletePerson(id) {
@@ -624,7 +666,7 @@ export default function Page() {
       </div>
 
       {peopleOpen && (
-        <PeopleModal people={data.people} onAdd={addPerson} onDelete={deletePerson} onClose={() => setPeopleOpen(false)} />
+        <PeopleModal people={data.people} onAdd={addPerson} onUpdate={updatePerson} onDelete={deletePerson} onClose={() => setPeopleOpen(false)} />
       )}
     </>
   );
@@ -671,7 +713,7 @@ function TeamOverview({ team, projects, tasks, onOpen, onAddProject, onSaveNotes
   );
 }
 
-function PeopleModal({ people, onAdd, onDelete, onClose }) {
+function PeopleModal({ people, onAdd, onUpdate, onDelete, onClose }) {
   const [name, setName] = useState('');
   const [color, setColor] = useState(PERSON_COLORS[0]);
 
@@ -690,19 +732,29 @@ function PeopleModal({ people, onAdd, onDelete, onClose }) {
         {people.map((p) => (
           <div key={p.id} className="person-row">
             <span className="avatar" style={{ background: p.color }}>{initials(p.name)}</span>
-            <span className="nm">{p.name}</span>
+            <input
+              className="person-name-input"
+              key={`${p.id}-${p.name}`}
+              defaultValue={p.name}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+              onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== p.name) onUpdate(p.id, { name: v }); else e.target.value = p.name; }}
+            />
+            <ColorControl value={p.color} onChange={(c) => onUpdate(p.id, { color: c })} />
             <button className="link-x" title="Remove" onClick={() => onDelete(p.id)}>×</button>
           </div>
         ))}
         {!people.length && <p style={{ color: '#8a8788', fontSize: 13 }}>No team members yet. Add someone below.</p>}
 
-        <div style={{ marginTop: 16 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#5B5859' }}>Add a person</label>
+        <div className="add-person">
+          <label className="add-person-label">Add a person</label>
           <input className="field" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
-          <div className="swatches">
-            {PERSON_COLORS.map((c) => (
-              <span key={c} className={`sw ${c === color ? 'sel' : ''}`} style={{ background: c }} onClick={() => setColor(c)} />
-            ))}
+          <div className="add-person-color">
+            <ColorControl value={color} onChange={setColor} />
+            <div className="swatches">
+              {PERSON_COLORS.map((c) => (
+                <span key={c} className={`sw ${normHex(c) === normHex(color) ? 'sel' : ''}`} style={{ background: c }} onClick={() => setColor(c)} title={c} />
+              ))}
+            </div>
           </div>
         </div>
 
