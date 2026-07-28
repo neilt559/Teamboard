@@ -10,6 +10,8 @@ const STATUSES = {
 const STATUS_ORDER = ['not_started', 'working', 'stuck', 'done'];
 const PERSON_COLORS = ['#5B5859', '#CBCE00', '#0086c0', '#e2445c', '#fdab3d', '#00c875', '#a25ddc', '#ff158a', '#037f4c', '#7f5347'];
 
+const byPos = (a, b) => (Number(a.position) - Number(b.position)) || (Number(a.id) - Number(b.id));
+
 function initials(name) {
   if (!name) return '?';
   const p = name.trim().split(/\s+/);
@@ -29,15 +31,17 @@ async function api(path, opts) {
 export default function Page() {
   const [data, setData] = useState({ people: [], teams: [], projects: [], tasks: [] });
   const [selected, setSelected] = useState(null);
+  const [teamView, setTeamView] = useState(null);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [collapsedTeams, setCollapsedTeams] = useState({});
-  const [expandedTask, setExpandedTask] = useState(null);
   const [expandedSubtasks, setExpandedSubtasks] = useState({});
-  const guard = useRef(0); // skip background refreshes briefly after a local edit
+  const [expandedNotes, setExpandedNotes] = useState({});
+  const [sidebarWidth, setSidebarWidth] = useState(250);
+  const guard = useRef(0);
 
   const load = useCallback(async (force = false) => {
     if (!force && Date.now() < guard.current) return;
@@ -58,15 +62,36 @@ export default function Page() {
     return () => clearInterval(t);
   }, [load]);
 
-  // keep a valid project selected
+  useEffect(() => {
+    const saved = Number(localStorage.getItem('tb_sidebar_w'));
+    if (saved >= 180 && saved <= 600) setSidebarWidth(saved);
+  }, []);
+
+  // keep a valid project selected (only matters when not viewing a team)
   useEffect(() => {
     if (!data.projects.length) { if (selected !== null) setSelected(null); return; }
     if (selected === null || !data.projects.find((p) => String(p.id) === String(selected))) {
-      setSelected(data.projects[0].id);
+      setSelected([...data.projects].sort(byPos)[0].id);
     }
   }, [data.projects, selected]);
 
   const touch = () => { guard.current = Date.now() + 2500; };
+
+  function startResize(e) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarWidth;
+    const onMove = (ev) => setSidebarWidth(Math.min(600, Math.max(180, startW + (ev.clientX - startX))));
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
+      setSidebarWidth((w) => { localStorage.setItem('tb_sidebar_w', String(Math.round(w))); return w; });
+    };
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
 
   // ---- teams ----
   async function addTeam() {
@@ -88,6 +113,7 @@ export default function Page() {
     const projCount = data.projects.filter((p) => String(p.team_id) === String(team.id)).length;
     const extra = projCount ? ` and its ${projCount} project${projCount > 1 ? 's' : ''} (and all their tasks)` : '';
     if (!confirm(`Delete team “${team.name}”${extra}? This can’t be undone.`)) return;
+    if (String(teamView) === String(team.id)) setTeamView(null);
     setData((d) => ({
       ...d,
       teams: d.teams.filter((x) => x.id !== team.id),
@@ -98,6 +124,20 @@ export default function Page() {
     catch (e) { setError(e.message); }
   }
   function toggleTeam(id) { setCollapsedTeams((c) => ({ ...c, [id]: !c[id] })); }
+  async function moveTeam(team, dir) {
+    const sorted = [...data.teams].sort(byPos);
+    const i = sorted.findIndex((x) => String(x.id) === String(team.id));
+    const j = i + dir;
+    if (j < 0 || j >= sorted.length) return;
+    const other = sorted[j];
+    const pi = Number(team.position), pj = Number(other.position);
+    setData((d) => ({ ...d, teams: d.teams.map((x) => (String(x.id) === String(team.id) ? { ...x, position: pj } : String(x.id) === String(other.id) ? { ...x, position: pi } : x)) }));
+    touch();
+    try {
+      await api(`/api/teams/${team.id}`, { method: 'PATCH', body: JSON.stringify({ position: pj }) });
+      await api(`/api/teams/${other.id}`, { method: 'PATCH', body: JSON.stringify({ position: pi }) });
+    } catch (e) { setError(e.message); }
+  }
 
   // ---- projects ----
   async function addProject(teamId) {
@@ -107,7 +147,7 @@ export default function Page() {
     try {
       const np = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name: name.trim() || 'New Project', team_id: teamId }) });
       await load(true);
-      if (np && np.id) { setSelected(np.id); setCollapsedTeams((c) => ({ ...c, [teamId]: false })); setSidebarOpen(false); }
+      if (np && np.id) { setSelected(np.id); setTeamView(null); setCollapsedTeams((c) => ({ ...c, [teamId]: false })); setSidebarOpen(false); }
     } catch (e) { setError(e.message); }
   }
   async function renameProject(p) {
@@ -141,15 +181,27 @@ export default function Page() {
     try { await api(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ team_id: teamId }) }); }
     catch (e) { setError(e.message); }
   }
+  async function moveProjectOrder(p, dir) {
+    const siblings = data.projects.filter((x) => String(x.team_id) === String(p.team_id)).sort(byPos);
+    const i = siblings.findIndex((x) => String(x.id) === String(p.id));
+    const j = i + dir;
+    if (j < 0 || j >= siblings.length) return;
+    const other = siblings[j];
+    const pi = Number(p.position), pj = Number(other.position);
+    setData((d) => ({ ...d, projects: d.projects.map((x) => (String(x.id) === String(p.id) ? { ...x, position: pj } : String(x.id) === String(other.id) ? { ...x, position: pi } : x)) }));
+    touch();
+    try {
+      await api(`/api/projects/${p.id}`, { method: 'PATCH', body: JSON.stringify({ position: pj }) });
+      await api(`/api/projects/${other.id}`, { method: 'PATCH', body: JSON.stringify({ position: pi }) });
+    } catch (e) { setError(e.message); }
+  }
 
   // ---- tasks ----
   async function addTask() {
     if (selected === null) return;
     touch();
-    try {
-      await api('/api/tasks', { method: 'POST', body: JSON.stringify({ project_id: selected }) });
-      await load(true);
-    } catch (e) { setError(e.message); }
+    try { await api('/api/tasks', { method: 'POST', body: JSON.stringify({ project_id: selected }) }); await load(true); }
+    catch (e) { setError(e.message); }
   }
   async function addSubtask(parentId) {
     if (selected === null) return;
@@ -161,20 +213,19 @@ export default function Page() {
     } catch (e) { setError(e.message); }
   }
   function toggleSubtasks(id) { setExpandedSubtasks((s) => ({ ...s, [id]: !s[id] })); }
+  function toggleNotes(id) { setExpandedNotes((s) => ({ ...s, [id]: !s[id] })); }
   async function updateTask(id, patch) {
     setData((d) => ({ ...d, tasks: d.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
     touch();
     try { await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); }
     catch (e) { setError(e.message); }
   }
-  // Marking a task Done also archives it (moves it out of the active list).
   function changeStatus(id, status) {
     updateTask(id, status === 'done' ? { status, archived: true } : { status });
   }
   function restoreTask(id) { updateTask(id, { archived: false }); }
   async function deleteTask(id) {
     if (!confirm('Delete this task? This can’t be undone.')) return;
-    // Drop the task and any of its subtasks from view immediately.
     setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id && String(t.parent_id) !== String(id)) }));
     touch();
     try { await api(`/api/tasks/${id}`, { method: 'DELETE' }); }
@@ -198,6 +249,7 @@ export default function Page() {
     catch (e) { setError(e.message); }
   }
 
+  const viewedTeam = teamView != null ? data.teams.find((t) => String(t.id) === String(teamView)) : null;
   const project = data.projects.find((p) => String(p.id) === String(selected)) || null;
   const allTasks = data.tasks.filter((t) => String(t.project_id) === String(selected));
   const topTasks = allTasks.filter((t) => !t.parent_id);
@@ -215,6 +267,103 @@ export default function Page() {
   });
   const isSetup = error && /POSTGRES_URL|connection string|connect/i.test(error);
 
+  // Renders one task row plus its (optional) subtask rows and notes editors.
+  function renderTaskRow(t, isSub) {
+    const owner = data.people.find((p) => String(p.id) === String(t.assignee_id));
+    const st = STATUSES[t.status] || STATUSES.not_started;
+    const hasNotes = (t.notes || '').trim().length > 0;
+    const notesOpen = !!expandedNotes[t.id];
+    const subs = isSub ? [] : (subtasksByParent[String(t.id)] || []);
+    const subExpanded = !!expandedSubtasks[t.id];
+    const subDone = subs.filter((s) => s.status === 'done').length;
+    return (
+      <Fragment key={t.id}>
+        <tr className={isSub ? 'subtask-row' : ''}>
+          <td>
+            <div className={isSub ? 'subtask-title-cell' : 'title-cell'}>
+              {isSub ? (
+                <span className="subtask-arrow">↳</span>
+              ) : (
+                <button className="subtask-toggle" title="Show / add subtasks" onClick={() => toggleSubtasks(t.id)}>
+                  <span className="caret">{subExpanded ? '▾' : '▸'}</span>
+                  {subs.length > 0 && <span className="sub-badge">{subDone}/{subs.length}</span>}
+                </button>
+              )}
+              <div className="title-main">
+                <input
+                  className="task-title"
+                  defaultValue={t.title}
+                  placeholder={isSub ? 'Untitled subtask' : 'Untitled task'}
+                  onBlur={(e) => { if (e.target.value !== t.title) updateTask(t.id, { title: e.target.value }); }}
+                />
+                {hasNotes && !notesOpen && (
+                  <div className="note-preview" title="Click to edit note" onClick={() => toggleNotes(t.id)}>📝 {t.notes}</div>
+                )}
+              </div>
+            </div>
+          </td>
+          <td>
+            <div className="cell-owner">
+              {owner ? (
+                <span className="avatar" style={{ background: owner.color }}>{initials(owner.name)}</span>
+              ) : (
+                <span className="avatar" style={{ background: '#dcdcdc', color: '#8a8788' }}>–</span>
+              )}
+              <select className="owner-select" value={t.assignee_id ?? ''} onChange={(e) => updateTask(t.id, { assignee_id: e.target.value || null })}>
+                <option value="">Unassigned</option>
+                {data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </td>
+          <td>
+            <input type="date" className="date-input" value={t.due_date ?? ''} onChange={(e) => updateTask(t.id, { due_date: e.target.value || null })} />
+          </td>
+          <td>
+            <select
+              className="status-select"
+              value={t.status}
+              style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}
+              onChange={(e) => (isSub ? updateTask(t.id, { status: e.target.value }) : changeStatus(t.id, e.target.value))}
+            >
+              {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
+            </select>
+          </td>
+          <td className="row-actions">
+            <button
+              className={`notes-btn ${hasNotes ? 'has-notes' : ''}`}
+              title={hasNotes ? 'Edit note' : 'Add a note'}
+              onClick={() => toggleNotes(t.id)}
+            >📝</button>
+            <button className="row-x" title={isSub ? 'Delete subtask' : 'Delete task'} onClick={() => deleteTask(t.id)}>×</button>
+          </td>
+        </tr>
+
+        {notesOpen && (
+          <tr className="task-notes-row">
+            <td colSpan={5}>
+              <textarea
+                className="task-notes-area"
+                defaultValue={t.notes || ''}
+                autoFocus
+                placeholder="Notes — details, blockers, links. Everyone on the team can see this."
+                onBlur={(e) => { if ((e.target.value || '') !== (t.notes || '')) updateTask(t.id, { notes: e.target.value }); }}
+              />
+            </td>
+          </tr>
+        )}
+
+        {!isSub && subExpanded && (
+          <>
+            {subs.map((sub) => renderTaskRow(sub, true))}
+            <tr className="subtask-add-row">
+              <td colSpan={5}><button className="add-subtask-btn" onClick={() => addSubtask(t.id)}>+ Add subtask</button></td>
+            </tr>
+          </>
+        )}
+      </Fragment>
+    );
+  }
+
   return (
     <>
       <header className="app-header">
@@ -229,16 +378,20 @@ export default function Page() {
       </header>
 
       <div className="layout">
-        <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth, flex: `0 0 ${sidebarWidth}px` }}>
           <h2>Teams <button className="add-mini" onClick={addTeam} aria-label="Add team">+</button></h2>
-          {data.teams.map((team) => {
-            const teamProjects = data.projects.filter((p) => String(p.team_id) === String(team.id));
+          {[...data.teams].sort(byPos).map((team) => {
+            const teamProjects = data.projects.filter((p) => String(p.team_id) === String(team.id)).sort(byPos);
             const collapsed = collapsedTeams[team.id];
             return (
               <div key={team.id} className="team">
-                <div className="team-head">
+                <div className={`team-head ${String(teamView) === String(team.id) ? 'viewing' : ''}`}>
                   <button className="team-caret" onClick={() => toggleTeam(team.id)} aria-label="Collapse team">{collapsed ? '▶' : '▼'}</button>
-                  <span className="team-name" onDoubleClick={() => renameTeam(team)} title="Double-click to rename">{team.name}</span>
+                  <span className="team-name" onClick={() => { setTeamView(team.id); setSidebarOpen(false); }} onDoubleClick={() => renameTeam(team)} title="Click to view team · double-click to rename">{team.name}</span>
+                  <span className="reorder">
+                    <button onClick={() => moveTeam(team, -1)} title="Move up">▲</button>
+                    <button onClick={() => moveTeam(team, 1)} title="Move down">▼</button>
+                  </span>
                   <button className="team-add" title="Add project to this team" onClick={() => addProject(team.id)}>+</button>
                   <button className="team-x" title="Delete team" onClick={() => deleteTeam(team)}>×</button>
                 </div>
@@ -247,13 +400,17 @@ export default function Page() {
                   return (
                     <div
                       key={p.id}
-                      className={`proj ${String(p.id) === String(selected) ? 'active' : ''}`}
-                      onClick={() => { setSelected(p.id); setSidebarOpen(false); }}
+                      className={`proj ${String(p.id) === String(selected) && teamView == null ? 'active' : ''}`}
+                      onClick={() => { setSelected(p.id); setTeamView(null); setSidebarOpen(false); }}
                       onDoubleClick={() => renameProject(p)}
-                      title="Double-click to rename"
+                      title="Click to open · double-click to rename"
                     >
                       <span className="name">{p.name}</span>
                       <span className="count">{count}</span>
+                      <span className="reorder">
+                        <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, -1); }} title="Move up">▲</button>
+                        <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, 1); }} title="Move down">▼</button>
+                      </span>
                       <button className="x" onClick={(e) => { e.stopPropagation(); deleteProject(p); }} aria-label="Delete project">×</button>
                     </div>
                   );
@@ -267,45 +424,34 @@ export default function Page() {
           {!data.teams.length && loaded && (
             <p style={{ color: '#8a8788', fontSize: 13, padding: '0 8px' }}>No teams yet. Click + to add one.</p>
           )}
+          <div className="sidebar-resizer" onMouseDown={startResize} title="Drag to resize" />
         </aside>
 
         <main className="main">
           {error && (
             <div className={`banner ${isSetup ? 'setup' : ''}`}>
-              {isSetup ? (
-                <>⚠️ <b>Database not connected yet.</b> In your Vercel project open <b>Storage → Create Database → Postgres</b>, connect it to this project, then redeploy.</>
-              ) : (
-                <>⚠️ {error}</>
-              )}
+              {isSetup ? (<>⚠️ <b>Database not connected yet.</b> Connect a Postgres database in Vercel and redeploy.</>) : (<>⚠️ {error}</>)}
             </div>
           )}
 
-          {!project && loaded && !error && (
-            <div className="empty">
-              {data.teams.length === 0 ? (
-                <>
-                  <h3>Create your first team</h3>
-                  <p>Teams group your projects. Add a team, then add projects inside it.</p>
-                  <button className="btn btn-lime" onClick={addTeam}>+ New Team</button>
-                </>
-              ) : (
-                <>
-                  <h3>Add a project</h3>
-                  <p>Click the <b>+</b> next to a team in the sidebar to add a project, then add tasks.</p>
-                </>
-              )}
-            </div>
-          )}
-
-          {project && (
+          {viewedTeam ? (
+            <TeamOverview
+              team={viewedTeam}
+              projects={data.projects.filter((p) => String(p.team_id) === String(viewedTeam.id)).sort(byPos)}
+              tasks={data.tasks}
+              onOpen={(id) => { setSelected(id); setTeamView(null); }}
+              onAddProject={() => addProject(viewedTeam.id)}
+              onSaveNotes={saveProjectNotes}
+            />
+          ) : project ? (
             <>
               <div className="proj-head">
                 <h1>{project.name}</h1>
                 <div className="progress" title={`${pct}% done`}><span style={{ width: `${pct}%` }} /></div>
-                <span className="progress-label">{doneCount}/{allTasks.length} done</span>
+                <span className="progress-label">{doneCount}/{topTasks.length} done</span>
                 <label className="team-select-wrap">Team
                   <select className="team-select" value={project.team_id ?? ''} onChange={(e) => moveProject(project.id, e.target.value)}>
-                    {data.teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+                    {[...data.teams].sort(byPos).map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
                   </select>
                 </label>
                 <div className="spacer" />
@@ -336,157 +482,7 @@ export default function Page() {
                       </tr>
                     </thead>
                     <tbody>
-                      {tasks.map((t) => {
-                        const owner = data.people.find((p) => String(p.id) === String(t.assignee_id));
-                        const st = STATUSES[t.status] || STATUSES.not_started;
-                        const expanded = expandedTask === t.id;
-                        const subs = subtasksByParent[String(t.id)] || [];
-                        const subExpanded = !!expandedSubtasks[t.id];
-                        const subDone = subs.filter((s) => s.status === 'done').length;
-                        return (
-                          <Fragment key={t.id}>
-                            <tr>
-                              <td>
-                                <div className="title-cell">
-                                  <button className="subtask-toggle" title="Show / add subtasks" onClick={() => toggleSubtasks(t.id)}>
-                                    <span className="caret">{subExpanded ? '▾' : '▸'}</span>
-                                    {subs.length > 0 && <span className="sub-badge">{subDone}/{subs.length}</span>}
-                                  </button>
-                                  <input
-                                    className="task-title"
-                                    defaultValue={t.title}
-                                    placeholder="Untitled task"
-                                    onBlur={(e) => { if (e.target.value !== t.title) updateTask(t.id, { title: e.target.value }); }}
-                                  />
-                                </div>
-                              </td>
-                              <td>
-                                <div className="cell-owner">
-                                  {owner ? (
-                                    <span className="avatar" style={{ background: owner.color }}>{initials(owner.name)}</span>
-                                  ) : (
-                                    <span className="avatar" style={{ background: '#dcdcdc', color: '#8a8788' }}>–</span>
-                                  )}
-                                  <select
-                                    className="owner-select"
-                                    value={t.assignee_id ?? ''}
-                                    onChange={(e) => updateTask(t.id, { assignee_id: e.target.value || null })}
-                                  >
-                                    <option value="">Unassigned</option>
-                                    {data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                  </select>
-                                </div>
-                              </td>
-                              <td>
-                                <input
-                                  type="date"
-                                  className="date-input"
-                                  value={t.due_date ?? ''}
-                                  onChange={(e) => updateTask(t.id, { due_date: e.target.value || null })}
-                                />
-                              </td>
-                              <td>
-                                <select
-                                  className="status-select"
-                                  value={t.status}
-                                  style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}
-                                  onChange={(e) => changeStatus(t.id, e.target.value)}
-                                >
-                                  {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
-                                </select>
-                              </td>
-                              <td className="row-actions">
-                                <button
-                                  className={`notes-btn ${(t.notes || '').trim() ? 'has-notes' : ''}`}
-                                  title={(t.notes || '').trim() ? 'Task notes (has notes)' : 'Add task notes'}
-                                  onClick={() => setExpandedTask(expanded ? null : t.id)}
-                                >📝</button>
-                                <button className="row-x" title="Delete task" onClick={() => deleteTask(t.id)}>×</button>
-                              </td>
-                            </tr>
-                            {subExpanded && (
-                              <>
-                                {subs.map((sub) => {
-                                  const sowner = data.people.find((p) => String(p.id) === String(sub.assignee_id));
-                                  const sst = STATUSES[sub.status] || STATUSES.not_started;
-                                  return (
-                                    <tr key={sub.id} className="subtask-row">
-                                      <td>
-                                        <div className="subtask-title-cell">
-                                          <span className="subtask-arrow">↳</span>
-                                          <input
-                                            className="task-title"
-                                            defaultValue={sub.title}
-                                            placeholder="Untitled subtask"
-                                            onBlur={(e) => { if (e.target.value !== sub.title) updateTask(sub.id, { title: e.target.value }); }}
-                                          />
-                                        </div>
-                                      </td>
-                                      <td>
-                                        <div className="cell-owner">
-                                          {sowner ? (
-                                            <span className="avatar" style={{ background: sowner.color }}>{initials(sowner.name)}</span>
-                                          ) : (
-                                            <span className="avatar" style={{ background: '#dcdcdc', color: '#8a8788' }}>–</span>
-                                          )}
-                                          <select
-                                            className="owner-select"
-                                            value={sub.assignee_id ?? ''}
-                                            onChange={(e) => updateTask(sub.id, { assignee_id: e.target.value || null })}
-                                          >
-                                            <option value="">Unassigned</option>
-                                            {data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                          </select>
-                                        </div>
-                                      </td>
-                                      <td>
-                                        <input
-                                          type="date"
-                                          className="date-input"
-                                          value={sub.due_date ?? ''}
-                                          onChange={(e) => updateTask(sub.id, { due_date: e.target.value || null })}
-                                        />
-                                      </td>
-                                      <td>
-                                        <select
-                                          className="status-select"
-                                          value={sub.status}
-                                          style={{ background: sst.color, color: sub.status === 'not_started' ? '#3a3a3a' : '#fff' }}
-                                          onChange={(e) => updateTask(sub.id, { status: e.target.value })}
-                                        >
-                                          {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
-                                        </select>
-                                      </td>
-                                      <td className="row-actions">
-                                        <button className="row-x" title="Delete subtask" onClick={() => deleteTask(sub.id)}>×</button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                                <tr className="subtask-add-row">
-                                  <td colSpan={5}>
-                                    <button className="add-subtask-btn" onClick={() => addSubtask(t.id)}>+ Add subtask</button>
-                                  </td>
-                                </tr>
-                              </>
-                            )}
-                            {expanded && (
-                              <tr className="task-notes-row">
-                                <td colSpan={5}>
-                                  <label className="task-notes-label">Notes for “{t.title || 'this task'}”</label>
-                                  <textarea
-                                    key={t.id}
-                                    className="task-notes-area"
-                                    defaultValue={t.notes || ''}
-                                    placeholder="Details, blockers, links — everyone on the team can see this."
-                                    onBlur={(e) => { if ((e.target.value || '') !== (t.notes || '')) updateTask(t.id, { notes: e.target.value }); }}
-                                  />
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
-                        );
-                      })}
+                      {tasks.map((t) => renderTaskRow(t, false))}
                       {!tasks.length && (
                         <tr><td colSpan={5} style={{ padding: 28, textAlign: 'center', color: '#8a8788' }}>No tasks yet — add your first one.</td></tr>
                       )}
@@ -543,17 +539,70 @@ export default function Page() {
                 </div>
               )}
             </>
+          ) : (
+            loaded && !error && (
+              <div className="empty">
+                {data.teams.length === 0 ? (
+                  <>
+                    <h3>Create your first team</h3>
+                    <p>Teams group your projects. Add a team, then add projects inside it.</p>
+                    <button className="btn btn-lime" onClick={addTeam}>+ New Team</button>
+                  </>
+                ) : (
+                  <>
+                    <h3>Pick a project or team</h3>
+                    <p>Click a project in the sidebar to open its board, or click a team name to see its overview.</p>
+                  </>
+                )}
+              </div>
+            )
           )}
         </main>
       </div>
 
       {peopleOpen && (
-        <PeopleModal
-          people={data.people}
-          onAdd={addPerson}
-          onDelete={deletePerson}
-          onClose={() => setPeopleOpen(false)}
-        />
+        <PeopleModal people={data.people} onAdd={addPerson} onDelete={deletePerson} onClose={() => setPeopleOpen(false)} />
+      )}
+    </>
+  );
+}
+
+function TeamOverview({ team, projects, tasks, onOpen, onAddProject, onSaveNotes }) {
+  return (
+    <>
+      <div className="proj-head">
+        <h1>{team.name}</h1>
+        <span className="progress-label">{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
+        <div className="spacer" />
+        <button className="btn btn-lime" onClick={onAddProject}>+ Add Project</button>
+      </div>
+      {projects.length === 0 ? (
+        <div className="empty">
+          <h3>No projects in this team yet</h3>
+          <p>Click “+ Add Project” to create one.</p>
+        </div>
+      ) : (
+        <div className="overview-grid">
+          {projects.map((p) => {
+            const count = tasks.filter((t) => String(t.project_id) === String(p.id) && !t.archived && !t.parent_id).length;
+            return (
+              <div key={p.id} className="overview-card">
+                <div className="overview-card-head">
+                  <button className="overview-open" onClick={() => onOpen(p.id)}>{p.name}</button>
+                  <span className="count">{count} task{count !== 1 ? 's' : ''}</span>
+                </div>
+                <textarea
+                  key={p.id}
+                  className="overview-notes"
+                  defaultValue={p.notes || ''}
+                  placeholder="Project notes…"
+                  onBlur={(e) => { if ((e.target.value || '') !== (p.notes || '')) onSaveNotes(p.id, e.target.value); }}
+                />
+                <button className="overview-open-link" onClick={() => onOpen(p.id)}>Open board →</button>
+              </div>
+            );
+          })}
+        </div>
       )}
     </>
   );
@@ -586,21 +635,10 @@ function PeopleModal({ people, onAdd, onDelete, onClose }) {
 
         <div style={{ marginTop: 16 }}>
           <label style={{ fontSize: 13, fontWeight: 600, color: '#5B5859' }}>Add a person</label>
-          <input
-            className="field"
-            placeholder="Full name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
-          />
+          <input className="field" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
           <div className="swatches">
             {PERSON_COLORS.map((c) => (
-              <span
-                key={c}
-                className={`sw ${c === color ? 'sel' : ''}`}
-                style={{ background: c }}
-                onClick={() => setColor(c)}
-              />
+              <span key={c} className={`sw ${c === color ? 'sel' : ''}`} style={{ background: c }} onClick={() => setColor(c)} />
             ))}
           </div>
         </div>
