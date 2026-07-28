@@ -278,7 +278,7 @@ export default function Page() {
     const subDone = subs.filter((s) => s.status === 'done').length;
     return (
       <Fragment key={t.id}>
-        <tr className={isSub ? 'subtask-row' : ''}>
+        <tr className={`${isSub ? 'subtask-row' : ''}${hasNotes && !notesOpen ? ' has-note-below' : ''}`}>
           <td>
             <div className={isSub ? 'subtask-title-cell' : 'title-cell'}>
               {isSub ? (
@@ -296,9 +296,6 @@ export default function Page() {
                   placeholder={isSub ? 'Untitled subtask' : 'Untitled task'}
                   onBlur={(e) => { if (e.target.value !== t.title) updateTask(t.id, { title: e.target.value }); }}
                 />
-                {hasNotes && !notesOpen && (
-                  <div className="note-preview" title="Click to edit note" onClick={() => toggleNotes(t.id)}>📝 {t.notes}</div>
-                )}
               </div>
             </div>
           </td>
@@ -338,13 +335,20 @@ export default function Page() {
           </td>
         </tr>
 
+        {hasNotes && !notesOpen && (
+          <tr className="note-preview-row">
+            <td colSpan={5}>
+              <div className="note-preview" title="Click to edit note" onClick={() => toggleNotes(t.id)}>📝 {t.notes}</div>
+            </td>
+          </tr>
+        )}
+
         {notesOpen && (
           <tr className="task-notes-row">
             <td colSpan={5}>
               <textarea
                 className="task-notes-area"
                 defaultValue={t.notes || ''}
-                autoFocus
                 placeholder="Notes — details, blockers, links. Everyone on the team can see this."
                 onBlur={(e) => { if ((e.target.value || '') !== (t.notes || '')) updateTask(t.id, { notes: e.target.value }); }}
               />

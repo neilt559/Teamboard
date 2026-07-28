@@ -201,14 +201,16 @@ tbody tr:hover .row-x { opacity: 1; }
 /* ---------- subtasks ---------- */
 .title-cell { display: flex; align-items: center; gap: 6px; }
 .title-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+tr.has-note-below td { border-bottom: none; }
+.note-preview-row td { padding: 4px 14px 8px; border-bottom: 1px solid var(--line); }
 .note-preview {
-  display: block; font-size: 12px; line-height: 20px; height: 20px;
-  color: var(--muted); background: #fbfbf2; border: 1px solid #eceedd;
-  border-radius: 6px; padding: 0 8px; margin: 2px 2px 0; cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-  box-sizing: content-box;
+  display: block; width: 100%; box-sizing: border-box;
+  font-size: 12px; line-height: 22px;
+  color: var(--ink-2); background: #fbfbf2; border: 1px solid #eceedd;
+  border-radius: 6px; padding: 0 10px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.note-preview:hover { background: #f3f4ec; color: var(--ink-2); }
+.note-preview:hover { background: #f3f4ec; }
 .subtask-toggle { border: none; background: none; cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; padding: 3px 5px; border-radius: 6px; flex: 0 0 auto; }
 .subtask-toggle:hover { background: #f1f1f2; color: var(--ink); }
 .subtask-toggle .caret { font-size: 11px; }
