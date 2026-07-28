@@ -28,6 +28,9 @@ function IconTrash() {
 function IconRestore() {
   return (<svg {...svgProps}><path d="M3 12a9 9 0 1 0 2.6-6.3" /><path d="M3 4v4h4" /></svg>);
 }
+function IconUsers() {
+  return (<svg {...svgProps}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>);
+}
 
 // Normalize a typed hex ("5b5859", "#ABC", "#5B5859") to "#rrggbb", or null if invalid.
 function normHex(s) {
@@ -449,7 +452,7 @@ export default function Page() {
           <span className="dot" /> TeamBoard <small>shared project board</small>
         </div>
         <div className="header-actions">
-          <button className="btn btn-ghost" onClick={() => setPeopleOpen(true)}>👥 People ({data.people.length})</button>
+          <button className="btn btn-ghost people-btn" onClick={() => setPeopleOpen(true)}><IconUsers /> People ({data.people.length})</button>
           <button className="btn btn-lime" onClick={addTeam}>+ New Team</button>
         </div>
       </header>

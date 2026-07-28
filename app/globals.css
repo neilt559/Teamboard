@@ -42,6 +42,8 @@ input, select { font-family: inherit; }
 .btn-lime { background: var(--lime); color: var(--on-lime); }
 .btn-lime:hover { background: var(--lime-dark); }
 .btn-ghost { background: rgba(255, 255, 255, .12); color: #fff; }
+.people-btn { display: inline-flex; align-items: center; gap: 6px; }
+.people-btn svg { color: var(--lime); }
 .btn-ghost:hover { background: rgba(255, 255, 255, .22); }
 .btn-ink { background: var(--ink); color: #fff; }
 .btn-ink:hover { background: var(--ink-hover); }
