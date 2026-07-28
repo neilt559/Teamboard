@@ -108,7 +108,7 @@ tbody tr:hover td { background: #fcfcfa; }
 
 .task-title {
   border: 1px solid transparent; background: transparent; border-radius: 6px;
-  padding: 7px 8px; width: 100%; font-size: 14px; color: var(--text);
+  padding: 7px 8px; width: 100%; font-size: 14px; font-weight: 600; color: var(--text);
 }
 .task-title:hover { border-color: var(--line); }
 .task-title:focus { outline: none; border-color: var(--lime); background: #fff; }
