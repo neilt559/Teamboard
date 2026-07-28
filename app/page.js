@@ -36,6 +36,7 @@ export default function Page() {
   const [showArchived, setShowArchived] = useState(false);
   const [collapsedTeams, setCollapsedTeams] = useState({});
   const [expandedTask, setExpandedTask] = useState(null);
+  const [expandedSubtasks, setExpandedSubtasks] = useState({});
   const guard = useRef(0); // skip background refreshes briefly after a local edit
 
   const load = useCallback(async (force = false) => {
@@ -150,6 +151,16 @@ export default function Page() {
       await load(true);
     } catch (e) { setError(e.message); }
   }
+  async function addSubtask(parentId) {
+    if (selected === null) return;
+    touch();
+    try {
+      await api('/api/tasks', { method: 'POST', body: JSON.stringify({ project_id: selected, parent_id: parentId }) });
+      await load(true);
+      setExpandedSubtasks((s) => ({ ...s, [parentId]: true }));
+    } catch (e) { setError(e.message); }
+  }
+  function toggleSubtasks(id) { setExpandedSubtasks((s) => ({ ...s, [id]: !s[id] })); }
   async function updateTask(id, patch) {
     setData((d) => ({ ...d, tasks: d.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
     touch();
@@ -163,7 +174,8 @@ export default function Page() {
   function restoreTask(id) { updateTask(id, { archived: false }); }
   async function deleteTask(id) {
     if (!confirm('Delete this task? This can’t be undone.')) return;
-    setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
+    // Drop the task and any of its subtasks from view immediately.
+    setData((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id && String(t.parent_id) !== String(id)) }));
     touch();
     try { await api(`/api/tasks/${id}`, { method: 'DELETE' }); }
     catch (e) { setError(e.message); }
@@ -188,10 +200,19 @@ export default function Page() {
 
   const project = data.projects.find((p) => String(p.id) === String(selected)) || null;
   const allTasks = data.tasks.filter((t) => String(t.project_id) === String(selected));
-  const tasks = allTasks.filter((t) => !t.archived);
-  const archivedTasks = allTasks.filter((t) => t.archived);
-  const doneCount = allTasks.filter((t) => t.status === 'done').length;
-  const pct = allTasks.length ? Math.round((doneCount / allTasks.length) * 100) : 0;
+  const topTasks = allTasks.filter((t) => !t.parent_id);
+  const tasks = topTasks.filter((t) => !t.archived);
+  const archivedTasks = topTasks.filter((t) => t.archived);
+  const doneCount = topTasks.filter((t) => t.status === 'done').length;
+  const pct = topTasks.length ? Math.round((doneCount / topTasks.length) * 100) : 0;
+  const subtasksByParent = {};
+  allTasks.forEach((t) => {
+    if (t.parent_id) {
+      const k = String(t.parent_id);
+      if (!subtasksByParent[k]) subtasksByParent[k] = [];
+      subtasksByParent[k].push(t);
+    }
+  });
   const isSetup = error && /POSTGRES_URL|connection string|connect/i.test(error);
 
   return (
@@ -222,7 +243,7 @@ export default function Page() {
                   <button className="team-x" title="Delete team" onClick={() => deleteTeam(team)}>×</button>
                 </div>
                 {!collapsed && teamProjects.map((p) => {
-                  const count = data.tasks.filter((t) => t.project_id === p.id && !t.archived).length;
+                  const count = data.tasks.filter((t) => t.project_id === p.id && !t.archived && !t.parent_id).length;
                   return (
                     <div
                       key={p.id}
@@ -319,16 +340,25 @@ export default function Page() {
                         const owner = data.people.find((p) => String(p.id) === String(t.assignee_id));
                         const st = STATUSES[t.status] || STATUSES.not_started;
                         const expanded = expandedTask === t.id;
+                        const subs = subtasksByParent[String(t.id)] || [];
+                        const subExpanded = !!expandedSubtasks[t.id];
+                        const subDone = subs.filter((s) => s.status === 'done').length;
                         return (
                           <Fragment key={t.id}>
                             <tr>
                               <td>
-                                <input
-                                  className="task-title"
-                                  defaultValue={t.title}
-                                  placeholder="Untitled task"
-                                  onBlur={(e) => { if (e.target.value !== t.title) updateTask(t.id, { title: e.target.value }); }}
-                                />
+                                <div className="title-cell">
+                                  <button className="subtask-toggle" title="Show / add subtasks" onClick={() => toggleSubtasks(t.id)}>
+                                    <span className="caret">{subExpanded ? '▾' : '▸'}</span>
+                                    {subs.length > 0 && <span className="sub-badge">{subDone}/{subs.length}</span>}
+                                  </button>
+                                  <input
+                                    className="task-title"
+                                    defaultValue={t.title}
+                                    placeholder="Untitled task"
+                                    onBlur={(e) => { if (e.target.value !== t.title) updateTask(t.id, { title: e.target.value }); }}
+                                  />
+                                </div>
                               </td>
                               <td>
                                 <div className="cell-owner">
@@ -374,6 +404,72 @@ export default function Page() {
                                 <button className="row-x" title="Delete task" onClick={() => deleteTask(t.id)}>×</button>
                               </td>
                             </tr>
+                            {subExpanded && (
+                              <>
+                                {subs.map((sub) => {
+                                  const sowner = data.people.find((p) => String(p.id) === String(sub.assignee_id));
+                                  const sst = STATUSES[sub.status] || STATUSES.not_started;
+                                  return (
+                                    <tr key={sub.id} className="subtask-row">
+                                      <td>
+                                        <div className="subtask-title-cell">
+                                          <span className="subtask-arrow">↳</span>
+                                          <input
+                                            className="task-title"
+                                            defaultValue={sub.title}
+                                            placeholder="Untitled subtask"
+                                            onBlur={(e) => { if (e.target.value !== sub.title) updateTask(sub.id, { title: e.target.value }); }}
+                                          />
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <div className="cell-owner">
+                                          {sowner ? (
+                                            <span className="avatar" style={{ background: sowner.color }}>{initials(sowner.name)}</span>
+                                          ) : (
+                                            <span className="avatar" style={{ background: '#dcdcdc', color: '#8a8788' }}>–</span>
+                                          )}
+                                          <select
+                                            className="owner-select"
+                                            value={sub.assignee_id ?? ''}
+                                            onChange={(e) => updateTask(sub.id, { assignee_id: e.target.value || null })}
+                                          >
+                                            <option value="">Unassigned</option>
+                                            {data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                          </select>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <input
+                                          type="date"
+                                          className="date-input"
+                                          value={sub.due_date ?? ''}
+                                          onChange={(e) => updateTask(sub.id, { due_date: e.target.value || null })}
+                                        />
+                                      </td>
+                                      <td>
+                                        <select
+                                          className="status-select"
+                                          value={sub.status}
+                                          style={{ background: sst.color, color: sub.status === 'not_started' ? '#3a3a3a' : '#fff' }}
+                                          onChange={(e) => updateTask(sub.id, { status: e.target.value })}
+                                        >
+                                          {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
+                                        </select>
+                                      </td>
+                                      <td className="row-actions">
+                                        <button className="row-x" title="Delete subtask" onClick={() => deleteTask(sub.id)}>×</button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                                <tr className="subtask-add-row">
+                                  <td colSpan={5}>
+                                    <button className="add-subtask-btn" onClick={() => addSubtask(t.id)}>+ Add subtask</button>
+                                  </td>
+                                </tr>
+                              </>
+                            )}
                             {expanded && (
                               <tr className="task-notes-row">
                                 <td colSpan={5}>
