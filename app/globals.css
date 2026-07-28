@@ -195,9 +195,11 @@ tbody tr:hover .row-x { opacity: 1; }
 .team-x:hover { color: #e2445c; }
 .team .proj { margin-left: 12px; }
 .team-empty { margin: 2px 0 6px 24px; font-size: 12px; color: var(--muted); }
-.row-icon { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 12px; line-height: 1; min-width: 20px; padding: 2px; opacity: 0; flex: 0 0 auto; border-radius: 5px; }
+.row-icon { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; min-width: 24px; height: 24px; padding: 3px; opacity: 0; flex: 0 0 auto; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; }
+.row-icon svg { display: block; }
 .team-head:hover .row-icon, .proj:hover .row-icon { opacity: 1; }
-.row-icon:hover { background: #e9e9ea; }
+.row-icon:hover { background: #e9e9ea; color: var(--ink); }
+.row-icon.danger:hover { background: #fdecef; color: #e2445c; }
 .archived-section { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
 .archived-toggle { width: 100%; text-align: left; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px 8px; }
 .archived-toggle:hover { color: var(--ink); }

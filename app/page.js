@@ -18,6 +18,17 @@ function initials(name) {
   return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?';
 }
 
+const svgProps = { viewBox: '0 0 24 24', width: 17, height: 17, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
+function IconArchive() {
+  return (<svg {...svgProps}><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" /></svg>);
+}
+function IconTrash() {
+  return (<svg {...svgProps}><path d="M3 6h18" /><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" /><path d="M6 6v14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6" /><path d="M10 11v6M14 11v6" /></svg>);
+}
+function IconRestore() {
+  return (<svg {...svgProps}><path d="M3 12a9 9 0 1 0 2.6-6.3" /><path d="M3 4v4h4" /></svg>);
+}
+
 async function api(path, opts) {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
   if (!res.ok) {
@@ -417,8 +428,8 @@ export default function Page() {
                     <button onClick={() => moveTeam(team, 1)} title="Move down">▼</button>
                   </span>
                   <button className="row-icon" title="Add project to this team" onClick={() => addProject(team.id)}>+</button>
-                  <button className="row-icon" title="Archive team" onClick={() => setTeamArchived(team, true)}>🗄</button>
-                  <button className="row-icon danger" title="Delete team" onClick={() => deleteTeam(team)}>🗑</button>
+                  <button className="row-icon" title="Archive team" onClick={() => setTeamArchived(team, true)}><IconArchive /></button>
+                  <button className="row-icon danger" title="Delete team" onClick={() => deleteTeam(team)}><IconTrash /></button>
                 </div>
                 {!collapsed && teamProjects.map((p) => {
                   const count = data.tasks.filter((t) => t.project_id === p.id && !t.archived && !t.parent_id).length;
@@ -436,8 +447,8 @@ export default function Page() {
                         <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, -1); }} title="Move up">▲</button>
                         <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, 1); }} title="Move down">▼</button>
                       </span>
-                      <button className="row-icon" title="Archive project" onClick={(e) => { e.stopPropagation(); setProjectArchived(p, true); }}>🗄</button>
-                      <button className="row-icon danger" title="Delete project" onClick={(e) => { e.stopPropagation(); deleteProject(p); }}>🗑</button>
+                      <button className="row-icon" title="Archive project" onClick={(e) => { e.stopPropagation(); setProjectArchived(p, true); }}><IconArchive /></button>
+                      <button className="row-icon danger" title="Delete project" onClick={(e) => { e.stopPropagation(); deleteProject(p); }}><IconTrash /></button>
                     </div>
                   );
                 })}
@@ -461,15 +472,15 @@ export default function Page() {
                   {archivedTeams.map((team) => (
                     <div key={`t${team.id}`} className="archived-item">
                       <span className="ai-name" title={team.name}>👥 {team.name}</span>
-                      <button className="row-icon" title="Restore team" onClick={() => setTeamArchived(team, false)}>↩</button>
-                      <button className="row-icon danger" title="Delete team" onClick={() => deleteTeam(team)}>🗑</button>
+                      <button className="row-icon" title="Restore team" onClick={() => setTeamArchived(team, false)}><IconRestore /></button>
+                      <button className="row-icon danger" title="Delete team" onClick={() => deleteTeam(team)}><IconTrash /></button>
                     </div>
                   ))}
                   {archivedProjects.map((p) => (
                     <div key={`p${p.id}`} className="archived-item">
                       <span className="ai-name" title={p.name}>📄 {p.name}</span>
-                      <button className="row-icon" title="Restore project" onClick={() => setProjectArchived(p, false)}>↩</button>
-                      <button className="row-icon danger" title="Delete project" onClick={() => deleteProject(p)}>🗑</button>
+                      <button className="row-icon" title="Restore project" onClick={() => setProjectArchived(p, false)}><IconRestore /></button>
+                      <button className="row-icon danger" title="Delete project" onClick={() => deleteProject(p)}><IconTrash /></button>
                     </div>
                   ))}
                 </div>
