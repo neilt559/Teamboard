@@ -41,6 +41,7 @@ export default function Page() {
   const [expandedSubtasks, setExpandedSubtasks] = useState({});
   const [expandedNotes, setExpandedNotes] = useState({});
   const [sidebarWidth, setSidebarWidth] = useState(250);
+  const [showArchivedSidebar, setShowArchivedSidebar] = useState(false);
   const guard = useRef(0);
 
   const load = useCallback(async (force = false) => {
@@ -67,12 +68,12 @@ export default function Page() {
     if (saved >= 180 && saved <= 600) setSidebarWidth(saved);
   }, []);
 
-  // keep a valid project selected (only matters when not viewing a team)
+  // keep a valid (non-archived) project selected (only matters when not viewing a team)
   useEffect(() => {
-    if (!data.projects.length) { if (selected !== null) setSelected(null); return; }
-    if (selected === null || !data.projects.find((p) => String(p.id) === String(selected))) {
-      setSelected([...data.projects].sort(byPos)[0].id);
-    }
+    const active = data.projects.filter((p) => !p.archived);
+    const cur = data.projects.find((p) => String(p.id) === String(selected));
+    if (selected !== null && cur && !cur.archived) return;
+    setSelected(active.length ? [...active].sort(byPos)[0].id : null);
   }, [data.projects, selected]);
 
   const touch = () => { guard.current = Date.now() + 2500; };
@@ -113,6 +114,7 @@ export default function Page() {
     const projCount = data.projects.filter((p) => String(p.team_id) === String(team.id)).length;
     const extra = projCount ? ` and its ${projCount} project${projCount > 1 ? 's' : ''} (and all their tasks)` : '';
     if (!confirm(`Delete team “${team.name}”${extra}? This can’t be undone.`)) return;
+    if (!confirm(`Are you REALLY really sure? “${team.name}” and everything in it will be gone for good.`)) return;
     if (String(teamView) === String(team.id)) setTeamView(null);
     setData((d) => ({
       ...d,
@@ -121,6 +123,13 @@ export default function Page() {
     }));
     touch();
     try { await api(`/api/teams/${team.id}`, { method: 'DELETE' }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  async function setTeamArchived(team, archived) {
+    if (archived && String(teamView) === String(team.id)) setTeamView(null);
+    setData((d) => ({ ...d, teams: d.teams.map((x) => (x.id === team.id ? { ...x, archived } : x)) }));
+    touch();
+    try { await api(`/api/teams/${team.id}`, { method: 'PATCH', body: JSON.stringify({ archived }) }); }
     catch (e) { setError(e.message); }
   }
   function toggleTeam(id) { setCollapsedTeams((c) => ({ ...c, [id]: !c[id] })); }
@@ -160,6 +169,7 @@ export default function Page() {
   }
   async function deleteProject(p) {
     if (!confirm(`Delete “${p.name}” and all of its tasks?`)) return;
+    if (!confirm(`Are you REALLY really sure? “${p.name}” and all its tasks will be gone for good.`)) return;
     setData((d) => ({
       ...d,
       projects: d.projects.filter((x) => x.id !== p.id),
@@ -167,6 +177,13 @@ export default function Page() {
     }));
     touch();
     try { await api(`/api/projects/${p.id}`, { method: 'DELETE' }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  async function setProjectArchived(p, archived) {
+    if (archived && String(selected) === String(p.id)) { setSelected(null); }
+    setData((d) => ({ ...d, projects: d.projects.map((x) => (x.id === p.id ? { ...x, archived } : x)) }));
+    touch();
+    try { await api(`/api/projects/${p.id}`, { method: 'PATCH', body: JSON.stringify({ archived }) }); }
     catch (e) { setError(e.message); }
   }
   async function saveProjectNotes(id, notes) {
@@ -249,7 +266,7 @@ export default function Page() {
     catch (e) { setError(e.message); }
   }
 
-  const viewedTeam = teamView != null ? data.teams.find((t) => String(t.id) === String(teamView)) : null;
+  const viewedTeam = teamView != null ? data.teams.find((t) => String(t.id) === String(teamView) && !t.archived) : null;
   const project = data.projects.find((p) => String(p.id) === String(selected)) || null;
   const allTasks = data.tasks.filter((t) => String(t.project_id) === String(selected));
   const topTasks = allTasks.filter((t) => !t.parent_id);
@@ -265,6 +282,9 @@ export default function Page() {
       subtasksByParent[k].push(t);
     }
   });
+  const activeTeams = [...data.teams].filter((t) => !t.archived).sort(byPos);
+  const archivedTeams = data.teams.filter((t) => t.archived);
+  const archivedProjects = data.projects.filter((p) => p.archived);
   const isSetup = error && /POSTGRES_URL|connection string|connect/i.test(error);
 
   // Renders one task row plus its (optional) subtask rows and notes editors.
@@ -384,8 +404,8 @@ export default function Page() {
       <div className="layout">
         <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth, flex: `0 0 ${sidebarWidth}px` }}>
           <h2>Teams <button className="add-mini" onClick={addTeam} aria-label="Add team">+</button></h2>
-          {[...data.teams].sort(byPos).map((team) => {
-            const teamProjects = data.projects.filter((p) => String(p.team_id) === String(team.id)).sort(byPos);
+          {activeTeams.map((team) => {
+            const teamProjects = data.projects.filter((p) => String(p.team_id) === String(team.id) && !p.archived).sort(byPos);
             const collapsed = collapsedTeams[team.id];
             return (
               <div key={team.id} className="team">
@@ -396,8 +416,9 @@ export default function Page() {
                     <button onClick={() => moveTeam(team, -1)} title="Move up">▲</button>
                     <button onClick={() => moveTeam(team, 1)} title="Move down">▼</button>
                   </span>
-                  <button className="team-add" title="Add project to this team" onClick={() => addProject(team.id)}>+</button>
-                  <button className="team-x" title="Delete team" onClick={() => deleteTeam(team)}>×</button>
+                  <button className="row-icon" title="Add project to this team" onClick={() => addProject(team.id)}>+</button>
+                  <button className="row-icon" title="Archive team" onClick={() => setTeamArchived(team, true)}>🗄</button>
+                  <button className="row-icon danger" title="Delete team" onClick={() => deleteTeam(team)}>🗑</button>
                 </div>
                 {!collapsed && teamProjects.map((p) => {
                   const count = data.tasks.filter((t) => t.project_id === p.id && !t.archived && !t.parent_id).length;
@@ -415,7 +436,8 @@ export default function Page() {
                         <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, -1); }} title="Move up">▲</button>
                         <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, 1); }} title="Move down">▼</button>
                       </span>
-                      <button className="x" onClick={(e) => { e.stopPropagation(); deleteProject(p); }} aria-label="Delete project">×</button>
+                      <button className="row-icon" title="Archive project" onClick={(e) => { e.stopPropagation(); setProjectArchived(p, true); }}>🗄</button>
+                      <button className="row-icon danger" title="Delete project" onClick={(e) => { e.stopPropagation(); deleteProject(p); }}>🗑</button>
                     </div>
                   );
                 })}
@@ -425,8 +447,34 @@ export default function Page() {
               </div>
             );
           })}
-          {!data.teams.length && loaded && (
+          {!activeTeams.length && loaded && (
             <p style={{ color: '#8a8788', fontSize: 13, padding: '0 8px' }}>No teams yet. Click + to add one.</p>
+          )}
+
+          {(archivedTeams.length > 0 || archivedProjects.length > 0) && (
+            <div className="archived-section">
+              <button className="archived-toggle" onClick={() => setShowArchivedSidebar((s) => !s)}>
+                🗄 Archived ({archivedTeams.length + archivedProjects.length}) {showArchivedSidebar ? '▾' : '▸'}
+              </button>
+              {showArchivedSidebar && (
+                <div className="archived-list">
+                  {archivedTeams.map((team) => (
+                    <div key={`t${team.id}`} className="archived-item">
+                      <span className="ai-name" title={team.name}>👥 {team.name}</span>
+                      <button className="row-icon" title="Restore team" onClick={() => setTeamArchived(team, false)}>↩</button>
+                      <button className="row-icon danger" title="Delete team" onClick={() => deleteTeam(team)}>🗑</button>
+                    </div>
+                  ))}
+                  {archivedProjects.map((p) => (
+                    <div key={`p${p.id}`} className="archived-item">
+                      <span className="ai-name" title={p.name}>📄 {p.name}</span>
+                      <button className="row-icon" title="Restore project" onClick={() => setProjectArchived(p, false)}>↩</button>
+                      <button className="row-icon danger" title="Delete project" onClick={() => deleteProject(p)}>🗑</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           <div className="sidebar-resizer" onMouseDown={startResize} title="Drag to resize" />
         </aside>
@@ -441,7 +489,7 @@ export default function Page() {
           {viewedTeam ? (
             <TeamOverview
               team={viewedTeam}
-              projects={data.projects.filter((p) => String(p.team_id) === String(viewedTeam.id)).sort(byPos)}
+              projects={data.projects.filter((p) => String(p.team_id) === String(viewedTeam.id) && !p.archived).sort(byPos)}
               tasks={data.tasks}
               onOpen={(id) => { setSelected(id); setTeamView(null); }}
               onAddProject={() => addProject(viewedTeam.id)}

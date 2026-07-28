@@ -21,7 +21,10 @@ export async function PATCH(req, { params }) {
     if ('position' in b) {
       await sql`UPDATE projects SET position=${b.position} WHERE id=${id}`;
     }
-    const r = await sql`SELECT id, team_id, name, notes, position FROM projects WHERE id=${id}`;
+    if ('archived' in b) {
+      await sql`UPDATE projects SET archived=${!!b.archived} WHERE id=${id}`;
+    }
+    const r = await sql`SELECT id, team_id, name, notes, position, archived FROM projects WHERE id=${id}`;
     return NextResponse.json(r.rows[0] || {});
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });

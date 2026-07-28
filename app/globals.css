@@ -195,6 +195,18 @@ tbody tr:hover .row-x { opacity: 1; }
 .team-x:hover { color: #e2445c; }
 .team .proj { margin-left: 12px; }
 .team-empty { margin: 2px 0 6px 24px; font-size: 12px; color: var(--muted); }
+.row-icon { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 12px; line-height: 1; min-width: 20px; padding: 2px; opacity: 0; flex: 0 0 auto; border-radius: 5px; }
+.team-head:hover .row-icon, .proj:hover .row-icon { opacity: 1; }
+.row-icon:hover { background: #e9e9ea; }
+.archived-section { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.archived-toggle { width: 100%; text-align: left; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px 8px; }
+.archived-toggle:hover { color: var(--ink); }
+.archived-list { padding: 2px; }
+.archived-item { display: flex; align-items: center; gap: 4px; padding: 5px 6px; border-radius: 6px; }
+.archived-item:hover { background: #f1f1f2; }
+.archived-item .row-icon { opacity: .75; }
+.archived-item:hover .row-icon { opacity: 1; }
+.ai-name { flex: 1; font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .team-select-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .team-select { border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 13px; background: #fff; color: var(--text); }
 
