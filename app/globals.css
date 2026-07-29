@@ -192,6 +192,14 @@ tbody tr:hover .row-x { opacity: 1; }
 .restore-btn { border: none; background: none; color: var(--ink-2); font-size: 16px; cursor: pointer; margin-right: 4px; }
 .restore-btn:hover { color: var(--lime-dark); }
 
+/* ---------- offices (sidebar) ---------- */
+.office { margin-bottom: 8px; }
+.office-head { display: flex; align-items: center; gap: 4px; padding: 7px 6px; border-radius: 6px; }
+.office-head:hover { background: #ededee; }
+.office-name { flex: 1; font-size: 13px; font-weight: 800; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.office-head:hover .row-icon, .office-head:hover .reorder { opacity: 1; }
+.office-teams { margin-left: 12px; padding-left: 6px; border-left: 2px solid var(--line); }
+
 /* ---------- teams (sidebar) ---------- */
 .team { margin-bottom: 4px; }
 .team-head { display: flex; align-items: center; gap: 4px; padding: 6px 6px; border-radius: 6px; }

@@ -79,7 +79,7 @@ async function api(path, opts) {
 }
 
 export default function Page() {
-  const [data, setData] = useState({ people: [], teams: [], projects: [], tasks: [] });
+  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
   const [error, setError] = useState(null);
@@ -88,6 +88,7 @@ export default function Page() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [collapsedTeams, setCollapsedTeams] = useState({});
+  const [collapsedOffices, setCollapsedOffices] = useState({});
   const [expandedSubtasks, setExpandedSubtasks] = useState({});
   const [expandedNotes, setExpandedNotes] = useState({});
   const [sidebarWidth, setSidebarWidth] = useState(250);
@@ -144,12 +145,70 @@ export default function Page() {
     window.addEventListener('mouseup', onUp);
   }
 
+  // ---- offices ----
+  async function addOffice() {
+    const name = prompt('New office name', 'New Office');
+    if (name === null) return;
+    touch();
+    try { await api('/api/offices', { method: 'POST', body: JSON.stringify({ name: name.trim() || 'New Office' }) }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  async function renameOffice(office) {
+    const name = prompt('Rename office', office.name);
+    if (name === null || name.trim() === '' || name === office.name) return;
+    setData((d) => ({ ...d, offices: d.offices.map((x) => (x.id === office.id ? { ...x, name } : x)) }));
+    touch();
+    try { await api(`/api/offices/${office.id}`, { method: 'PATCH', body: JSON.stringify({ name }) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function deleteOffice(office) {
+    const teamCount = data.teams.filter((t) => String(t.office_id) === String(office.id)).length;
+    const extra = teamCount ? ` and its ${teamCount} team${teamCount > 1 ? 's' : ''} (and everything in them)` : '';
+    if (!confirm(`Delete office “${office.name}”${extra}? This can’t be undone.`)) return;
+    if (!confirm(`Are you REALLY really sure? “${office.name}” and everything in it will be gone for good.`)) return;
+    setData((d) => ({
+      ...d,
+      offices: d.offices.filter((x) => x.id !== office.id),
+      teams: d.teams.filter((t) => String(t.office_id) !== String(office.id)),
+    }));
+    touch();
+    try { await api(`/api/offices/${office.id}`, { method: 'DELETE' }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  async function setOfficeArchived(office, archived) {
+    setData((d) => ({ ...d, offices: d.offices.map((x) => (x.id === office.id ? { ...x, archived } : x)) }));
+    touch();
+    try { await api(`/api/offices/${office.id}`, { method: 'PATCH', body: JSON.stringify({ archived }) }); }
+    catch (e) { setError(e.message); }
+  }
+  function toggleOffice(id) { setCollapsedOffices((c) => ({ ...c, [id]: !c[id] })); }
+  async function moveOffice(office, dir) {
+    const sorted = [...data.offices].filter((o) => !o.archived).sort(byPos);
+    const i = sorted.findIndex((x) => String(x.id) === String(office.id));
+    const j = i + dir;
+    if (j < 0 || j >= sorted.length) return;
+    const other = sorted[j];
+    const pi = Number(office.position), pj = Number(other.position);
+    setData((d) => ({ ...d, offices: d.offices.map((x) => (String(x.id) === String(office.id) ? { ...x, position: pj } : String(x.id) === String(other.id) ? { ...x, position: pi } : x)) }));
+    touch();
+    try {
+      await api(`/api/offices/${office.id}`, { method: 'PATCH', body: JSON.stringify({ position: pj }) });
+      await api(`/api/offices/${other.id}`, { method: 'PATCH', body: JSON.stringify({ position: pi }) });
+    } catch (e) { setError(e.message); }
+  }
+  async function moveTeamToOffice(teamId, officeId) {
+    setData((d) => ({ ...d, teams: d.teams.map((t) => (t.id === teamId ? { ...t, office_id: officeId } : t)) }));
+    touch();
+    try { await api(`/api/teams/${teamId}`, { method: 'PATCH', body: JSON.stringify({ office_id: officeId }) }); }
+    catch (e) { setError(e.message); }
+  }
+
   // ---- teams ----
-  async function addTeam() {
+  async function addTeam(officeId) {
     const name = prompt('New team name', 'New Team');
     if (name === null) return;
     touch();
-    try { await api('/api/teams', { method: 'POST', body: JSON.stringify({ name: name.trim() || 'New Team' }) }); await load(true); }
+    try { await api('/api/teams', { method: 'POST', body: JSON.stringify({ name: name.trim() || 'New Team', office_id: officeId }) }); await load(true); setCollapsedOffices((c) => ({ ...c, [officeId]: false })); }
     catch (e) { setError(e.message); }
   }
   async function renameTeam(team) {
@@ -338,7 +397,8 @@ export default function Page() {
       subtasksByParent[k].push(t);
     }
   });
-  const activeTeams = [...data.teams].filter((t) => !t.archived).sort(byPos);
+  const activeOffices = [...data.offices].filter((o) => !o.archived).sort(byPos);
+  const archivedOffices = data.offices.filter((o) => o.archived);
   const archivedTeams = data.teams.filter((t) => t.archived);
   const archivedProjects = data.projects.filter((p) => p.archived);
   const isSetup = error && /POSTGRES_URL|connection string|connect/i.test(error);
@@ -453,67 +513,100 @@ export default function Page() {
         </div>
         <div className="header-actions">
           <button className="btn btn-ghost people-btn" onClick={() => setPeopleOpen(true)}><IconUsers /> People ({data.people.length})</button>
-          <button className="btn btn-lime" onClick={addTeam}>+ New Team</button>
+          <button className="btn btn-lime" onClick={addOffice}>+ New Office</button>
         </div>
       </header>
 
       <div className="layout">
         <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth, flex: `0 0 ${sidebarWidth}px` }}>
-          <h2>Teams <button className="add-mini" onClick={addTeam} aria-label="Add team">+</button></h2>
-          {activeTeams.map((team) => {
-            const teamProjects = data.projects.filter((p) => String(p.team_id) === String(team.id) && !p.archived).sort(byPos);
-            const collapsed = collapsedTeams[team.id];
+          <h2>Offices <button className="add-mini" onClick={addOffice} aria-label="Add office">+</button></h2>
+          {activeOffices.map((office) => {
+            const officeTeams = data.teams.filter((t) => String(t.office_id) === String(office.id) && !t.archived).sort(byPos);
+            const oCollapsed = collapsedOffices[office.id];
             return (
-              <div key={team.id} className="team">
-                <div className={`team-head ${String(teamView) === String(team.id) ? 'viewing' : ''}`}>
-                  <button className="team-caret" onClick={() => toggleTeam(team.id)} aria-label="Collapse team">{collapsed ? '▶' : '▼'}</button>
-                  <span className="team-name" onClick={() => { setTeamView(team.id); setSidebarOpen(false); }} onDoubleClick={() => renameTeam(team)} title="Click to view team · double-click to rename">{team.name}</span>
+              <div key={office.id} className="office">
+                <div className="office-head">
+                  <button className="team-caret" onClick={() => toggleOffice(office.id)} aria-label="Collapse office">{oCollapsed ? '▶' : '▼'}</button>
+                  <span className="office-name" onClick={() => toggleOffice(office.id)} onDoubleClick={() => renameOffice(office)} title="Click to collapse · double-click to rename">{office.name}</span>
                   <span className="reorder">
-                    <button onClick={() => moveTeam(team, -1)} title="Move up">▲</button>
-                    <button onClick={() => moveTeam(team, 1)} title="Move down">▼</button>
+                    <button onClick={() => moveOffice(office, -1)} title="Move up">▲</button>
+                    <button onClick={() => moveOffice(office, 1)} title="Move down">▼</button>
                   </span>
-                  <button className="row-icon" title="Add project to this team" onClick={() => addProject(team.id)}>+</button>
-                  <button className="row-icon" title="Archive team" onClick={() => setTeamArchived(team, true)}><IconArchive /></button>
-                  <button className="row-icon danger" title="Delete team" onClick={() => deleteTeam(team)}><IconTrash /></button>
+                  <button className="row-icon" title="Add team to this office" onClick={() => addTeam(office.id)}>+</button>
+                  <button className="row-icon" title="Archive office" onClick={() => setOfficeArchived(office, true)}><IconArchive /></button>
+                  <button className="row-icon danger" title="Delete office" onClick={() => deleteOffice(office)}><IconTrash /></button>
                 </div>
-                {!collapsed && teamProjects.map((p) => {
-                  const count = data.tasks.filter((t) => t.project_id === p.id && !t.archived && !t.parent_id).length;
-                  return (
-                    <div
-                      key={p.id}
-                      className={`proj ${String(p.id) === String(selected) && teamView == null ? 'active' : ''}`}
-                      onClick={() => { setSelected(p.id); setTeamView(null); setSidebarOpen(false); }}
-                      onDoubleClick={() => renameProject(p)}
-                      title="Click to open · double-click to rename"
-                    >
-                      <span className="name">{p.name}</span>
-                      <span className="count">{count}</span>
-                      <span className="reorder">
-                        <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, -1); }} title="Move up">▲</button>
-                        <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, 1); }} title="Move down">▼</button>
-                      </span>
-                      <button className="row-icon" title="Archive project" onClick={(e) => { e.stopPropagation(); setProjectArchived(p, true); }}><IconArchive /></button>
-                      <button className="row-icon danger" title="Delete project" onClick={(e) => { e.stopPropagation(); deleteProject(p); }}><IconTrash /></button>
-                    </div>
-                  );
-                })}
-                {!collapsed && teamProjects.length === 0 && (
-                  <p className="team-empty">No projects — click <b>+</b> to add one.</p>
+                {!oCollapsed && (
+                  <div className="office-teams">
+                    {officeTeams.map((team) => {
+                      const teamProjects = data.projects.filter((p) => String(p.team_id) === String(team.id) && !p.archived).sort(byPos);
+                      const collapsed = collapsedTeams[team.id];
+                      return (
+                        <div key={team.id} className="team">
+                          <div className={`team-head ${String(teamView) === String(team.id) ? 'viewing' : ''}`}>
+                            <button className="team-caret" onClick={() => toggleTeam(team.id)} aria-label="Collapse team">{collapsed ? '▶' : '▼'}</button>
+                            <span className="team-name" onClick={() => { setTeamView(team.id); setSidebarOpen(false); }} onDoubleClick={() => renameTeam(team)} title="Click to view team · double-click to rename">{team.name}</span>
+                            <span className="reorder">
+                              <button onClick={() => moveTeam(team, -1)} title="Move up">▲</button>
+                              <button onClick={() => moveTeam(team, 1)} title="Move down">▼</button>
+                            </span>
+                            <button className="row-icon" title="Add project to this team" onClick={() => addProject(team.id)}>+</button>
+                            <button className="row-icon" title="Archive team" onClick={() => setTeamArchived(team, true)}><IconArchive /></button>
+                            <button className="row-icon danger" title="Delete team" onClick={() => deleteTeam(team)}><IconTrash /></button>
+                          </div>
+                          {!collapsed && teamProjects.map((p) => {
+                            const count = data.tasks.filter((t) => t.project_id === p.id && !t.archived && !t.parent_id).length;
+                            return (
+                              <div
+                                key={p.id}
+                                className={`proj ${String(p.id) === String(selected) && teamView == null ? 'active' : ''}`}
+                                onClick={() => { setSelected(p.id); setTeamView(null); setSidebarOpen(false); }}
+                                onDoubleClick={() => renameProject(p)}
+                                title="Click to open · double-click to rename"
+                              >
+                                <span className="name">{p.name}</span>
+                                <span className="count">{count}</span>
+                                <span className="reorder">
+                                  <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, -1); }} title="Move up">▲</button>
+                                  <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, 1); }} title="Move down">▼</button>
+                                </span>
+                                <button className="row-icon" title="Archive project" onClick={(e) => { e.stopPropagation(); setProjectArchived(p, true); }}><IconArchive /></button>
+                                <button className="row-icon danger" title="Delete project" onClick={(e) => { e.stopPropagation(); deleteProject(p); }}><IconTrash /></button>
+                              </div>
+                            );
+                          })}
+                          {!collapsed && teamProjects.length === 0 && (
+                            <p className="team-empty">No projects — click <b>+</b> to add one.</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {officeTeams.length === 0 && (
+                      <p className="team-empty">No teams — click <b>+</b> to add one.</p>
+                    )}
+                  </div>
                 )}
               </div>
             );
           })}
-          {!activeTeams.length && loaded && (
-            <p style={{ color: '#8a8788', fontSize: 13, padding: '0 8px' }}>No teams yet. Click + to add one.</p>
+          {!activeOffices.length && loaded && (
+            <p style={{ color: '#8a8788', fontSize: 13, padding: '0 8px' }}>No offices yet. Click + to add one.</p>
           )}
 
-          {(archivedTeams.length > 0 || archivedProjects.length > 0) && (
+          {(archivedOffices.length > 0 || archivedTeams.length > 0 || archivedProjects.length > 0) && (
             <div className="archived-section">
               <button className="archived-toggle" onClick={() => setShowArchivedSidebar((s) => !s)}>
-                🗄 Archived ({archivedTeams.length + archivedProjects.length}) {showArchivedSidebar ? '▾' : '▸'}
+                🗄 Archived ({archivedOffices.length + archivedTeams.length + archivedProjects.length}) {showArchivedSidebar ? '▾' : '▸'}
               </button>
               {showArchivedSidebar && (
                 <div className="archived-list">
+                  {archivedOffices.map((office) => (
+                    <div key={`o${office.id}`} className="archived-item">
+                      <span className="ai-name" title={office.name}>🏢 {office.name}</span>
+                      <button className="row-icon" title="Restore office" onClick={() => setOfficeArchived(office, false)}><IconRestore /></button>
+                      <button className="row-icon danger" title="Delete office" onClick={() => deleteOffice(office)}><IconTrash /></button>
+                    </div>
+                  ))}
                   {archivedTeams.map((team) => (
                     <div key={`t${team.id}`} className="archived-item">
                       <span className="ai-name" title={team.name}>👥 {team.name}</span>
@@ -545,11 +638,13 @@ export default function Page() {
           {viewedTeam ? (
             <TeamOverview
               team={viewedTeam}
+              offices={activeOffices}
               projects={data.projects.filter((p) => String(p.team_id) === String(viewedTeam.id) && !p.archived).sort(byPos)}
               tasks={data.tasks}
               onOpen={(id) => { setSelected(id); setTeamView(null); }}
               onAddProject={() => addProject(viewedTeam.id)}
               onSaveNotes={saveProjectNotes}
+              onMoveOffice={(officeId) => moveTeamToOffice(viewedTeam.id, officeId)}
             />
           ) : project ? (
             <>
@@ -650,16 +745,16 @@ export default function Page() {
           ) : (
             loaded && !error && (
               <div className="empty">
-                {data.teams.length === 0 ? (
+                {data.offices.length === 0 ? (
                   <>
-                    <h3>Create your first team</h3>
-                    <p>Teams group your projects. Add a team, then add projects inside it.</p>
-                    <button className="btn btn-lime" onClick={addTeam}>+ New Team</button>
+                    <h3>Create your first office</h3>
+                    <p>Offices hold teams, and teams hold projects. Start by adding an office.</p>
+                    <button className="btn btn-lime" onClick={addOffice}>+ New Office</button>
                   </>
                 ) : (
                   <>
                     <h3>Pick a project or team</h3>
-                    <p>Click a project in the sidebar to open its board, or click a team name to see its overview.</p>
+                    <p>In the sidebar, click a project to open its board, or a team name to see its overview.</p>
                   </>
                 )}
               </div>
@@ -675,12 +770,17 @@ export default function Page() {
   );
 }
 
-function TeamOverview({ team, projects, tasks, onOpen, onAddProject, onSaveNotes }) {
+function TeamOverview({ team, offices, projects, tasks, onOpen, onAddProject, onSaveNotes, onMoveOffice }) {
   return (
     <>
       <div className="proj-head">
         <h1>{team.name}</h1>
         <span className="progress-label">{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
+        <label className="team-select-wrap">Office
+          <select className="team-select" value={team.office_id ?? ''} onChange={(e) => onMoveOffice(e.target.value)}>
+            {offices.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        </label>
         <div className="spacer" />
         <button className="btn btn-lime" onClick={onAddProject}>+ Add Project</button>
       </div>
