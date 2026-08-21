@@ -209,6 +209,9 @@ tbody tr:hover .row-x { opacity: 1; }
 .sw.sel { box-shadow: 0 0 0 2px var(--ink); }
 .field { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-top: 4px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.add-task-modal { max-width: 420px; }
+.atm-label { display: block; font-size: 13px; font-weight: 600; color: var(--ink); margin: 13px 0 5px; }
+.add-task-modal .field { margin-top: 0; }
 .link-x { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; }
 .link-x:hover { color: #e2445c; }
 

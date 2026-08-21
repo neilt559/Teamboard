@@ -92,6 +92,7 @@ export default function Page() {
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
   const [globalView, setGlobalView] = useState(false);
+  const [addingTaskFor, setAddingTaskFor] = useState(null);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
@@ -339,11 +340,12 @@ export default function Page() {
     try { await api('/api/tasks', { method: 'POST', body: JSON.stringify({ project_id: selected }) }); await load(true); }
     catch (e) { setError(e.message); }
   }
-  async function addTaskNamed(projectId) {
-    const name = prompt('New task name', '');
-    if (name === null) return;
+  async function createTaskWithOwner(title, assigneeId) {
+    const projectId = addingTaskFor;
+    setAddingTaskFor(null);
+    if (!projectId) return;
     touch();
-    try { await api('/api/tasks', { method: 'POST', body: JSON.stringify({ project_id: projectId, title: name.trim() }) }); await load(true); }
+    try { await api('/api/tasks', { method: 'POST', body: JSON.stringify({ project_id: projectId, title, assignee_id: assigneeId }) }); await load(true); }
     catch (e) { setError(e.message); }
   }
   async function addSubtask(parentId) {
@@ -715,7 +717,7 @@ export default function Page() {
               onAddProject={() => addProject(viewedTeam.id)}
               onSaveNotes={saveProjectNotes}
               onMoveOffice={(officeId) => moveTeamToOffice(viewedTeam.id, officeId)}
-              onAddTask={addTaskNamed}
+              onAddTask={(projectId) => setAddingTaskFor(projectId)}
             />
           ) : project ? (
             <>
@@ -750,7 +752,7 @@ export default function Page() {
                       <tr>
                         <th style={{ width: '32%' }}>Task</th>
                         <th style={{ width: '18%' }}>Owner</th>
-                        <th style={{ width: '11%' }}>Stoplight</th>
+                        <th style={{ width: '11%', textAlign: 'center' }}>Stoplight</th>
                         <th style={{ width: '14%' }}>Due date</th>
                         <th style={{ width: '17%' }}>Status</th>
                         <th style={{ width: '8%' }} />
@@ -890,6 +892,9 @@ export default function Page() {
       {peopleOpen && (
         <PeopleModal people={data.people} onAdd={addPerson} onUpdate={updatePerson} onDelete={deletePerson} onClose={() => setPeopleOpen(false)} />
       )}
+      {addingTaskFor && (
+        <AddTaskModal people={data.people} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />
+      )}
     </>
   );
 }
@@ -968,7 +973,7 @@ function GlobalTasks({ tasks, people, projects, onUpdate, onOpenProject }) {
                 <th style={{ width: '20%' }} className="sortable" onClick={() => setSort('project')}>Project{arrow('project')}</th>
                 <th style={{ width: '26%' }} className="sortable" onClick={() => setSort('task')}>Task{arrow('task')}</th>
                 <th style={{ width: '16%' }} className="sortable" onClick={() => setSort('owner')}>Owner{arrow('owner')}</th>
-                <th style={{ width: '11%' }} className="sortable" onClick={() => setSort('stoplight')}>Stoplight{arrow('stoplight')}</th>
+                <th style={{ width: '11%', textAlign: 'center' }} className="sortable" onClick={() => setSort('stoplight')}>Stoplight{arrow('stoplight')}</th>
                 <th style={{ width: '12%' }} className="sortable" onClick={() => setSort('due')}>Due{arrow('due')}</th>
                 <th style={{ width: '15%' }} className="sortable" onClick={() => setSort('status')}>Status{arrow('status')}</th>
               </tr>
@@ -1101,6 +1106,37 @@ function TeamOverview({ team, offices, people, projects, tasks, onOpen, onAddPro
         </div>
       )}
     </>
+  );
+}
+
+function AddTaskModal({ people, onCreate, onClose }) {
+  const [name, setName] = useState('');
+  const [owner, setOwner] = useState('');
+  const submit = () => { const n = name.trim(); if (!n) return; onCreate(n, owner || null); };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal add-task-modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Add task</h2>
+        <label className="atm-label">Task name</label>
+        <input
+          className="field"
+          autoFocus
+          placeholder="What needs doing?"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+        />
+        <label className="atm-label">Who’s responsible?</label>
+        <select className="field" value={owner} onChange={(e) => setOwner(e.target.value)}>
+          <option value="">Unassigned</option>
+          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <div className="modal-actions">
+          <button className="btn btn-plain" onClick={onClose}>Cancel</button>
+          <button className="btn btn-ink" onClick={submit}>Add task</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
