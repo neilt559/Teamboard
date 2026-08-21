@@ -311,7 +311,9 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .task-notes-area:focus { outline: none; border-color: var(--lime); }
 
 /* ---------- team overview ---------- */
-.overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1150px) { .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .overview-grid { grid-template-columns: 1fr; } }
 .overview-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; }
 .overview-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .overview-open { border: none; background: none; font-size: 16px; font-weight: 700; color: var(--ink); cursor: pointer; text-align: left; padding: 0; }
