@@ -339,6 +339,13 @@ export default function Page() {
     try { await api('/api/tasks', { method: 'POST', body: JSON.stringify({ project_id: selected }) }); await load(true); }
     catch (e) { setError(e.message); }
   }
+  async function addTaskNamed(projectId) {
+    const name = prompt('New task name', '');
+    if (name === null) return;
+    touch();
+    try { await api('/api/tasks', { method: 'POST', body: JSON.stringify({ project_id: projectId, title: name.trim() }) }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
   async function addSubtask(parentId) {
     if (selected === null) return;
     touch();
@@ -697,6 +704,7 @@ export default function Page() {
               onAddProject={() => addProject(viewedTeam.id)}
               onSaveNotes={saveProjectNotes}
               onMoveOffice={(officeId) => moveTeamToOffice(viewedTeam.id, officeId)}
+              onAddTask={addTaskNamed}
             />
           ) : project ? (
             <>
@@ -1009,7 +1017,7 @@ function GlobalTasks({ tasks, people, projects, onUpdate, onOpenProject }) {
   );
 }
 
-function TeamOverview({ team, offices, projects, tasks, onOpen, onAddProject, onSaveNotes, onMoveOffice }) {
+function TeamOverview({ team, offices, projects, tasks, onOpen, onAddProject, onSaveNotes, onMoveOffice, onAddTask }) {
   return (
     <>
       <div className="proj-head">
@@ -1031,7 +1039,8 @@ function TeamOverview({ team, offices, projects, tasks, onOpen, onAddProject, on
       ) : (
         <div className="overview-grid">
           {projects.map((p) => {
-            const count = tasks.filter((t) => String(t.project_id) === String(p.id) && !t.archived && !t.parent_id).length;
+            const projTop = tasks.filter((t) => String(t.project_id) === String(p.id) && !t.archived && !t.parent_id).sort(byPos);
+            const count = projTop.length;
             return (
               <div key={p.id} className="overview-card">
                 <div className="overview-card-head">
@@ -1045,6 +1054,26 @@ function TeamOverview({ team, offices, projects, tasks, onOpen, onAddProject, on
                   placeholder="Project notes…"
                   onBlur={(e) => { if ((e.target.value || '') !== (p.notes || '')) onSaveNotes(p.id, e.target.value); }}
                 />
+                <div className="ov-tasks">
+                  {projTop.length === 0 && <div className="ov-empty">No tasks yet.</div>}
+                  {projTop.map((t) => {
+                    const st = STATUSES[t.status] || STATUSES.not_started;
+                    const subs = tasks.filter((x) => String(x.parent_id) === String(t.id) && !x.archived).sort(byPos);
+                    return (
+                      <div key={t.id} className="ov-task" style={{ borderLeftColor: t.stoplight && STOPLIGHTS[t.stoplight] ? STOPLIGHTS[t.stoplight] : 'transparent' }}>
+                        <div className="ov-task-row" onClick={() => onOpen(p.id)} title="Open project board">
+                          <span className="ov-dot" style={{ background: st.color }} />
+                          <span className="ov-task-title">{t.title || 'Untitled task'}</span>
+                          <span className="ov-task-status" style={{ color: st.text }}>{st.label}</span>
+                        </div>
+                        {subs.map((s) => (
+                          <div key={s.id} className="ov-sub">↳ {s.title || 'Untitled subtask'}</div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  <button className="ov-add" onClick={() => onAddTask(p.id)}>+ Add task</button>
+                </div>
                 <button className="overview-open-link" onClick={() => onOpen(p.id)}>Open board →</button>
               </div>
             );
