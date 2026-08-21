@@ -1007,6 +1007,40 @@ function OfficeView({ office, meetings, geoScores, expandedMeetings, onToggleMee
   );
 }
 
+// Summary stats for GeoGuessr scores. "Work week" = Monday–Friday; weekly
+// averages group weekday scores by the Monday of their week.
+function geoStats(scores) {
+  const vals = scores.map((s) => Number(s.score)).filter((v) => !isNaN(v));
+  if (!vals.length) return null;
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const high = Math.max(...vals);
+  const low = Math.min(...vals);
+  const mean = sum(vals) / vals.length;
+
+  const parseLocal = (s) => { const p = String(s).split('-').map(Number); return new Date(p[0], (p[1] || 1) - 1, p[2] || 1); };
+  const fmtLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const mondayOf = (d) => { const dow = d.getDay(); const diff = dow === 0 ? 6 : dow - 1; const m = new Date(d); m.setDate(d.getDate() - diff); return m; };
+
+  const weeks = {};
+  scores.forEach((s) => {
+    const v = Number(s.score);
+    if (isNaN(v) || !s.score_date) return;
+    const d = parseLocal(s.score_date);
+    if (isNaN(d.getTime())) return;
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) return; // work week = Mon–Fri only
+    const key = fmtLocal(mondayOf(d));
+    (weeks[key] = weeks[key] || []).push(v);
+  });
+  const avgs = Object.values(weeks).map((arr) => sum(arr) / arr.length);
+  const bestWeek = avgs.length ? Math.max(...avgs) : null;
+  const worstWeek = avgs.length ? Math.min(...avgs) : null;
+  const curKey = fmtLocal(mondayOf(new Date()));
+  const currentWeek = weeks[curKey] ? sum(weeks[curKey]) / weeks[curKey].length : null;
+
+  return { high, low, mean, bestWeek, worstWeek, currentWeek };
+}
+
 function GeoTracker({ scores, onAdd, onDelete }) {
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
@@ -1014,6 +1048,8 @@ function GeoTracker({ scores, onAdd, onDelete }) {
   const [showHistory, setShowHistory] = useState(false);
   const submit = () => { const n = parseInt(val, 10); if (isNaN(n)) return; onAdd(n, date); setVal(''); };
   const sorted = [...scores].sort((a, b) => (a.score_date || '').localeCompare(b.score_date || '') || (Number(a.id) - Number(b.id)));
+  const stats = geoStats(scores);
+  const fmt = (v) => (v == null ? '—' : Math.round(v).toLocaleString());
   return (
     <>
       <div className="geo-add">
@@ -1022,6 +1058,16 @@ function GeoTracker({ scores, onAdd, onDelete }) {
         <button className="btn btn-ink btn-sm" onClick={submit}>+ Add</button>
       </div>
       <GeoChart data={sorted} />
+      {stats && (
+        <div className="geo-stats">
+          <div className="geo-stat"><span className="gs-label">High</span><span className="gs-val">{fmt(stats.high)}</span></div>
+          <div className="geo-stat"><span className="gs-label">Low</span><span className="gs-val">{fmt(stats.low)}</span></div>
+          <div className="geo-stat"><span className="gs-label">All-time avg</span><span className="gs-val">{fmt(stats.mean)}</span></div>
+          <div className="geo-stat"><span className="gs-label">This week avg</span><span className="gs-val">{fmt(stats.currentWeek)}</span></div>
+          <div className="geo-stat"><span className="gs-label">Best week avg</span><span className="gs-val">{fmt(stats.bestWeek)}</span></div>
+          <div className="geo-stat"><span className="gs-label">Worst week avg</span><span className="gs-val">{fmt(stats.worstWeek)}</span></div>
+        </div>
+      )}
       {sorted.length > 0 && (
         <div className="geo-history">
           <button className="geo-history-toggle" onClick={() => setShowHistory((s) => !s)}>

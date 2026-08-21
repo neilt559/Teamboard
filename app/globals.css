@@ -357,6 +357,10 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .geo-chart-wrap { width: 100%; overflow: hidden; }
 .geo-chart { width: 100%; height: auto; display: block; }
 .geo-axis { font-size: 9px; fill: var(--muted); }
+.geo-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 8px; margin: 12px 0 4px; }
+.geo-stat { background: #fafbf3; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; display: flex; flex-direction: column; gap: 2px; }
+.gs-label { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.gs-val { font-size: 16px; font-weight: 800; color: var(--ink); }
 .geo-chart-empty { color: var(--muted); font-size: 13px; padding: 20px 4px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; }
 .geo-history { margin-top: 12px; }
 .geo-history-toggle { background: none; border: none; cursor: pointer; color: var(--ink-2); font-weight: 600; font-size: 12px; padding: 6px 2px; }
