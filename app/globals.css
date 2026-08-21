@@ -316,7 +316,7 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .overview-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .overview-open { border: none; background: none; font-size: 16px; font-weight: 700; color: var(--ink); cursor: pointer; text-align: left; padding: 0; }
 .overview-open:hover { color: var(--lime-dark); text-decoration: underline; }
-.overview-notes { width: 100%; min-height: 64px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--text); resize: vertical; background: #fffdf5; }
+.overview-notes { width: 100%; min-height: 130px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--text); resize: vertical; background: #fffdf5; }
 .overview-notes:focus { outline: none; border-color: var(--lime); background: #fff; }
 .overview-open-link { align-self: flex-start; margin-top: 8px; border: none; background: none; color: var(--ink-2); font-weight: 600; font-size: 12px; cursor: pointer; padding: 0; }
 .overview-open-link:hover { color: var(--lime-dark); }
