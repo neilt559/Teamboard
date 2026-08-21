@@ -42,8 +42,19 @@ input, select { font-family: inherit; }
 .btn-lime { background: var(--lime); color: var(--on-lime); }
 .btn-lime:hover { background: var(--lime-dark); }
 .btn-ghost { background: rgba(255, 255, 255, .12); color: #fff; }
+.btn-ghost.tab-on { background: var(--lime); color: var(--on-lime); }
 .people-btn { display: inline-flex; align-items: center; gap: 6px; }
 .people-btn svg { color: var(--lime); }
+
+/* All Tasks view: filters + sortable headers */
+.filters { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.filters label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.filters select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 13px; background: #fff; color: var(--text); text-transform: none; letter-spacing: 0; font-weight: 400; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--ink); background: #f3f4ec; }
+.proj-link { border: none; background: none; color: var(--ink); font-weight: 600; font-size: 13px; cursor: pointer; padding: 0; text-align: left; }
+.proj-link:hover { color: var(--lime-dark); text-decoration: underline; }
+.gt-title { font-weight: 600; font-size: 14px; }
 .btn-ghost:hover { background: rgba(255, 255, 255, .22); }
 .btn-ink { background: var(--ink); color: #fff; }
 .btn-ink:hover { background: var(--ink-hover); }
@@ -229,9 +240,9 @@ tbody tr:hover .row-x { opacity: 1; }
 
 /* ---------- teams (sidebar) ---------- */
 .team { margin-bottom: 4px; }
-.team-head { display: flex; align-items: center; gap: 4px; padding: 6px 6px; border-radius: 6px; }
-.team-head:hover { background: #f1f1f2; }
-.team-head.viewing { background: #f3f4ec; box-shadow: inset 3px 0 0 var(--lime); }
+.team-head { display: flex; align-items: center; gap: 4px; padding: 6px 6px; border-radius: 6px; background: rgba(203, 206, 0, 0.15); border-left: 3px solid var(--lime); margin: 3px 0 2px; }
+.team-head:hover { background: rgba(203, 206, 0, 0.26); }
+.team-head.viewing { background: rgba(203, 206, 0, 0.36); }
 .reorder { display: inline-flex; flex-direction: column; line-height: .6; opacity: 0; flex: 0 0 auto; }
 .reorder button { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 8px; padding: 1px 2px; }
 .reorder button:hover { color: var(--ink); }

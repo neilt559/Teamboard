@@ -13,6 +13,7 @@ const STOPLIGHTS = { red: '#e5484d', yellow: '#f4be0d', green: '#2fb344' };
 const PERSON_COLORS = ['#5B5859', '#CBCE00', '#0086c0', '#e2445c', '#fdab3d', '#00c875', '#a25ddc', '#ff158a', '#037f4c', '#7f5347'];
 
 const byPos = (a, b) => (Number(a.position) - Number(b.position)) || (Number(a.id) - Number(b.id));
+const byName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
 
 function initials(name) {
   if (!name) return '?';
@@ -90,6 +91,7 @@ export default function Page() {
   const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
+  const [globalView, setGlobalView] = useState(false);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
@@ -426,6 +428,8 @@ export default function Page() {
     }
   });
   const infoRows = data.info.filter((r) => String(r.project_id) === String(selected)).sort(byPos);
+  const activeProjectIdSet = new Set(data.projects.filter((p) => !p.archived).map((p) => String(p.id)));
+  const globalTasks = data.tasks.filter((t) => !t.archived && activeProjectIdSet.has(String(t.project_id)));
   const activeOffices = [...data.offices].filter((o) => !o.archived).sort(byPos);
   const archivedOffices = data.offices.filter((o) => o.archived);
   const archivedTeams = data.teams.filter((t) => t.archived);
@@ -555,6 +559,7 @@ export default function Page() {
           <span className="dot" /> TeamBoard <small>shared project board</small>
         </div>
         <div className="header-actions">
+          <button className={`btn btn-ghost ${globalView ? 'tab-on' : ''}`} onClick={() => { setGlobalView(true); setTeamView(null); setSidebarOpen(false); }}>📋 All Tasks</button>
           <button className="btn btn-ghost people-btn" onClick={() => setPeopleOpen(true)}><IconUsers /> People ({data.people.length})</button>
           <button className="btn btn-lime" onClick={addOffice}>+ New Office</button>
         </div>
@@ -582,13 +587,13 @@ export default function Page() {
                 {!oCollapsed && (
                   <div className="office-teams">
                     {officeTeams.map((team) => {
-                      const teamProjects = data.projects.filter((p) => String(p.team_id) === String(team.id) && !p.archived).sort(byPos);
+                      const teamProjects = data.projects.filter((p) => String(p.team_id) === String(team.id) && !p.archived).sort(byName);
                       const collapsed = collapsedTeams[team.id];
                       return (
                         <div key={team.id} className="team">
                           <div className={`team-head ${String(teamView) === String(team.id) ? 'viewing' : ''}`}>
                             <button className="team-caret" onClick={() => toggleTeam(team.id)} aria-label="Collapse team">{collapsed ? '▶' : '▼'}</button>
-                            <span className="team-name" onClick={() => { setTeamView(team.id); setSidebarOpen(false); }} onDoubleClick={() => renameTeam(team)} title="Click to view team · double-click to rename">{team.name}</span>
+                            <span className="team-name" onClick={() => { setTeamView(team.id); setGlobalView(false); setSidebarOpen(false); }} onDoubleClick={() => renameTeam(team)} title="Click to view team · double-click to rename">{team.name}</span>
                             <span className="reorder">
                               <button onClick={() => moveTeam(team, -1)} title="Move up">▲</button>
                               <button onClick={() => moveTeam(team, 1)} title="Move down">▼</button>
@@ -602,17 +607,13 @@ export default function Page() {
                             return (
                               <div
                                 key={p.id}
-                                className={`proj ${String(p.id) === String(selected) && teamView == null ? 'active' : ''}`}
-                                onClick={() => { setSelected(p.id); setTeamView(null); setSidebarOpen(false); }}
+                                className={`proj ${String(p.id) === String(selected) && teamView == null && !globalView ? 'active' : ''}`}
+                                onClick={() => { setSelected(p.id); setTeamView(null); setGlobalView(false); setSidebarOpen(false); }}
                                 onDoubleClick={() => renameProject(p)}
                                 title="Click to open · double-click to rename"
                               >
                                 <span className="name">{p.name}</span>
                                 <span className="count">{count}</span>
-                                <span className="reorder">
-                                  <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, -1); }} title="Move up">▲</button>
-                                  <button onClick={(e) => { e.stopPropagation(); moveProjectOrder(p, 1); }} title="Move down">▼</button>
-                                </span>
                                 <button className="row-icon" title="Archive project" onClick={(e) => { e.stopPropagation(); setProjectArchived(p, true); }}><IconArchive /></button>
                                 <button className="row-icon danger" title="Delete project" onClick={(e) => { e.stopPropagation(); deleteProject(p); }}><IconTrash /></button>
                               </div>
@@ -678,11 +679,19 @@ export default function Page() {
             </div>
           )}
 
-          {viewedTeam ? (
+          {globalView ? (
+            <GlobalTasks
+              tasks={globalTasks}
+              people={data.people}
+              projects={data.projects}
+              onUpdate={updateTask}
+              onOpenProject={(id) => { setGlobalView(false); setTeamView(null); setSelected(id); }}
+            />
+          ) : viewedTeam ? (
             <TeamOverview
               team={viewedTeam}
               offices={activeOffices}
-              projects={data.projects.filter((p) => String(p.team_id) === String(viewedTeam.id) && !p.archived).sort(byPos)}
+              projects={data.projects.filter((p) => String(p.team_id) === String(viewedTeam.id) && !p.archived).sort(byName)}
               tasks={data.tasks}
               onOpen={(id) => { setSelected(id); setTeamView(null); }}
               onAddProject={() => addProject(viewedTeam.id)}
@@ -862,6 +871,140 @@ export default function Page() {
       {peopleOpen && (
         <PeopleModal people={data.people} onAdd={addPerson} onUpdate={updatePerson} onDelete={deletePerson} onClose={() => setPeopleOpen(false)} />
       )}
+    </>
+  );
+}
+
+function GlobalTasks({ tasks, people, projects, onUpdate, onOpenProject }) {
+  const [fOwner, setFOwner] = useState('all');
+  const [fLight, setFLight] = useState('all');
+  const [fStatus, setFStatus] = useState('all');
+  const [sortBy, setSortBy] = useState('due');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const projName = (id) => projects.find((p) => String(p.id) === String(id))?.name || '—';
+  const personName = (id) => people.find((p) => String(p.id) === String(id))?.name || '';
+
+  let rows = tasks.filter((t) => {
+    if (fOwner === 'none' && t.assignee_id) return false;
+    if (fOwner !== 'all' && fOwner !== 'none' && String(t.assignee_id) !== String(fOwner)) return false;
+    if (fLight === 'none' && t.stoplight) return false;
+    if (fLight !== 'all' && fLight !== 'none' && t.stoplight !== fLight) return false;
+    if (fStatus !== 'all' && t.status !== fStatus) return false;
+    return true;
+  });
+
+  const slRank = { red: 0, yellow: 1, green: 2, '': 3 };
+  const cmp = {
+    project: (a, b) => projName(a.project_id).localeCompare(projName(b.project_id), undefined, { numeric: true }),
+    task: (a, b) => (a.title || '').localeCompare(b.title || ''),
+    owner: (a, b) => (personName(a.assignee_id) || 'zzzz').localeCompare(personName(b.assignee_id) || 'zzzz'),
+    stoplight: (a, b) => (slRank[a.stoplight || ''] - slRank[b.stoplight || '']),
+    due: (a, b) => (a.due_date || '9999-99-99').localeCompare(b.due_date || '9999-99-99'),
+    status: (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status),
+  };
+  rows = [...rows].sort((a, b) => { const c = (cmp[sortBy] || cmp.due)(a, b); return sortDir === 'asc' ? c : -c; });
+
+  const setSort = (col) => {
+    if (sortBy === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortBy(col); setSortDir('asc'); }
+  };
+  const arrow = (col) => (sortBy === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+
+  return (
+    <>
+      <div className="proj-head">
+        <h1>All Tasks</h1>
+        <span className="progress-label">{rows.length} task{rows.length !== 1 ? 's' : ''} across all projects</span>
+      </div>
+      <div className="filters">
+        <label>Person
+          <select value={fOwner} onChange={(e) => setFOwner(e.target.value)}>
+            <option value="all">Everyone</option>
+            <option value="none">Unassigned</option>
+            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <label>Stoplight
+          <select value={fLight} onChange={(e) => setFLight(e.target.value)}>
+            <option value="all">Any</option>
+            <option value="red">Red</option>
+            <option value="yellow">Yellow</option>
+            <option value="green">Green</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <label>Status
+          <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
+            <option value="all">Any</option>
+            {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="board">
+        <div className="board-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: '20%' }} className="sortable" onClick={() => setSort('project')}>Project{arrow('project')}</th>
+                <th style={{ width: '26%' }} className="sortable" onClick={() => setSort('task')}>Task{arrow('task')}</th>
+                <th style={{ width: '16%' }} className="sortable" onClick={() => setSort('owner')}>Owner{arrow('owner')}</th>
+                <th style={{ width: '11%' }} className="sortable" onClick={() => setSort('stoplight')}>Stoplight{arrow('stoplight')}</th>
+                <th style={{ width: '12%' }} className="sortable" onClick={() => setSort('due')}>Due{arrow('due')}</th>
+                <th style={{ width: '15%' }} className="sortable" onClick={() => setSort('status')}>Status{arrow('status')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((t) => {
+                const owner = people.find((p) => String(p.id) === String(t.assignee_id));
+                const st = STATUSES[t.status] || STATUSES.not_started;
+                return (
+                  <tr key={t.id}>
+                    <td><button className="proj-link" onClick={() => onOpenProject(t.project_id)} title="Open this project">{projName(t.project_id)}</button></td>
+                    <td>{t.parent_id ? <span className="subtask-arrow">↳ </span> : null}<span className="gt-title">{t.title || 'Untitled task'}</span></td>
+                    <td>
+                      <div className="cell-owner">
+                        {owner ? (
+                          <span className="avatar" style={{ background: owner.color }}>{initials(owner.name)}</span>
+                        ) : (
+                          <span className="avatar" style={{ background: '#dcdcdc', color: '#8a8788' }}>–</span>
+                        )}
+                        <select className="owner-select" value={t.assignee_id ?? ''} onChange={(e) => onUpdate(t.id, { assignee_id: e.target.value || null })}>
+                          <option value="">Unassigned</option>
+                          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="stoplight">
+                        {STOPLIGHT_ORDER.map((c) => (
+                          <button key={c} type="button" className={`sl-dot ${t.stoplight === c ? 'on' : ''}`} style={{ '--sl': STOPLIGHTS[c] }} onClick={() => onUpdate(t.id, { stoplight: t.stoplight === c ? '' : c })} />
+                        ))}
+                      </div>
+                    </td>
+                    <td>
+                      <input type="date" className="date-input" value={t.due_date ?? ''} onChange={(e) => onUpdate(t.id, { due_date: e.target.value || null })} />
+                    </td>
+                    <td>
+                      <select
+                        className="status-select"
+                        value={t.status}
+                        style={{ background: '#fff', color: st.text, borderColor: st.color }}
+                        onChange={(e) => { const v = e.target.value; onUpdate(t.id, v === 'done' ? { status: 'done', archived: true } : { status: v }); }}
+                      >
+                        {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
+                      </select>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!rows.length && (
+                <tr><td colSpan={6} style={{ padding: 28, textAlign: 'center', color: '#8a8788' }}>No tasks match these filters.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </>
   );
 }
