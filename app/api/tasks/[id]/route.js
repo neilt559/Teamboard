@@ -29,8 +29,11 @@ export async function PATCH(req, { params }) {
     if ('notes' in b) {
       await sql`UPDATE tasks SET notes=${(b.notes ?? '').slice(0, 5000)} WHERE id=${id}`;
     }
+    if ('stoplight' in b) {
+      await sql`UPDATE tasks SET stoplight=${b.stoplight || ''} WHERE id=${id}`;
+    }
     const r = await sql`
-      SELECT id, project_id, title, assignee_id, due_date, status, archived, notes
+      SELECT id, project_id, parent_id, title, assignee_id, due_date, status, archived, notes, stoplight
       FROM tasks WHERE id=${id}`;
     return NextResponse.json(r.rows[0] || {});
   } catch (e) {

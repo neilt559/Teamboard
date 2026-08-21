@@ -14,14 +14,16 @@ export async function GET() {
     const offices = await sql`SELECT id, name, position, archived FROM offices ORDER BY position ASC, id ASC`;
     const teams = await sql`SELECT id, name, office_id, position, archived FROM teams ORDER BY position ASC, id ASC`;
     const projects = await sql`SELECT id, team_id, name, notes, position, archived FROM projects ORDER BY position ASC, id ASC`;
-    const tasks = await sql`SELECT id, project_id, parent_id, title, assignee_id, due_date, status, archived, notes
+    const tasks = await sql`SELECT id, project_id, parent_id, title, assignee_id, due_date, status, archived, notes, stoplight
                             FROM tasks ORDER BY position ASC, id ASC`;
+    const info = await sql`SELECT id, project_id, label, value, position FROM project_info ORDER BY position ASC, id ASC`;
     return NextResponse.json({
       people: people.rows,
       offices: offices.rows,
       teams: teams.rows,
       projects: projects.rows,
       tasks: tasks.rows,
+      info: info.rows,
     });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });

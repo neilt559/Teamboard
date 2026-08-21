@@ -2,12 +2,14 @@
 import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
 
 const STATUSES = {
-  not_started: { label: 'Not Started', color: '#c4c4c4' },
-  working: { label: 'Working on it', color: '#fdab3d' },
-  stuck: { label: 'Stuck', color: '#e2445c' },
-  done: { label: 'Done', color: '#00c875' },
+  not_started: { label: 'Not Started', color: '#b6b6b7', text: '#6f6c6d' },
+  working: { label: 'Working on it', color: '#fdab3d', text: '#b9760a' },
+  stuck: { label: 'Stuck', color: '#e2445c', text: '#cf3350' },
+  done: { label: 'Done', color: '#00c875', text: '#029457' },
 };
 const STATUS_ORDER = ['not_started', 'working', 'stuck', 'done'];
+const STOPLIGHT_ORDER = ['red', 'yellow', 'green'];
+const STOPLIGHTS = { red: '#e5484d', yellow: '#f4be0d', green: '#2fb344' };
 const PERSON_COLORS = ['#5B5859', '#CBCE00', '#0086c0', '#e2445c', '#fdab3d', '#00c875', '#a25ddc', '#ff158a', '#037f4c', '#7f5347'];
 
 const byPos = (a, b) => (Number(a.position) - Number(b.position)) || (Number(a.id) - Number(b.id));
@@ -41,6 +43,12 @@ function normHex(s) {
   return null;
 }
 function toHex(v) { return normHex(v) || '#5b5859'; }
+
+function isWebUrl(s) { return /^https?:\/\//i.test((s || '').trim()); }
+function isFilePath(s) { const v = (s || '').trim(); return /^(\\\\|[a-zA-Z]:[\\/])/.test(v); }
+async function copyText(s) {
+  try { await navigator.clipboard.writeText(s); return true; } catch { return false; }
+}
 
 function ColorControl({ value, onChange }) {
   const [local, setLocal] = useState(toHex(value));
@@ -79,7 +87,7 @@ async function api(path, opts) {
 }
 
 export default function Page() {
-  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [] });
+  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
   const [error, setError] = useState(null);
@@ -381,6 +389,26 @@ export default function Page() {
     catch (e) { setError(e.message); }
   }
 
+  // ---- additional project info ----
+  async function addInfo() {
+    if (selected === null) return;
+    touch();
+    try { await api('/api/info', { method: 'POST', body: JSON.stringify({ project_id: selected }) }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  async function updateInfo(id, patch) {
+    setData((d) => ({ ...d, info: d.info.map((r) => (r.id === id ? { ...r, ...patch } : r)) }));
+    touch();
+    try { await api(`/api/info/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function deleteInfo(id) {
+    setData((d) => ({ ...d, info: d.info.filter((r) => r.id !== id) }));
+    touch();
+    try { await api(`/api/info/${id}`, { method: 'DELETE' }); }
+    catch (e) { setError(e.message); }
+  }
+
   const viewedTeam = teamView != null ? data.teams.find((t) => String(t.id) === String(teamView) && !t.archived) : null;
   const project = data.projects.find((p) => String(p.id) === String(selected)) || null;
   const allTasks = data.tasks.filter((t) => String(t.project_id) === String(selected));
@@ -397,6 +425,7 @@ export default function Page() {
       subtasksByParent[k].push(t);
     }
   });
+  const infoRows = data.info.filter((r) => String(r.project_id) === String(selected)).sort(byPos);
   const activeOffices = [...data.offices].filter((o) => !o.archived).sort(byPos);
   const archivedOffices = data.offices.filter((o) => o.archived);
   const archivedTeams = data.teams.filter((t) => t.archived);
@@ -449,13 +478,27 @@ export default function Page() {
             </div>
           </td>
           <td>
+            <div className="stoplight">
+              {STOPLIGHT_ORDER.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`sl-dot ${t.stoplight === c ? 'on' : ''}`}
+                  style={{ '--sl': STOPLIGHTS[c] }}
+                  title={c === 'red' ? 'Urgent' : c === 'yellow' ? 'Priority' : 'When there is time'}
+                  onClick={() => updateTask(t.id, { stoplight: t.stoplight === c ? '' : c })}
+                />
+              ))}
+            </div>
+          </td>
+          <td>
             <input type="date" className="date-input" value={t.due_date ?? ''} onChange={(e) => updateTask(t.id, { due_date: e.target.value || null })} />
           </td>
           <td>
             <select
               className="status-select"
               value={t.status}
-              style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}
+              style={{ background: '#fff', color: st.text, borderColor: st.color }}
               onChange={(e) => (isSub ? updateTask(t.id, { status: e.target.value }) : changeStatus(t.id, e.target.value))}
             >
               {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
@@ -473,7 +516,7 @@ export default function Page() {
 
         {hasNotes && !notesOpen && (
           <tr className="note-preview-row">
-            <td colSpan={5}>
+            <td colSpan={6}>
               <div className="note-preview" title="Click to edit note" onClick={() => toggleNotes(t.id)}>📝 {t.notes}</div>
             </td>
           </tr>
@@ -481,7 +524,7 @@ export default function Page() {
 
         {notesOpen && (
           <tr className="task-notes-row">
-            <td colSpan={5}>
+            <td colSpan={6}>
               <textarea
                 className="task-notes-area"
                 defaultValue={t.notes || ''}
@@ -496,7 +539,7 @@ export default function Page() {
           <>
             {subs.map((sub) => renderTaskRow(sub, true))}
             <tr className="subtask-add-row">
-              <td colSpan={5}><button className="add-subtask-btn" onClick={() => addSubtask(t.id)}>+ Add subtask</button></td>
+              <td colSpan={6}><button className="add-subtask-btn" onClick={() => addSubtask(t.id)}>+ Add subtask</button></td>
             </tr>
           </>
         )}
@@ -677,9 +720,10 @@ export default function Page() {
                   <table>
                     <thead>
                       <tr>
-                        <th style={{ width: '40%' }}>Task</th>
-                        <th style={{ width: '20%' }}>Owner</th>
-                        <th style={{ width: '15%' }}>Due date</th>
+                        <th style={{ width: '32%' }}>Task</th>
+                        <th style={{ width: '18%' }}>Owner</th>
+                        <th style={{ width: '11%' }}>Stoplight</th>
+                        <th style={{ width: '14%' }}>Due date</th>
                         <th style={{ width: '17%' }}>Status</th>
                         <th style={{ width: '8%' }} />
                       </tr>
@@ -687,9 +731,9 @@ export default function Page() {
                     <tbody>
                       {tasks.map((t) => renderTaskRow(t, false))}
                       {!tasks.length && (
-                        <tr><td colSpan={5} style={{ padding: 28, textAlign: 'center', color: '#8a8788' }}>No tasks yet — add your first one.</td></tr>
+                        <tr><td colSpan={6} style={{ padding: 28, textAlign: 'center', color: '#8a8788' }}>No tasks yet — add your first one.</td></tr>
                       )}
-                      <tr><td colSpan={5} style={{ padding: 0 }}>
+                      <tr><td colSpan={6} style={{ padding: 0 }}>
                         <button className="add-task-btn" onClick={addTask}>+ Add task</button>
                       </td></tr>
                     </tbody>
@@ -712,8 +756,8 @@ export default function Page() {
                               const st = STATUSES[t.status] || STATUSES.done;
                               return (
                                 <tr key={t.id} className="archived-row">
-                                  <td style={{ width: '40%' }}><span className="archived-title">{t.title || 'Untitled task'}</span></td>
-                                  <td style={{ width: '20%' }}>
+                                  <td style={{ width: '32%' }}><span className="archived-title">{t.title || 'Untitled task'}</span></td>
+                                  <td style={{ width: '18%' }}>
                                     <div className="cell-owner">
                                       {owner ? (
                                         <span className="avatar" style={{ background: owner.color }}>{initials(owner.name)}</span>
@@ -723,7 +767,12 @@ export default function Page() {
                                       <span className="archived-owner">{owner ? owner.name : 'Unassigned'}</span>
                                     </div>
                                   </td>
-                                  <td style={{ width: '15%' }} className="archived-due">{t.due_date || '—'}</td>
+                                  <td style={{ width: '11%' }}>
+                                    {t.stoplight && STOPLIGHTS[t.stoplight]
+                                      ? <span className="sl-dot on" style={{ '--sl': STOPLIGHTS[t.stoplight] }} />
+                                      : <span style={{ color: '#c4c4c4' }}>—</span>}
+                                  </td>
+                                  <td style={{ width: '14%' }} className="archived-due">{t.due_date || '—'}</td>
                                   <td style={{ width: '17%' }}>
                                     <span className="status-pill" style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}>{st.label}</span>
                                   </td>
@@ -741,6 +790,53 @@ export default function Page() {
                   )}
                 </div>
               )}
+
+              <div className="info-panel">
+                <div className="info-head">
+                  <label className="notes-label">📎 Additional project info <span>· links, documents &amp; references</span></label>
+                  <button className="btn btn-lime btn-sm" onClick={addInfo}>+ Add row</button>
+                </div>
+                {infoRows.length > 0 && (
+                  <div className="info-table">
+                    <div className="info-row info-row-head">
+                      <div>Item</div>
+                      <div>Info / link</div>
+                      <div />
+                    </div>
+                    {infoRows.map((r) => (
+                      <div key={r.id} className="info-row">
+                        <input
+                          className="info-input"
+                          key={`${r.id}-l`}
+                          defaultValue={r.label}
+                          placeholder="Item name"
+                          onBlur={(e) => { if (e.target.value !== r.label) updateInfo(r.id, { label: e.target.value }); }}
+                        />
+                        <div className="info-value-cell">
+                          <input
+                            className="info-input"
+                            key={`${r.id}-v-${r.value}`}
+                            defaultValue={r.value}
+                            placeholder="Type info, a web link, or a file path…"
+                            onBlur={(e) => { if (e.target.value !== r.value) updateInfo(r.id, { value: e.target.value }); }}
+                          />
+                          {isWebUrl(r.value) && (
+                            <a className="info-action" href={r.value} target="_blank" rel="noopener noreferrer" title="Open link in a new tab">Open ↗</a>
+                          )}
+                          {!isWebUrl(r.value) && isFilePath(r.value) && (
+                            <button className="info-action" title="Copy path — paste into File Explorer's address bar" onClick={async (e) => { const ok = await copyText(r.value); const b = e.currentTarget; if (ok) { b.textContent = 'Copied!'; setTimeout(() => { b.textContent = 'Copy'; }, 1200); } }}>Copy</button>
+                          )}
+                        </div>
+                        <button className="row-x info-del" title="Delete row" onClick={() => deleteInfo(r.id)}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {infoRows.length === 0 && (
+                  <p className="info-empty">Nothing here yet — add rows for document links, permit numbers, file paths, contacts, etc.</p>
+                )}
+                <p className="info-hint">Web links (http/https) become clickable and open in a new tab. Local/network paths (<code>C:\…</code> or <code>\\server\…</code>) can’t be clickable from a website — use <b>Copy</b> and paste into File Explorer’s address bar.</p>
+              </div>
             </>
           ) : (
             loaded && !error && (
