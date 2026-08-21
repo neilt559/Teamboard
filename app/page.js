@@ -490,16 +490,26 @@ export default function Page() {
           </td>
           <td>
             <div className="stoplight">
-              {STOPLIGHT_ORDER.map((c) => (
+              {t.stoplight && STOPLIGHTS[t.stoplight] ? (
                 <button
-                  key={c}
                   type="button"
-                  className={`sl-dot ${t.stoplight === c ? 'on' : ''}`}
-                  style={{ '--sl': STOPLIGHTS[c] }}
-                  title={c === 'red' ? 'Urgent' : c === 'yellow' ? 'Priority' : 'When there is time'}
-                  onClick={() => updateTask(t.id, { stoplight: t.stoplight === c ? '' : c })}
+                  className="sl-dot on solo"
+                  style={{ '--sl': STOPLIGHTS[t.stoplight] }}
+                  title="Click to clear priority"
+                  onClick={() => updateTask(t.id, { stoplight: '' })}
                 />
-              ))}
+              ) : (
+                STOPLIGHT_ORDER.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className="sl-dot"
+                    style={{ '--sl': STOPLIGHTS[c] }}
+                    title={c === 'red' ? 'Urgent' : c === 'yellow' ? 'Priority' : 'When there is time'}
+                    onClick={() => updateTask(t.id, { stoplight: c })}
+                  />
+                ))
+              )}
             </div>
           </td>
           <td>
@@ -698,6 +708,7 @@ export default function Page() {
             <TeamOverview
               team={viewedTeam}
               offices={activeOffices}
+              people={data.people}
               projects={data.projects.filter((p) => String(p.team_id) === String(viewedTeam.id) && !p.archived).sort(byName)}
               tasks={data.tasks}
               onOpen={(id) => { setSelected(id); setTeamView(null); }}
@@ -985,9 +996,13 @@ function GlobalTasks({ tasks, people, projects, onUpdate, onOpenProject }) {
                     </td>
                     <td>
                       <div className="stoplight">
-                        {STOPLIGHT_ORDER.map((c) => (
-                          <button key={c} type="button" className={`sl-dot ${t.stoplight === c ? 'on' : ''}`} style={{ '--sl': STOPLIGHTS[c] }} onClick={() => onUpdate(t.id, { stoplight: t.stoplight === c ? '' : c })} />
-                        ))}
+                        {t.stoplight && STOPLIGHTS[t.stoplight] ? (
+                          <button type="button" className="sl-dot on solo" style={{ '--sl': STOPLIGHTS[t.stoplight] }} title="Click to clear priority" onClick={() => onUpdate(t.id, { stoplight: '' })} />
+                        ) : (
+                          STOPLIGHT_ORDER.map((c) => (
+                            <button key={c} type="button" className="sl-dot" style={{ '--sl': STOPLIGHTS[c] }} onClick={() => onUpdate(t.id, { stoplight: c })} />
+                          ))
+                        )}
                       </div>
                     </td>
                     <td>
@@ -1017,7 +1032,11 @@ function GlobalTasks({ tasks, people, projects, onUpdate, onOpenProject }) {
   );
 }
 
-function TeamOverview({ team, offices, projects, tasks, onOpen, onAddProject, onSaveNotes, onMoveOffice, onAddTask }) {
+function TeamOverview({ team, offices, people, projects, tasks, onOpen, onAddProject, onSaveNotes, onMoveOffice, onAddTask }) {
+  const ownerOf = (id) => people.find((pp) => String(pp.id) === String(id));
+  const renderOwner = (owner) => (owner
+    ? <span className="ov-owner"><span className="avatar xs" style={{ background: owner.color }}>{initials(owner.name)}</span>{owner.name}</span>
+    : <span className="ov-owner ov-unassigned">Unassigned</span>);
   return (
     <>
       <div className="proj-head">
@@ -1057,17 +1076,18 @@ function TeamOverview({ team, offices, projects, tasks, onOpen, onAddProject, on
                 <div className="ov-tasks">
                   {projTop.length === 0 && <div className="ov-empty">No tasks yet.</div>}
                   {projTop.map((t) => {
-                    const st = STATUSES[t.status] || STATUSES.not_started;
                     const subs = tasks.filter((x) => String(x.parent_id) === String(t.id) && !x.archived).sort(byPos);
                     return (
                       <div key={t.id} className="ov-task" style={{ borderLeftColor: t.stoplight && STOPLIGHTS[t.stoplight] ? STOPLIGHTS[t.stoplight] : 'transparent' }}>
                         <div className="ov-task-row" onClick={() => onOpen(p.id)} title="Open project board">
-                          <span className="ov-dot" style={{ background: st.color }} />
                           <span className="ov-task-title">{t.title || 'Untitled task'}</span>
-                          <span className="ov-task-status" style={{ color: st.text }}>{st.label}</span>
+                          {renderOwner(ownerOf(t.assignee_id))}
                         </div>
                         {subs.map((s) => (
-                          <div key={s.id} className="ov-sub">↳ {s.title || 'Untitled subtask'}</div>
+                          <div key={s.id} className="ov-sub">
+                            <span className="ov-sub-title">↳ {s.title || 'Untitled subtask'}</span>
+                            {renderOwner(ownerOf(s.assignee_id))}
+                          </div>
                         ))}
                       </div>
                     );

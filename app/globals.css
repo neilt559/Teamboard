@@ -141,10 +141,11 @@ tbody tr:hover td { background: #fcfcfa; }
 }
 
 /* stoplight priority dots */
-.stoplight { display: inline-flex; gap: 6px; align-items: center; }
+.stoplight { display: flex; gap: 6px; align-items: center; justify-content: center; }
 .sl-dot { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--sl); background: transparent; cursor: pointer; padding: 0; opacity: .38; transition: opacity .1s, box-shadow .1s; }
 .sl-dot:hover { opacity: .85; }
 .sl-dot.on { background: var(--sl); opacity: 1; box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--sl); }
+.sl-dot.solo { width: 18px; height: 18px; box-shadow: none; }
 
 /* additional project info */
 .info-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 16px; }
@@ -324,7 +325,11 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .ov-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
 .ov-task-title { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ov-task-status { font-size: 11px; font-weight: 600; white-space: nowrap; flex: 0 0 auto; }
-.ov-sub { font-size: 12px; color: var(--ink-2); padding: 2px 4px 2px 27px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-sub { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); padding: 2px 4px 2px 20px; }
+.ov-sub-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-owner { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); font-weight: 600; white-space: nowrap; flex: 0 0 auto; }
+.ov-unassigned { color: var(--muted); font-weight: 400; font-style: italic; }
+.avatar.xs { width: 18px; height: 18px; font-size: 9px; flex: 0 0 18px; }
 .ov-add { margin-top: 8px; background: none; border: 1px dashed var(--line); color: var(--ink-2); font-weight: 600; font-size: 12px; padding: 6px 10px; border-radius: 6px; cursor: pointer; width: 100%; }
 .ov-add:hover { border-color: var(--lime); color: var(--ink); background: #fafbf0; }
 

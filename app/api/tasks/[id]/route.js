@@ -23,6 +23,10 @@ export async function PATCH(req, { params }) {
     if ('status' in b) {
       await sql`UPDATE tasks SET status=${b.status || 'not_started'} WHERE id=${id}`;
     }
+    // A top-level task set to Done always archives (subtasks stay put).
+    if (b.status === 'done') {
+      await sql`UPDATE tasks SET archived=true WHERE id=${id} AND parent_id IS NULL`;
+    }
     if ('archived' in b) {
       await sql`UPDATE tasks SET archived=${!!b.archived} WHERE id=${id}`;
     }
