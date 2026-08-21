@@ -1011,6 +1011,7 @@ function GeoTracker({ scores, onAdd, onDelete }) {
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
   const [val, setVal] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
   const submit = () => { const n = parseInt(val, 10); if (isNaN(n)) return; onAdd(n, date); setVal(''); };
   const sorted = [...scores].sort((a, b) => (a.score_date || '').localeCompare(b.score_date || '') || (Number(a.id) - Number(b.id)));
   return (
@@ -1022,14 +1023,21 @@ function GeoTracker({ scores, onAdd, onDelete }) {
       </div>
       <GeoChart data={sorted} />
       {sorted.length > 0 && (
-        <div className="geo-list">
-          {[...sorted].reverse().slice(0, 14).map((s) => (
-            <div key={s.id} className="geo-row">
-              <span className="geo-date">{s.score_date || '—'}</span>
-              <span className="geo-score">{Number(s.score).toLocaleString()}</span>
-              <button className="row-x" title="Delete" onClick={() => onDelete(s.id)}>×</button>
+        <div className="geo-history">
+          <button className="geo-history-toggle" onClick={() => setShowHistory((s) => !s)}>
+            {showHistory ? '▾' : '▸'} Score history ({sorted.length})
+          </button>
+          {showHistory && (
+            <div className="geo-list">
+              {[...sorted].reverse().map((s) => (
+                <div key={s.id} className="geo-row">
+                  <span className="geo-date">{s.score_date || '—'}</span>
+                  <span className="geo-score">{Number(s.score).toLocaleString()}</span>
+                  <button className="row-x" title="Delete" onClick={() => onDelete(s.id)}>×</button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </>
