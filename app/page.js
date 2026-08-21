@@ -88,10 +88,12 @@ async function api(path, opts) {
 }
 
 export default function Page() {
-  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [] });
+  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
   const [globalView, setGlobalView] = useState(false);
+  const [officeView, setOfficeView] = useState(null);
+  const [expandedMeetings, setExpandedMeetings] = useState({});
   const [addingTaskFor, setAddingTaskFor] = useState(null);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -211,6 +213,46 @@ export default function Page() {
     setData((d) => ({ ...d, teams: d.teams.map((t) => (t.id === teamId ? { ...t, office_id: officeId } : t)) }));
     touch();
     try { await api(`/api/teams/${teamId}`, { method: 'PATCH', body: JSON.stringify({ office_id: officeId }) }); }
+    catch (e) { setError(e.message); }
+  }
+
+  // ---- meetings ----
+  async function addMeeting(officeId) {
+    const title = prompt('Meeting name', 'Meeting');
+    if (title === null) return;
+    const today = new Date().toISOString().slice(0, 10);
+    touch();
+    try {
+      const m = await api('/api/meetings', { method: 'POST', body: JSON.stringify({ office_id: officeId, title: title.trim() || 'Meeting', meeting_date: today }) });
+      await load(true);
+      if (m && m.id) setExpandedMeetings((s) => ({ ...s, [m.id]: true }));
+    } catch (e) { setError(e.message); }
+  }
+  async function updateMeeting(id, patch) {
+    setData((d) => ({ ...d, meetings: d.meetings.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
+    touch();
+    try { await api(`/api/meetings/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function deleteMeeting(m) {
+    if (!confirm(`Delete meeting “${m.title}” and its minutes?`)) return;
+    setData((d) => ({ ...d, meetings: d.meetings.filter((x) => x.id !== m.id) }));
+    touch();
+    try { await api(`/api/meetings/${m.id}`, { method: 'DELETE' }); }
+    catch (e) { setError(e.message); }
+  }
+  function toggleMeeting(id) { setExpandedMeetings((s) => ({ ...s, [id]: !s[id] })); }
+
+  // ---- geoguessr ----
+  async function addGeo(officeId, score, date) {
+    touch();
+    try { await api('/api/geo', { method: 'POST', body: JSON.stringify({ office_id: officeId, score, score_date: date }) }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  async function deleteGeo(id) {
+    setData((d) => ({ ...d, geo: d.geo.filter((g) => g.id !== id) }));
+    touch();
+    try { await api(`/api/geo/${id}`, { method: 'DELETE' }); }
     catch (e) { setError(e.message); }
   }
 
@@ -421,6 +463,7 @@ export default function Page() {
   }
 
   const viewedTeam = teamView != null ? data.teams.find((t) => String(t.id) === String(teamView) && !t.archived) : null;
+  const viewedOffice = officeView != null ? data.offices.find((o) => String(o.id) === String(officeView) && !o.archived) : null;
   const project = data.projects.find((p) => String(p.id) === String(selected)) || null;
   const allTasks = data.tasks.filter((t) => String(t.project_id) === String(selected));
   const topTasks = allTasks.filter((t) => !t.parent_id);
@@ -578,7 +621,7 @@ export default function Page() {
           <span className="dot" /> TeamBoard <small>shared project board</small>
         </div>
         <div className="header-actions">
-          <button className={`btn btn-ghost ${globalView ? 'tab-on' : ''}`} onClick={() => { setGlobalView(true); setTeamView(null); setSidebarOpen(false); }}>📋 All Tasks</button>
+          <button className={`btn btn-ghost ${globalView ? 'tab-on' : ''}`} onClick={() => { setGlobalView(true); setTeamView(null); setOfficeView(null); setSidebarOpen(false); }}>📋 All Tasks</button>
           <button className="btn btn-ghost people-btn" onClick={() => setPeopleOpen(true)}><IconUsers /> People ({data.people.length})</button>
           <button className="btn btn-lime" onClick={addOffice}>+ New Office</button>
         </div>
@@ -594,7 +637,7 @@ export default function Page() {
               <div key={office.id} className="office">
                 <div className="office-head">
                   <button className="team-caret" onClick={() => toggleOffice(office.id)} aria-label="Collapse office">{oCollapsed ? '▶' : '▼'}</button>
-                  <span className="office-name" onClick={() => toggleOffice(office.id)} onDoubleClick={() => renameOffice(office)} title="Click to collapse · double-click to rename">{office.name}</span>
+                  <span className={`office-name ${String(officeView) === String(office.id) ? 'viewing' : ''}`} onClick={() => { setOfficeView(office.id); setTeamView(null); setGlobalView(false); setSidebarOpen(false); }} onDoubleClick={() => renameOffice(office)} title="Click to open office page · double-click to rename">{office.name}</span>
                   <span className="reorder">
                     <button onClick={() => moveOffice(office, -1)} title="Move up">▲</button>
                     <button onClick={() => moveOffice(office, 1)} title="Move down">▼</button>
@@ -612,7 +655,7 @@ export default function Page() {
                         <div key={team.id} className="team">
                           <div className={`team-head ${String(teamView) === String(team.id) ? 'viewing' : ''}`}>
                             <button className="team-caret" onClick={() => toggleTeam(team.id)} aria-label="Collapse team">{collapsed ? '▶' : '▼'}</button>
-                            <span className="team-name" onClick={() => { setTeamView(team.id); setGlobalView(false); setSidebarOpen(false); }} onDoubleClick={() => renameTeam(team)} title="Click to view team · double-click to rename">{team.name}</span>
+                            <span className="team-name" onClick={() => { setTeamView(team.id); setGlobalView(false); setOfficeView(null); setSidebarOpen(false); }} onDoubleClick={() => renameTeam(team)} title="Click to view team · double-click to rename">{team.name}</span>
                             <span className="reorder">
                               <button onClick={() => moveTeam(team, -1)} title="Move up">▲</button>
                               <button onClick={() => moveTeam(team, 1)} title="Move down">▼</button>
@@ -627,7 +670,7 @@ export default function Page() {
                               <div
                                 key={p.id}
                                 className={`proj ${String(p.id) === String(selected) && teamView == null && !globalView ? 'active' : ''}`}
-                                onClick={() => { setSelected(p.id); setTeamView(null); setGlobalView(false); setSidebarOpen(false); }}
+                                onClick={() => { setSelected(p.id); setTeamView(null); setGlobalView(false); setOfficeView(null); setSidebarOpen(false); }}
                                 onDoubleClick={() => renameProject(p)}
                                 title="Click to open · double-click to rename"
                               >
@@ -704,7 +747,20 @@ export default function Page() {
               people={data.people}
               projects={data.projects}
               onUpdate={updateTask}
-              onOpenProject={(id) => { setGlobalView(false); setTeamView(null); setSelected(id); }}
+              onOpenProject={(id) => { setGlobalView(false); setTeamView(null); setOfficeView(null); setSelected(id); }}
+            />
+          ) : viewedOffice ? (
+            <OfficeView
+              office={viewedOffice}
+              meetings={data.meetings.filter((m) => String(m.office_id) === String(viewedOffice.id))}
+              geoScores={data.geo.filter((g) => String(g.office_id) === String(viewedOffice.id))}
+              expandedMeetings={expandedMeetings}
+              onToggleMeeting={toggleMeeting}
+              onAddMeeting={() => addMeeting(viewedOffice.id)}
+              onUpdateMeeting={updateMeeting}
+              onDeleteMeeting={deleteMeeting}
+              onAddGeo={(score, date) => addGeo(viewedOffice.id, score, date)}
+              onDeleteGeo={deleteGeo}
             />
           ) : viewedTeam ? (
             <TeamOverview
@@ -896,6 +952,126 @@ export default function Page() {
         <AddTaskModal people={data.people} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />
       )}
     </>
+  );
+}
+
+function OfficeView({ office, meetings, geoScores, expandedMeetings, onToggleMeeting, onAddMeeting, onUpdateMeeting, onDeleteMeeting, onAddGeo, onDeleteGeo }) {
+  return (
+    <>
+      <div className="proj-head">
+        <h1>🏢 {office.name}</h1>
+      </div>
+      <div className="office-cols">
+        <div className="office-section">
+          <div className="section-head">
+            <h2 className="section-title">Meetings</h2>
+            <button className="btn btn-lime btn-sm" onClick={onAddMeeting}>+ New meeting</button>
+          </div>
+          {meetings.length === 0 && <p className="ov-empty">No meetings yet — add one to start taking minutes.</p>}
+          {meetings.map((m) => {
+            const open = !!expandedMeetings[m.id];
+            return (
+              <div key={m.id} className="meeting">
+                <div className="meeting-head">
+                  <button className="team-caret" onClick={() => onToggleMeeting(m.id)} aria-label="Toggle minutes">{open ? '▾' : '▸'}</button>
+                  <input
+                    className="meeting-title"
+                    key={`${m.id}-t-${m.title}`}
+                    defaultValue={m.title}
+                    onBlur={(e) => { if (e.target.value !== m.title) onUpdateMeeting(m.id, { title: e.target.value }); }}
+                  />
+                  <input type="date" className="date-input meeting-date" value={m.meeting_date || ''} onChange={(e) => onUpdateMeeting(m.id, { meeting_date: e.target.value || null })} />
+                  <button className="row-icon danger" title="Delete meeting" onClick={() => onDeleteMeeting(m)}><IconTrash /></button>
+                </div>
+                {open && (
+                  <textarea
+                    className="meeting-minutes"
+                    key={`${m.id}-min`}
+                    defaultValue={m.minutes || ''}
+                    placeholder="Meeting minutes — attendees, agenda, decisions, action items…"
+                    onBlur={(e) => { if ((e.target.value || '') !== (m.minutes || '')) onUpdateMeeting(m.id, { minutes: e.target.value }); }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="office-section">
+          <div className="section-head">
+            <h2 className="section-title">Daily GeoGuessr 🌍</h2>
+          </div>
+          <GeoTracker scores={geoScores} onAdd={onAddGeo} onDelete={onDeleteGeo} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function GeoTracker({ scores, onAdd, onDelete }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [val, setVal] = useState('');
+  const submit = () => { const n = parseInt(val, 10); if (isNaN(n)) return; onAdd(n, date); setVal(''); };
+  const sorted = [...scores].sort((a, b) => (a.score_date || '').localeCompare(b.score_date || '') || (Number(a.id) - Number(b.id)));
+  return (
+    <>
+      <div className="geo-add">
+        <input type="date" className="date-input" value={date} onChange={(e) => setDate(e.target.value)} />
+        <input type="number" className="geo-input" placeholder="Score" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
+        <button className="btn btn-ink btn-sm" onClick={submit}>+ Add</button>
+      </div>
+      <GeoChart data={sorted} />
+      {sorted.length > 0 && (
+        <div className="geo-list">
+          {[...sorted].reverse().slice(0, 14).map((s) => (
+            <div key={s.id} className="geo-row">
+              <span className="geo-date">{s.score_date || '—'}</span>
+              <span className="geo-score">{Number(s.score).toLocaleString()}</span>
+              <button className="row-x" title="Delete" onClick={() => onDelete(s.id)}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function GeoChart({ data }) {
+  if (!data.length) return <div className="geo-chart-empty">Add a score to start the graph.</div>;
+  const W = 520, H = 210;
+  const pad = { l: 48, r: 14, t: 14, b: 30 };
+  const iw = W - pad.l - pad.r;
+  const ih = H - pad.t - pad.b;
+  const scores = data.map((d) => Number(d.score));
+  const min = Math.min(...scores), max = Math.max(...scores);
+  const padY = Math.max(200, (max - min) * 0.15);
+  const yMin = Math.max(0, min - padY);
+  const yMax = max + padY;
+  const n = data.length;
+  const x = (i) => pad.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+  const y = (v) => pad.t + (1 - (v - yMin) / (yMax - yMin || 1)) * ih;
+  const line = data.map((d, i) => `${x(i)},${y(Number(d.score))}`).join(' ');
+  const yTicks = [yMin, (yMin + yMax) / 2, yMax];
+  const fmt = (v) => Math.round(v).toLocaleString();
+  return (
+    <div className="geo-chart-wrap">
+      <svg viewBox={`0 0 ${W} ${H}`} className="geo-chart" preserveAspectRatio="xMidYMid meet">
+        {yTicks.map((t, i) => (
+          <g key={i}>
+            <line x1={pad.l} y1={y(t)} x2={W - pad.r} y2={y(t)} stroke="#ecedee" strokeWidth="1" />
+            <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" className="geo-axis">{fmt(t)}</text>
+          </g>
+        ))}
+        <polyline points={line} fill="none" stroke="#b3b600" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        {data.map((d, i) => (
+          <circle key={d.id} cx={x(i)} cy={y(Number(d.score))} r="3.5" fill="#5B5859" stroke="#fff" strokeWidth="1.5">
+            <title>{d.score_date || ''}: {Number(d.score).toLocaleString()}</title>
+          </circle>
+        ))}
+        <text x={pad.l} y={H - 8} textAnchor="start" className="geo-axis">{data[0].score_date || ''}</text>
+        {n > 1 && <text x={W - pad.r} y={H - 8} textAnchor="end" className="geo-axis">{data[n - 1].score_date || ''}</text>}
+      </svg>
+    </div>
   );
 }
 

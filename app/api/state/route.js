@@ -17,6 +17,8 @@ export async function GET() {
     const tasks = await sql`SELECT id, project_id, parent_id, title, assignee_id, due_date, status, archived, notes, stoplight
                             FROM tasks ORDER BY position ASC, id ASC`;
     const info = await sql`SELECT id, project_id, label, value, position FROM project_info ORDER BY position ASC, id ASC`;
+    const meetings = await sql`SELECT id, office_id, title, meeting_date, minutes, position FROM meetings ORDER BY meeting_date DESC NULLS LAST, id DESC`;
+    const geo = await sql`SELECT id, office_id, score, score_date FROM geo_scores ORDER BY score_date ASC NULLS LAST, id ASC`;
     return NextResponse.json({
       people: people.rows,
       offices: offices.rows,
@@ -24,6 +26,8 @@ export async function GET() {
       projects: projects.rows,
       tasks: tasks.rows,
       info: info.rows,
+      meetings: meetings.rows,
+      geo: geo.rows,
     });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
