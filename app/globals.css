@@ -335,6 +335,14 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .avatar.xs { width: 18px; height: 18px; font-size: 9px; flex: 0 0 18px; }
 .ov-add { margin-top: 8px; background: none; border: 1px dashed var(--line); color: var(--ink-2); font-weight: 600; font-size: 12px; padding: 6px 10px; border-radius: 6px; cursor: pointer; width: 100%; }
 .ov-add:hover { border-color: var(--lime); color: var(--ink); background: #fafbf0; }
+.ov-menu { display: flex; gap: 6px; padding: 4px 4px 6px 8px; }
+.ov-menu-sub { padding-left: 27px; }
+.ov-menu-btn { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.ov-menu-btn:hover { border-color: var(--lime); background: #fafbf0; }
+.ov-menu-done { color: #029457; border-color: #bfe6d2; }
+.ov-menu-done:hover { background: #eafaf1; border-color: #00c875; }
+.ov-sub-click { cursor: pointer; border-radius: 6px; }
+.ov-sub-click:hover { background: #f3f4ec; }
 
 /* office page: meetings + geoguessr */
 .office-cols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; align-items: start; }

@@ -774,6 +774,7 @@ export default function Page() {
               onSaveNotes={saveProjectNotes}
               onMoveOffice={(officeId) => moveTeamToOffice(viewedTeam.id, officeId)}
               onAddTask={(projectId) => setAddingTaskFor(projectId)}
+              onMarkDone={(id) => { const t = data.tasks.find((x) => String(x.id) === String(id)); updateTask(id, t && t.parent_id ? { status: 'done' } : { status: 'done', archived: true }); }}
             />
           ) : project ? (
             <>
@@ -1267,7 +1268,8 @@ function GlobalTasks({ tasks, people, projects, onUpdate, onOpenProject }) {
   );
 }
 
-function TeamOverview({ team, offices, people, projects, tasks, onOpen, onAddProject, onSaveNotes, onMoveOffice, onAddTask }) {
+function TeamOverview({ team, offices, people, projects, tasks, onOpen, onAddProject, onSaveNotes, onMoveOffice, onAddTask, onMarkDone }) {
+  const [menuFor, setMenuFor] = useState(null);
   const ownerOf = (id) => people.find((pp) => String(pp.id) === String(id));
   const renderOwner = (owner) => (owner
     ? <span className="ov-owner"><span className="avatar xs" style={{ background: owner.color }}>{initials(owner.name)}</span>{owner.name}</span>
@@ -1314,15 +1316,29 @@ function TeamOverview({ team, offices, people, projects, tasks, onOpen, onAddPro
                     const subs = tasks.filter((x) => String(x.parent_id) === String(t.id) && !x.archived).sort(byPos);
                     return (
                       <div key={t.id} className="ov-task" style={{ borderLeftColor: t.stoplight && STOPLIGHTS[t.stoplight] ? STOPLIGHTS[t.stoplight] : 'transparent' }}>
-                        <div className="ov-task-row" onClick={() => onOpen(p.id)} title="Open project board">
+                        <div className="ov-task-row" onClick={() => setMenuFor(menuFor === t.id ? null : t.id)} title="Click for options">
                           <span className="ov-task-title">{t.title || 'Untitled task'}</span>
                           {renderOwner(ownerOf(t.assignee_id))}
                         </div>
-                        {subs.map((s) => (
-                          <div key={s.id} className="ov-sub">
-                            <span className="ov-sub-title">↳ {s.title || 'Untitled subtask'}</span>
-                            {renderOwner(ownerOf(s.assignee_id))}
+                        {menuFor === t.id && (
+                          <div className="ov-menu">
+                            <button className="ov-menu-btn" onClick={() => { setMenuFor(null); onOpen(p.id); }}>View task</button>
+                            <button className="ov-menu-btn ov-menu-done" onClick={() => { setMenuFor(null); onMarkDone(t.id); }}>✓ Mark done</button>
                           </div>
+                        )}
+                        {subs.map((s) => (
+                          <Fragment key={s.id}>
+                            <div className="ov-sub ov-sub-click" onClick={() => setMenuFor(menuFor === s.id ? null : s.id)} title="Click for options">
+                              <span className="ov-sub-title">↳ {s.title || 'Untitled subtask'}</span>
+                              {renderOwner(ownerOf(s.assignee_id))}
+                            </div>
+                            {menuFor === s.id && (
+                              <div className="ov-menu ov-menu-sub">
+                                <button className="ov-menu-btn" onClick={() => { setMenuFor(null); onOpen(p.id); }}>View task</button>
+                                <button className="ov-menu-btn ov-menu-done" onClick={() => { setMenuFor(null); onMarkDone(s.id); }}>✓ Mark done</button>
+                              </div>
+                            )}
+                          </Fragment>
                         ))}
                       </div>
                     );
