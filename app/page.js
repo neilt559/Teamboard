@@ -88,12 +88,13 @@ async function api(path, opts) {
 }
 
 export default function Page() {
-  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [] });
+  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [], pseries: [], pmeetings: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
   const [globalView, setGlobalView] = useState(false);
   const [officeView, setOfficeView] = useState(null);
   const [expandedMeetings, setExpandedMeetings] = useState({});
+  const [expandedPMeetings, setExpandedPMeetings] = useState({});
   const [addingTaskFor, setAddingTaskFor] = useState(null);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -253,6 +254,53 @@ export default function Page() {
     setData((d) => ({ ...d, geo: d.geo.filter((g) => g.id !== id) }));
     touch();
     try { await api(`/api/geo/${id}`, { method: 'DELETE' }); }
+    catch (e) { setError(e.message); }
+  }
+
+  // ---- project meetings ----
+  async function addPMeeting(projectId, seriesId) {
+    touch();
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const m = await api('/api/project-meetings', { method: 'POST', body: JSON.stringify({ project_id: projectId, series_id: seriesId || null, title: 'Meeting', meeting_date: today }) });
+      await load(true);
+      if (m && m.id) setExpandedPMeetings((s) => ({ ...s, [m.id]: true }));
+    } catch (e) { setError(e.message); }
+  }
+  async function updatePMeeting(id, patch) {
+    setData((d) => ({ ...d, pmeetings: d.pmeetings.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
+    touch();
+    try { await api(`/api/project-meetings/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function deletePMeeting(m) {
+    if (!confirm(`Delete meeting “${m.title}”?`)) return;
+    setData((d) => ({ ...d, pmeetings: d.pmeetings.filter((x) => x.id !== m.id) }));
+    touch();
+    try { await api(`/api/project-meetings/${m.id}`, { method: 'DELETE' }); }
+    catch (e) { setError(e.message); }
+  }
+  function togglePMeeting(id) { setExpandedPMeetings((s) => ({ ...s, [id]: !s[id] })); }
+  async function addPSeries(projectId) {
+    const name = prompt('Meeting series name', '');
+    if (name === null) return;
+    touch();
+    try { await api('/api/meeting-series', { method: 'POST', body: JSON.stringify({ project_id: projectId, name: name.trim() || 'Series' }) }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
+  async function renamePSeries(sv) {
+    const name = prompt('Rename series', sv.name);
+    if (name === null || name.trim() === '' || name === sv.name) return;
+    setData((d) => ({ ...d, pseries: d.pseries.map((x) => (x.id === sv.id ? { ...x, name } : x)) }));
+    touch();
+    try { await api(`/api/meeting-series/${sv.id}`, { method: 'PATCH', body: JSON.stringify({ name }) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function deletePSeries(sv) {
+    if (!confirm(`Delete series “${sv.name}” and all meetings in it?`)) return;
+    setData((d) => ({ ...d, pseries: d.pseries.filter((x) => x.id !== sv.id), pmeetings: d.pmeetings.filter((m) => String(m.series_id) !== String(sv.id)) }));
+    touch();
+    try { await api(`/api/meeting-series/${sv.id}`, { method: 'DELETE' }); await load(true); }
     catch (e) { setError(e.message); }
   }
 
@@ -878,6 +926,20 @@ export default function Page() {
                 </div>
               )}
 
+              <ProjectMeetings
+                project={project}
+                meetings={data.pmeetings.filter((m) => String(m.project_id) === String(project.id))}
+                series={data.pseries.filter((sv) => String(sv.project_id) === String(project.id))}
+                expanded={expandedPMeetings}
+                onToggle={togglePMeeting}
+                onAddMeeting={(seriesId) => addPMeeting(project.id, seriesId)}
+                onAddSeries={() => addPSeries(project.id)}
+                onUpdateMeeting={updatePMeeting}
+                onDeleteMeeting={deletePMeeting}
+                onRenameSeries={renamePSeries}
+                onDeleteSeries={deletePSeries}
+              />
+
               <div className="info-panel">
                 <div className="info-head">
                   <label className="notes-label">📎 Additional project info <span>· links, documents &amp; references</span></label>
@@ -953,6 +1015,61 @@ export default function Page() {
         <AddTaskModal people={data.people} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />
       )}
     </>
+  );
+}
+
+function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddMeeting, onAddSeries, onUpdateMeeting, onDeleteMeeting, onRenameSeries, onDeleteSeries }) {
+  const standalone = meetings.filter((m) => !m.series_id).sort(byPos);
+  const renderMeeting = (m) => {
+    const open = !!expanded[m.id];
+    return (
+      <div key={m.id} className="pm">
+        <div className="pm-head">
+          <button className="team-caret" onClick={() => onToggle(m.id)} aria-label="Toggle meeting">{open ? '▾' : '▸'}</button>
+          <input className="pm-title" key={`${m.id}-t-${m.title}`} defaultValue={m.title} onBlur={(e) => { if (e.target.value !== m.title) onUpdateMeeting(m.id, { title: e.target.value }); }} />
+          <input type="date" className="date-input pm-date" value={m.meeting_date || ''} onChange={(e) => onUpdateMeeting(m.id, { meeting_date: e.target.value || null })} />
+          <button className="row-icon danger" title="Delete meeting" onClick={() => onDeleteMeeting(m)}><IconTrash /></button>
+        </div>
+        {open && (
+          <div className="pm-body">
+            <label className="pm-label">Attendance</label>
+            <input className="pm-attendance" key={`${m.id}-a-${m.attendance}`} defaultValue={m.attendance || ''} placeholder="Who attended — e.g. John, Kyler, Sam" onBlur={(e) => { if (e.target.value !== (m.attendance || '')) onUpdateMeeting(m.id, { attendance: e.target.value }); }} />
+            <label className="pm-label">Notes</label>
+            <textarea className="pm-notes" key={`${m.id}-n`} defaultValue={m.notes || ''} placeholder="Meeting notes — agenda, decisions, action items…" onBlur={(e) => { if ((e.target.value || '') !== (m.notes || '')) onUpdateMeeting(m.id, { notes: e.target.value }); }} />
+          </div>
+        )}
+      </div>
+    );
+  };
+  const hasAny = meetings.length > 0 || series.length > 0;
+  return (
+    <div className="info-panel">
+      <div className="section-head">
+        <label className="notes-label">📅 Meetings</label>
+        <div className="pm-actions">
+          <button className="btn btn-lime btn-sm" onClick={() => onAddMeeting()}>+ Meeting</button>
+          <button className="btn btn-plain btn-sm" onClick={onAddSeries}>+ Meeting series</button>
+        </div>
+      </div>
+      {!hasAny && <p className="ov-empty">No meetings yet — create a one-off meeting or a series.</p>}
+      {standalone.map(renderMeeting)}
+      {[...series].sort(byPos).map((sv) => {
+        const sm = meetings.filter((m) => String(m.series_id) === String(sv.id)).sort(byPos);
+        return (
+          <div key={sv.id} className="pm-series">
+            <div className="pm-series-head">
+              <span className="pm-series-name">📁 {sv.name}</span>
+              <div className="spacer" />
+              <button className="btn btn-plain btn-xs" onClick={() => onAddMeeting(sv.id)}>+ Add meeting</button>
+              <button className="row-icon" title="Rename series" onClick={() => onRenameSeries(sv)}>✎</button>
+              <button className="row-icon danger" title="Delete series" onClick={() => onDeleteSeries(sv)}><IconTrash /></button>
+            </div>
+            {sm.length === 0 && <p className="pm-series-empty">No meetings in this series yet.</p>}
+            {sm.map(renderMeeting)}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

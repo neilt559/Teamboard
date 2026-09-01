@@ -19,6 +19,8 @@ export async function GET() {
     const info = await sql`SELECT id, project_id, label, value, position FROM project_info ORDER BY position ASC, id ASC`;
     const meetings = await sql`SELECT id, office_id, title, meeting_date, minutes, position FROM meetings ORDER BY meeting_date DESC NULLS LAST, id DESC`;
     const geo = await sql`SELECT id, office_id, score, score_date FROM geo_scores ORDER BY score_date ASC NULLS LAST, id ASC`;
+    const pseries = await sql`SELECT id, project_id, name, position FROM meeting_series ORDER BY position ASC, id ASC`;
+    const pmeetings = await sql`SELECT id, project_id, series_id, title, meeting_date, attendance, notes, position FROM project_meetings ORDER BY meeting_date DESC NULLS LAST, id DESC`;
     return NextResponse.json({
       people: people.rows,
       offices: offices.rows,
@@ -28,6 +30,8 @@ export async function GET() {
       info: info.rows,
       meetings: meetings.rows,
       geo: geo.rows,
+      pseries: pseries.rows,
+      pmeetings: pmeetings.rows,
     });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
