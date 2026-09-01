@@ -1026,8 +1026,17 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
       <div key={m.id} className="pm">
         <div className="pm-head">
           <button className="team-caret" onClick={() => onToggle(m.id)} aria-label="Toggle meeting">{open ? '▾' : '▸'}</button>
-          <input className="pm-title" key={`${m.id}-t-${m.title}`} defaultValue={m.title} onBlur={(e) => { if (e.target.value !== m.title) onUpdateMeeting(m.id, { title: e.target.value }); }} />
-          <input type="date" className="date-input pm-date" value={m.meeting_date || ''} onChange={(e) => onUpdateMeeting(m.id, { meeting_date: e.target.value || null })} />
+          {m.series_id ? (
+            <>
+              <input type="date" className="date-input pm-date-series" value={m.meeting_date || ''} onChange={(e) => onUpdateMeeting(m.id, { meeting_date: e.target.value || null })} />
+              <div className="spacer" />
+            </>
+          ) : (
+            <>
+              <input className="pm-title" key={`${m.id}-t-${m.title}`} defaultValue={m.title} onBlur={(e) => { if (e.target.value !== m.title) onUpdateMeeting(m.id, { title: e.target.value }); }} />
+              <input type="date" className="date-input pm-date" value={m.meeting_date || ''} onChange={(e) => onUpdateMeeting(m.id, { meeting_date: e.target.value || null })} />
+            </>
+          )}
           <button className="row-icon danger" title="Delete meeting" onClick={() => onDeleteMeeting(m)}><IconTrash /></button>
         </div>
         {open && (
