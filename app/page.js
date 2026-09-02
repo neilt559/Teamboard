@@ -79,6 +79,7 @@ function ColorControl({ value, onChange }) {
 
 async function api(path, opts) {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (res.status === 401) { if (typeof window !== 'undefined') window.location.href = '/login'; throw new Error('Please sign in'); }
   if (!res.ok) {
     let msg = 'Request failed';
     try { const j = await res.json(); msg = j.error || msg; } catch {}
@@ -107,6 +108,7 @@ export default function Page() {
   const [expandedNotes, setExpandedNotes] = useState({});
   const [sidebarWidth, setSidebarWidth] = useState(250);
   const [showArchivedSidebar, setShowArchivedSidebar] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const guard = useRef(0);
 
   const load = useCallback(async (force = false) => {
@@ -123,6 +125,13 @@ export default function Page() {
   }, []);
 
   useEffect(() => { load(true); }, [load]);
+  useEffect(() => {
+    fetch('/api/auth/me').then((r) => r.json()).then((j) => setCurrentUser(j.user || null)).catch(() => {});
+  }, []);
+  async function logout() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    window.location.href = '/login';
+  }
   useEffect(() => {
     const t = setInterval(() => load(false), 4000);
     return () => clearInterval(t);
@@ -672,6 +681,8 @@ export default function Page() {
           <button className={`btn btn-ghost ${globalView ? 'tab-on' : ''}`} onClick={() => { setGlobalView(true); setTeamView(null); setOfficeView(null); setSidebarOpen(false); }}>📋 All Tasks</button>
           <button className="btn btn-ghost people-btn" onClick={() => setPeopleOpen(true)}><IconUsers /> People ({data.people.length})</button>
           <button className="btn btn-lime" onClick={addOffice}>+ New Office</button>
+          {currentUser && <span className="user-chip" title={`Signed in as ${currentUser.username}`}>{currentUser.username}</span>}
+          <button className="btn btn-ghost" onClick={logout} title="Log out">Log out</button>
         </div>
       </header>
 
