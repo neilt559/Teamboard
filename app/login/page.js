@@ -45,7 +45,7 @@ export default function Login() {
 
         {mode === 'signup' && (
           <>
-            <label className="login-label">Team code <span className="login-opt">(only if your team set one)</span></label>
+            <label className="login-label">Team code <span className="login-opt">(ask your team)</span></label>
             <input className="login-input" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" />
           </>
         )}

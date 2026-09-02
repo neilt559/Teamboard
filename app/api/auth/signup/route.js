@@ -19,9 +19,9 @@ export async function POST(req) {
     if (password.length < 6) {
       return NextResponse.json({ error: 'Password must be at least 6 characters.' }, { status: 400 });
     }
-    // Optional signup gate: set SIGNUP_CODE in Vercel to require a team code.
-    const required = process.env.SIGNUP_CODE;
-    if (required && code !== required) {
+    // Team signup code — defaults to CUTIES; override with a SIGNUP_CODE env var.
+    const required = process.env.SIGNUP_CODE || 'CUTIES';
+    if ((code || '').trim().toLowerCase() !== required.trim().toLowerCase()) {
       return NextResponse.json({ error: 'Invalid team code.' }, { status: 403 });
     }
 
