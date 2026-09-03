@@ -1179,6 +1179,37 @@ function geoStats(scores) {
   return { high, low, mean, bestWeek, worstWeek, currentWeek };
 }
 
+// Work-week (Mon–Fri) averages, keyed by the Monday of each week.
+function weeklyAverages(scores) {
+  const parse = (s) => { const p = String(s).split('-').map(Number); return new Date(p[0], (p[1] || 1) - 1, p[2] || 1); };
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const monday = (d) => { const dow = d.getDay(); const diff = dow === 0 ? 6 : dow - 1; const m = new Date(d); m.setDate(d.getDate() - diff); return m; };
+  const weeks = {};
+  scores.forEach((s) => {
+    const v = Number(s.score);
+    if (isNaN(v) || !s.score_date) return;
+    const d = parse(s.score_date);
+    if (isNaN(d.getTime())) return;
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) return;
+    const key = fmt(monday(d));
+    (weeks[key] = weeks[key] || []).push(v);
+  });
+  return Object.keys(weeks).sort().map((k) => ({ id: 'w' + k, score: Math.round(weeks[k].reduce((a, b) => a + b, 0) / weeks[k].length), score_date: k }));
+}
+
+// Calendar-month averages, keyed by YYYY-MM.
+function monthlyAverages(scores) {
+  const months = {};
+  scores.forEach((s) => {
+    const v = Number(s.score);
+    if (isNaN(v) || !s.score_date) return;
+    const key = String(s.score_date).slice(0, 7);
+    (months[key] = months[key] || []).push(v);
+  });
+  return Object.keys(months).sort().map((k) => ({ id: 'm' + k, score: Math.round(months[k].reduce((a, b) => a + b, 0) / months[k].length), score_date: k }));
+}
+
 function GeoTracker({ scores, onAdd, onDelete }) {
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
@@ -1186,6 +1217,8 @@ function GeoTracker({ scores, onAdd, onDelete }) {
   const [showHistory, setShowHistory] = useState(false);
   const submit = () => { const n = parseInt(val, 10); if (isNaN(n)) return; onAdd(n, date); setVal(''); };
   const sorted = [...scores].sort((a, b) => (a.score_date || '').localeCompare(b.score_date || '') || (Number(a.id) - Number(b.id)));
+  const weekly = weeklyAverages(scores);
+  const monthly = monthlyAverages(scores);
   const stats = geoStats(scores);
   const fmt = (v) => (v == null ? '—' : Math.round(v).toLocaleString());
   return (
@@ -1195,7 +1228,12 @@ function GeoTracker({ scores, onAdd, onDelete }) {
         <input type="number" className="geo-input" placeholder="Score" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
         <button className="btn btn-ink btn-sm" onClick={submit}>+ Add</button>
       </div>
+      <div className="geo-chart-title">Daily scores</div>
       <GeoChart data={sorted} />
+      <div className="geo-chart-title">Weekly average <span>(Mon–Fri)</span></div>
+      <GeoChart data={weekly} />
+      <div className="geo-chart-title">Monthly average</div>
+      <GeoChart data={monthly} />
       {stats && (
         <div className="geo-stats">
           <div className="geo-stat"><span className="gs-label">High</span><span className="gs-val">{fmt(stats.high)}</span></div>
