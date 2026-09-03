@@ -1234,6 +1234,11 @@ function GeoTracker({ scores, onAdd, onDelete }) {
       <GeoChart data={weekly} />
       <div className="geo-chart-title">Monthly average</div>
       <GeoChart data={monthly} />
+      <div className="geo-legend">
+        {[...GEO_TIERS].reverse().map((t) => (
+          <span key={t.label} className="geo-leg"><i style={{ background: t.color }} />{t.label}</span>
+        ))}
+      </div>
       {stats && (
         <div className="geo-stats">
           <div className="geo-stat"><span className="gs-label">High</span><span className="gs-val">{fmt(stats.high)}</span></div>
@@ -1266,6 +1271,19 @@ function GeoTracker({ scores, onAdd, onDelete }) {
   );
 }
 
+// GeoGuessr medal tiers by score.
+const GEO_TIERS = [
+  { min: 25000, color: '#3ad0e0', label: 'Diamond' }, // 25000
+  { min: 22500, color: '#e0a800', label: 'Gold' },    // 22500–24999
+  { min: 15000, color: '#9aa4ad', label: 'Silver' },  // 15000–22499
+  { min: 5000, color: '#cd7f32', label: 'Bronze' },   // 5000–14999
+  { min: 0, color: '#2f2e2e', label: 'Black' },       // 0–4999
+];
+function tierColor(v) {
+  for (const t of GEO_TIERS) { if (v >= t.min) return t.color; }
+  return '#2f2e2e';
+}
+
 function GeoChart({ data }) {
   if (!data.length) return <div className="geo-chart-empty">Add a score to start the graph.</div>;
   const W = 520, H = 210;
@@ -1273,16 +1291,15 @@ function GeoChart({ data }) {
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
   const scores = data.map((d) => Number(d.score));
-  const min = Math.min(...scores), max = Math.max(...scores);
-  const padY = Math.max(200, (max - min) * 0.15);
-  const yMin = Math.max(0, min - padY);
-  const yMax = max + padY;
+  const yMin = 0;
+  const yMax = Math.max(25000, ...scores);
   const n = data.length;
-  const x = (i) => pad.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+  const band = iw / n;
+  const barW = Math.max(2, Math.min(38, band * 0.72));
   const y = (v) => pad.t + (1 - (v - yMin) / (yMax - yMin || 1)) * ih;
-  const line = data.map((d, i) => `${x(i)},${y(Number(d.score))}`).join(' ');
-  const yTicks = [yMin, (yMin + yMax) / 2, yMax];
+  const yTicks = [0, 12500, 25000];
   const fmt = (v) => Math.round(v).toLocaleString();
+  const baseline = pad.t + ih;
   return (
     <div className="geo-chart-wrap">
       <svg viewBox={`0 0 ${W} ${H}`} className="geo-chart" preserveAspectRatio="xMidYMid meet">
@@ -1292,12 +1309,16 @@ function GeoChart({ data }) {
             <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" className="geo-axis">{fmt(t)}</text>
           </g>
         ))}
-        <polyline points={line} fill="none" stroke="#b3b600" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-        {data.map((d, i) => (
-          <circle key={d.id} cx={x(i)} cy={y(Number(d.score))} r="3.5" fill="#5B5859" stroke="#fff" strokeWidth="1.5">
-            <title>{d.score_date || ''}: {Number(d.score).toLocaleString()}</title>
-          </circle>
-        ))}
+        {data.map((d, i) => {
+          const v = Number(d.score);
+          const cx = pad.l + band * i + band / 2;
+          const top = y(v);
+          return (
+            <rect key={d.id} x={cx - barW / 2} y={top} width={barW} height={Math.max(0, baseline - top)} rx="2" fill={tierColor(v)}>
+              <title>{d.score_date || ''}: {v.toLocaleString()}</title>
+            </rect>
+          );
+        })}
         <text x={pad.l} y={H - 8} textAnchor="start" className="geo-axis">{data[0].score_date || ''}</text>
         {n > 1 && <text x={W - pad.r} y={H - 8} textAnchor="end" className="geo-axis">{data[n - 1].score_date || ''}</text>}
       </svg>
