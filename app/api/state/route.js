@@ -14,7 +14,7 @@ export async function GET() {
     const offices = await sql`SELECT id, name, position, archived FROM offices ORDER BY position ASC, id ASC`;
     const teams = await sql`SELECT id, name, office_id, position, archived FROM teams ORDER BY position ASC, id ASC`;
     const projects = await sql`SELECT id, team_id, name, notes, position, archived FROM projects ORDER BY position ASC, id ASC`;
-    const tasks = await sql`SELECT id, project_id, parent_id, title, assignee_id, due_date, status, archived, notes, stoplight
+    const tasks = await sql`SELECT id, project_id, parent_id, title, assignee_id, due_date, status, archived, notes, stoplight, created_at
                             FROM tasks ORDER BY position ASC, id ASC`;
     const info = await sql`SELECT id, project_id, label, value, position FROM project_info ORDER BY position ASC, id ASC`;
     const meetings = await sql`SELECT id, office_id, title, meeting_date, minutes, position FROM meetings ORDER BY meeting_date DESC NULLS LAST, id DESC`;

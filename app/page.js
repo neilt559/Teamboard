@@ -21,6 +21,15 @@ function initials(name) {
   return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?';
 }
 
+// Compact "date added" label, e.g. 9/14/26 — deliberately small so it never
+// competes with the target finish (Due) date.
+function fmtAdded(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+}
+
 const svgProps = { viewBox: '0 0 24 24', width: 17, height: 17, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
 function IconArchive() {
   return (<svg {...svgProps}><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" /></svg>);
@@ -627,6 +636,9 @@ export default function Page() {
               {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
             </select>
           </td>
+          <td className="added-cell" title={t.created_at ? `Added ${new Date(t.created_at).toLocaleString()}` : ''}>
+            {isSub ? '' : fmtAdded(t.created_at)}
+          </td>
           <td className="row-actions">
             <button
               className={`notes-btn ${hasNotes ? 'has-notes' : ''}`}
@@ -639,7 +651,7 @@ export default function Page() {
 
         {hasNotes && !notesOpen && (
           <tr className="note-preview-row">
-            <td colSpan={6}>
+            <td colSpan={7}>
               <div className="note-preview" title="Click to edit note" onClick={() => toggleNotes(t.id)}>📝 {t.notes}</div>
             </td>
           </tr>
@@ -647,7 +659,7 @@ export default function Page() {
 
         {notesOpen && (
           <tr className="task-notes-row">
-            <td colSpan={6}>
+            <td colSpan={7}>
               <textarea
                 className="task-notes-area"
                 defaultValue={t.notes || ''}
@@ -662,7 +674,7 @@ export default function Page() {
           <>
             {subs.map((sub) => renderTaskRow(sub, true))}
             <tr className="subtask-add-row">
-              <td colSpan={6}><button className="add-subtask-btn" onClick={() => addSubtask(t.id)}>+ Add subtask</button></td>
+              <td colSpan={7}><button className="add-subtask-btn" onClick={() => addSubtask(t.id)}>+ Add subtask</button></td>
             </tr>
           </>
         )}
@@ -866,20 +878,21 @@ export default function Page() {
                   <table>
                     <thead>
                       <tr>
-                        <th style={{ width: '32%' }}>Task</th>
-                        <th style={{ width: '18%' }}>Owner</th>
-                        <th style={{ width: '11%', textAlign: 'center' }}>Stoplight</th>
-                        <th style={{ width: '14%' }}>Due date</th>
-                        <th style={{ width: '17%' }}>Status</th>
+                        <th style={{ width: '30%' }}>Task</th>
+                        <th style={{ width: '16%' }}>Owner</th>
+                        <th style={{ width: '10%', textAlign: 'center' }}>Stoplight</th>
+                        <th style={{ width: '13%' }}>Due date</th>
+                        <th style={{ width: '15%' }}>Status</th>
+                        <th style={{ width: '8%', textAlign: 'center' }}>Added</th>
                         <th style={{ width: '8%' }} />
                       </tr>
                     </thead>
                     <tbody>
                       {tasks.map((t) => renderTaskRow(t, false))}
                       {!tasks.length && (
-                        <tr><td colSpan={6} style={{ padding: 28, textAlign: 'center', color: '#8a8788' }}>No tasks yet — add your first one.</td></tr>
+                        <tr><td colSpan={7} style={{ padding: 28, textAlign: 'center', color: '#8a8788' }}>No tasks yet — add your first one.</td></tr>
                       )}
-                      <tr><td colSpan={6} style={{ padding: 0 }}>
+                      <tr><td colSpan={7} style={{ padding: 0 }}>
                         <button className="add-task-btn" onClick={addTask}>+ Add task</button>
                       </td></tr>
                     </tbody>
@@ -902,8 +915,8 @@ export default function Page() {
                               const st = STATUSES[t.status] || STATUSES.done;
                               return (
                                 <tr key={t.id} className="archived-row">
-                                  <td style={{ width: '32%' }}><span className="archived-title">{t.title || 'Untitled task'}</span></td>
-                                  <td style={{ width: '18%' }}>
+                                  <td style={{ width: '30%' }}><span className="archived-title">{t.title || 'Untitled task'}</span></td>
+                                  <td style={{ width: '16%' }}>
                                     <div className="cell-owner">
                                       {owner ? (
                                         <span className="avatar" style={{ background: owner.color }}>{initials(owner.name)}</span>
@@ -913,15 +926,16 @@ export default function Page() {
                                       <span className="archived-owner">{owner ? owner.name : 'Unassigned'}</span>
                                     </div>
                                   </td>
-                                  <td style={{ width: '11%' }}>
+                                  <td style={{ width: '10%' }}>
                                     {t.stoplight && STOPLIGHTS[t.stoplight]
                                       ? <span className="sl-dot on" style={{ '--sl': STOPLIGHTS[t.stoplight] }} />
                                       : <span style={{ color: '#c4c4c4' }}>—</span>}
                                   </td>
-                                  <td style={{ width: '14%' }} className="archived-due">{t.due_date || '—'}</td>
-                                  <td style={{ width: '17%' }}>
+                                  <td style={{ width: '13%' }} className="archived-due">{t.due_date || '—'}</td>
+                                  <td style={{ width: '15%' }}>
                                     <span className="status-pill" style={{ background: st.color, color: t.status === 'not_started' ? '#3a3a3a' : '#fff' }}>{st.label}</span>
                                   </td>
+                                  <td style={{ width: '8%', textAlign: 'center' }} className="added-cell">{fmtAdded(t.created_at)}</td>
                                   <td style={{ width: '8%', whiteSpace: 'nowrap', textAlign: 'right' }}>
                                     <button className="restore-btn" title="Restore to the board" onClick={() => restoreTask(t.id)}>↩</button>
                                     <button className="row-x" title="Delete task" onClick={() => deleteTask(t.id)}>×</button>
@@ -1353,6 +1367,7 @@ function GlobalTasks({ tasks, people, projects, onUpdate, onOpenProject }) {
     stoplight: (a, b) => (slRank[a.stoplight || ''] - slRank[b.stoplight || '']),
     due: (a, b) => (a.due_date || '9999-99-99').localeCompare(b.due_date || '9999-99-99'),
     status: (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status),
+    added: (a, b) => (new Date(a.created_at || 0) - new Date(b.created_at || 0)),
   };
   rows = [...rows].sort((a, b) => { const c = (cmp[sortBy] || cmp.due)(a, b); return sortDir === 'asc' ? c : -c; });
 
@@ -1397,12 +1412,13 @@ function GlobalTasks({ tasks, people, projects, onUpdate, onOpenProject }) {
           <table>
             <thead>
               <tr>
-                <th style={{ width: '20%' }} className="sortable" onClick={() => setSort('project')}>Project{arrow('project')}</th>
-                <th style={{ width: '26%' }} className="sortable" onClick={() => setSort('task')}>Task{arrow('task')}</th>
-                <th style={{ width: '16%' }} className="sortable" onClick={() => setSort('owner')}>Owner{arrow('owner')}</th>
-                <th style={{ width: '11%', textAlign: 'center' }} className="sortable" onClick={() => setSort('stoplight')}>Stoplight{arrow('stoplight')}</th>
-                <th style={{ width: '12%' }} className="sortable" onClick={() => setSort('due')}>Due{arrow('due')}</th>
-                <th style={{ width: '15%' }} className="sortable" onClick={() => setSort('status')}>Status{arrow('status')}</th>
+                <th style={{ width: '19%' }} className="sortable" onClick={() => setSort('project')}>Project{arrow('project')}</th>
+                <th style={{ width: '24%' }} className="sortable" onClick={() => setSort('task')}>Task{arrow('task')}</th>
+                <th style={{ width: '15%' }} className="sortable" onClick={() => setSort('owner')}>Owner{arrow('owner')}</th>
+                <th style={{ width: '10%', textAlign: 'center' }} className="sortable" onClick={() => setSort('stoplight')}>Stoplight{arrow('stoplight')}</th>
+                <th style={{ width: '11%' }} className="sortable" onClick={() => setSort('due')}>Due{arrow('due')}</th>
+                <th style={{ width: '13%' }} className="sortable" onClick={() => setSort('status')}>Status{arrow('status')}</th>
+                <th style={{ width: '8%', textAlign: 'center' }} className="sortable" onClick={() => setSort('added')}>Added{arrow('added')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1450,11 +1466,12 @@ function GlobalTasks({ tasks, people, projects, onUpdate, onOpenProject }) {
                         {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUSES[s].label}</option>)}
                       </select>
                     </td>
+                    <td className="added-cell" title={t.created_at ? `Added ${new Date(t.created_at).toLocaleString()}` : ''}>{fmtAdded(t.created_at)}</td>
                   </tr>
                 );
               })}
               {!rows.length && (
-                <tr><td colSpan={6} style={{ padding: 28, textAlign: 'center', color: '#8a8788' }}>No tasks match these filters.</td></tr>
+                <tr><td colSpan={7} style={{ padding: 28, textAlign: 'center', color: '#8a8788' }}>No tasks match these filters.</td></tr>
               )}
             </tbody>
           </table>

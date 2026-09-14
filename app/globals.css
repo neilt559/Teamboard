@@ -249,6 +249,8 @@ tbody tr:hover .row-x { opacity: 1; }
 .archived-title { font-size: 14px; color: var(--ink-2); text-decoration: line-through; text-decoration-color: #c9c9c9; }
 .archived-owner { font-size: 13px; color: var(--ink-2); }
 .archived-due { font-size: 13px; color: var(--muted); }
+/* "Added" date — deliberately small & muted so it reads as a footnote, not a due date. */
+.added-cell { font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .status-pill { display: inline-block; border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; }
 .restore-btn { border: none; background: none; color: var(--ink-2); font-size: 16px; cursor: pointer; margin-right: 4px; }
 .restore-btn:hover { color: var(--lime-dark); }
