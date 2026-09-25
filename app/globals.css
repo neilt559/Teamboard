@@ -390,6 +390,73 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .geo-axis { font-size: 9px; fill: var(--muted); }
 .geo-chart-title { font-size: 12px; font-weight: 700; color: var(--ink-2); margin: 12px 0 2px; }
 .geo-chart-title span { font-weight: 400; color: var(--muted); }
+/* ---- 5K Club counter (big gold "we nailed a 5,000" button) ---- */
+.fivek { margin: 2px 0 18px; }
+.fivek-stage { position: relative; }
+.fivek-btn {
+  position: relative; overflow: hidden; width: 100%;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 14px 18px 13px; border: 2px solid #9a7000; border-radius: 16px;
+  font-family: inherit; color: #4a3400; cursor: pointer;
+  background: linear-gradient(160deg, #fff1a8 0%, #f5cf45 28%, #e0a800 62%, #b88400 100%);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.65), inset 0 -3px 0 rgba(0,0,0,.12), 0 5px 0 #8a6400, 0 10px 22px rgba(224,168,0,.35);
+  transition: transform .08s ease, box-shadow .08s ease, filter .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.fivek-btn:hover { filter: brightness(1.06) saturate(1.05); }
+.fivek-btn:active {
+  transform: translateY(4px);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.65), inset 0 -3px 0 rgba(0,0,0,.12), 0 1px 0 #8a6400, 0 4px 10px rgba(224,168,0,.3);
+}
+.fivek-btn:focus-visible { outline: 3px solid var(--ink, #5B5859); outline-offset: 3px; }
+.fivek-top { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; letter-spacing: .22em; text-transform: uppercase; }
+.fivek-count {
+  display: inline-block; font-size: 58px; line-height: 1.02; font-weight: 900; font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 0 rgba(255,255,255,.55), 0 3px 6px rgba(120,80,0,.25);
+}
+.fivek-count.pop { animation: fivek-pop .45s cubic-bezier(.2,1.6,.4,1); }
+.fivek-sub { font-size: 12.5px; font-weight: 600; opacity: .8; }
+.fivek-shine {
+  position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  transform: skewX(-20deg); animation: fivek-shine 4.5s ease-in-out infinite;
+}
+.fivek-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.fivek-burst i {
+  position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 2px;
+  background: #ffe066; box-shadow: 0 0 6px #ffd000; opacity: 0;
+  animation: fivek-spark .75s ease-out forwards;
+}
+.fivek-burst i:nth-child(3n) { background: #3ad0e0; box-shadow: 0 0 6px #3ad0e0; }
+.fivek-burst i:nth-child(3n+1) { background: #CBCE00; box-shadow: 0 0 6px #CBCE00; }
+.fivek-burst b {
+  position: absolute; left: 0; top: -40px; font-size: 28px; font-weight: 900; color: #b88400; white-space: nowrap;
+  text-shadow: 0 1px 0 #fff, 0 0 10px rgba(255,255,255,.9); opacity: 0;
+  animation: fivek-float .9s ease-out forwards;
+}
+.fivek-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+.fivek-undo {
+  border: 1px solid var(--line); background: #fff; color: var(--ink-2); font-family: inherit;
+  font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+}
+.fivek-undo:hover:not(:disabled) { border-color: #e5484d; color: #e5484d; }
+.fivek-undo:disabled { opacity: .4; cursor: default; }
+@keyframes fivek-pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes fivek-shine { 0%, 70% { left: -60%; } 100% { left: 130%; } }
+@keyframes fivek-spark {
+  0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--d))) scale(.3); }
+}
+@keyframes fivek-float {
+  0% { opacity: 0; transform: translate(-50%, 14px) scale(.6); }
+  25% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -60px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fivek-shine, .fivek-burst { display: none; }
+  .fivek-count.pop { animation: none; }
+}
+
 .geo-legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 2px; }
 .geo-leg { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--ink-2); }
 .geo-leg i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }

@@ -274,6 +274,15 @@ export default function Page() {
     try { await api(`/api/geo/${id}`, { method: 'DELETE' }); }
     catch (e) { setError(e.message); }
   }
+  async function bumpFiveK(officeId, delta) {
+    setData((d) => ({
+      ...d,
+      offices: d.offices.map((o) => (String(o.id) === String(officeId) ? { ...o, fivek: Math.max(0, (Number(o.fivek) || 0) + delta) } : o)),
+    }));
+    touch();
+    try { await api('/api/fivek', { method: 'POST', body: JSON.stringify({ office_id: officeId, delta }) }); }
+    catch (e) { setError(e.message); }
+  }
 
   // ---- project meetings ----
   async function addPMeeting(projectId, seriesId) {
@@ -832,6 +841,7 @@ export default function Page() {
               onDeleteMeeting={deleteMeeting}
               onAddGeo={(score, date) => addGeo(viewedOffice.id, score, date)}
               onDeleteGeo={deleteGeo}
+              onFiveK={(delta) => bumpFiveK(viewedOffice.id, delta)}
             />
           ) : viewedTeam ? (
             <TeamOverview
@@ -1107,7 +1117,7 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
   );
 }
 
-function OfficeView({ office, meetings, geoScores, expandedMeetings, onToggleMeeting, onAddMeeting, onUpdateMeeting, onDeleteMeeting, onAddGeo, onDeleteGeo }) {
+function OfficeView({ office, meetings, geoScores, expandedMeetings, onToggleMeeting, onAddMeeting, onUpdateMeeting, onDeleteMeeting, onAddGeo, onDeleteGeo, onFiveK }) {
   return (
     <>
       <div className="proj-head">
@@ -1152,10 +1162,45 @@ function OfficeView({ office, meetings, geoScores, expandedMeetings, onToggleMee
           <div className="section-head">
             <h2 className="section-title">Daily GeoGuessr 🌍</h2>
           </div>
+          <FiveKCounter count={Number(office.fivek) || 0} onChange={onFiveK} />
           <GeoTracker scores={geoScores} onAdd={onAddGeo} onDelete={onDeleteGeo} />
         </div>
       </div>
     </>
+  );
+}
+
+function IconStar() {
+  return (<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" /></svg>);
+}
+
+// Big celebratory tally of perfect 5,000-point guesses. Tap to add one (with a
+// little burst); "Undo one" takes it back if someone hits it by accident.
+function FiveKCounter({ count, onChange }) {
+  const [burst, setBurst] = useState(0);
+  const hit = () => { onChange(1); setBurst((b) => b + 1); };
+  return (
+    <div className="fivek">
+      <div className="fivek-stage">
+        <button type="button" className="fivek-btn" onClick={hit} title="Nailed a 5,000? Tap to add one!">
+          <span className="fivek-shine" aria-hidden />
+          <span className="fivek-top"><IconStar /> 5K Club <IconStar /></span>
+          <span key={burst} className={`fivek-count${burst ? ' pop' : ''}`}>{count.toLocaleString()}</span>
+          <span className="fivek-sub">perfect 5,000s — tap when you nail one!</span>
+        </button>
+        {burst > 0 && (
+          <div key={burst} className="fivek-burst" aria-hidden>
+            {Array.from({ length: 14 }, (_, i) => (
+              <i key={i} style={{ '--a': `${(360 / 14) * i}deg`, '--d': `${80 + (i % 3) * 26}px` }} />
+            ))}
+            <b>+1</b>
+          </div>
+        )}
+      </div>
+      <div className="fivek-foot">
+        <button type="button" className="fivek-undo" onClick={() => onChange(-1)} disabled={count <= 0} title="Pressed it by accident? Take one back">− Undo one</button>
+      </div>
+    </div>
   );
 }
 
