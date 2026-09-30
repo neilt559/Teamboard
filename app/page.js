@@ -1,5 +1,7 @@
 'use client';
 import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
+import BracketView, { OfficeTabs } from './bracket-ui';
+import { nextSlot } from '@/lib/bracket';
 
 const STATUSES = {
   not_started: { label: 'Not Started', color: '#b6b6b7', text: '#6f6c6d' },
@@ -98,11 +100,12 @@ async function api(path, opts) {
 }
 
 export default function Page() {
-  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [], pseries: [], pmeetings: [] });
+  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [], pseries: [], pmeetings: [], users: [], brackets: [], bentrants: [], bmatches: [], bvotes: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
   const [globalView, setGlobalView] = useState(false);
   const [officeView, setOfficeView] = useState(null);
+  const [officeTab, setOfficeTab] = useState('overview');
   const [expandedMeetings, setExpandedMeetings] = useState({});
   const [expandedPMeetings, setExpandedPMeetings] = useState({});
   const [addingTaskFor, setAddingTaskFor] = useState(null);
@@ -274,6 +277,98 @@ export default function Page() {
     try { await api(`/api/geo/${id}`, { method: 'DELETE' }); }
     catch (e) { setError(e.message); }
   }
+  // ---- bracket ----
+  // Mirrors the server: set/clear a match winner and fill/empty the slot it
+  // feeds (or the bracket's champion), so the board updates instantly.
+  function applyWinnerLocal(d, matchId, winnerId) {
+    const m = d.bmatches.find((x) => String(x.id) === String(matchId));
+    if (!m) return d;
+    const winnerTo = winnerId || null;
+    let bmatches = d.bmatches.map((x) => (x.id === m.id ? { ...x, winner_id: winnerTo } : x));
+    let bvotes = d.bvotes;
+    let brackets = d.brackets;
+    const nx = nextSlot(m.round, m.idx);
+    if (nx) {
+      const key = nx.side === 'a' ? 'a_id' : 'b_id';
+      const n = bmatches.find((x) => String(x.bracket_id) === String(m.bracket_id) && Number(x.round) === nx.round && Number(x.idx) === nx.idx);
+      if (n) {
+        bmatches = bmatches.map((x) => (x.id === n.id ? { ...x, [key]: winnerTo } : x));
+        if (!winnerTo) bvotes = bvotes.filter((v) => String(v.match_id) !== String(n.id));
+      }
+    } else {
+      const champName = winnerTo ? (d.bentrants.find((e) => String(e.id) === String(winnerTo)) || {}).name : null;
+      brackets = brackets.map((b) => (String(b.id) === String(m.bracket_id)
+        ? { ...b, champion_id: winnerTo, champion_name: champName, completed_at: winnerTo ? new Date().toISOString() : null }
+        : b));
+    }
+    return { ...d, bmatches, bvotes, brackets };
+  }
+  async function castVote(matchId, entrantId) {
+    const uid = currentUser && currentUser.id;
+    if (!uid) return;
+    setData((d) => ({
+      ...d,
+      bvotes: [
+        ...d.bvotes.filter((v) => !(String(v.match_id) === String(matchId) && String(v.user_id) === String(uid))),
+        ...(entrantId ? [{ match_id: matchId, user_id: uid, entrant_id: entrantId }] : []),
+      ],
+    }));
+    touch();
+    try { await api('/api/bracket-votes', { method: 'POST', body: JSON.stringify({ match_id: matchId, entrant_id: entrantId }) }); }
+    catch (e) { setError(e.message); load(true); }
+  }
+  async function declareWinner(matchId, entrantId) {
+    setData((d) => applyWinnerLocal(d, matchId, entrantId));
+    touch();
+    try { await api(`/api/bracket-matches/${matchId}/winner`, { method: 'POST', body: JSON.stringify({ entrant_id: entrantId }) }); await load(true); }
+    catch (e) { setError(e.message); load(true); }
+  }
+  async function undoWinner(matchId) {
+    setData((d) => applyWinnerLocal(d, matchId, null));
+    touch();
+    try { await api(`/api/bracket-matches/${matchId}/winner`, { method: 'DELETE' }); await load(true); }
+    catch (e) { setError(e.message); load(true); }
+  }
+  async function createBracket(officeId, payload) {
+    touch();
+    try {
+      await api('/api/brackets', { method: 'POST', body: JSON.stringify({ office_id: officeId, ...payload }) });
+      await load(true);
+      return true;
+    } catch (e) { setError(e.message); return false; }
+  }
+  async function patchBracket(id, patch) {
+    const local = { ...patch };
+    if (Array.isArray(local.regions)) local.regions = JSON.stringify(local.regions);
+    setData((d) => ({ ...d, brackets: d.brackets.map((b) => (String(b.id) === String(id) ? { ...b, ...local } : b)) }));
+    touch();
+    try { await api(`/api/brackets/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function renameEntrant(id, name) {
+    setData((d) => ({ ...d, bentrants: d.bentrants.map((e) => (String(e.id) === String(id) ? { ...e, name } : e)) }));
+    touch();
+    try { await api(`/api/bracket-entrants/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function deleteBracket(id) {
+    setData((d) => ({ ...d, brackets: d.brackets.filter((b) => String(b.id) !== String(id)) }));
+    touch();
+    try { await api(`/api/brackets/${id}`, { method: 'DELETE' }); }
+    catch (e) { setError(e.message); }
+  }
+  async function setAvatar(userId, image) {
+    touch();
+    if (image) {
+      const r = await api(`/api/avatar/${userId}`, { method: 'PUT', body: JSON.stringify({ image }) });
+      setData((d) => ({ ...d, users: d.users.map((u) => (String(u.id) === String(userId) ? { ...u, avatar_v: r.avatar_v } : u)) }));
+    } else {
+      setData((d) => ({ ...d, users: d.users.map((u) => (String(u.id) === String(userId) ? { ...u, avatar_v: null } : u)) }));
+      try { await api(`/api/avatar/${userId}`, { method: 'DELETE' }); }
+      catch (e) { setError(e.message); }
+    }
+  }
+
   async function bumpFiveK(officeId, delta) {
     setData((d) => ({
       ...d,
@@ -700,6 +795,11 @@ export default function Page() {
         </div>
         <div className="header-actions">
           <button className={`btn btn-ghost ${globalView ? 'tab-on' : ''}`} onClick={() => { setGlobalView(true); setTeamView(null); setOfficeView(null); setSidebarOpen(false); }}>📋 All Tasks</button>
+          <button
+            className={`btn btn-ghost ${!globalView && viewedOffice && officeTab === 'bracket' ? 'tab-on' : ''}`}
+            disabled={!activeOffices.length}
+            onClick={() => { const o = viewedOffice || activeOffices[0]; if (!o) return; setOfficeView(o.id); setOfficeTab('bracket'); setTeamView(null); setGlobalView(false); setSidebarOpen(false); }}
+          >🏆 Bracket</button>
           <button className="btn btn-ghost people-btn" onClick={() => setPeopleOpen(true)}><IconUsers /> People ({data.people.length})</button>
           <button className="btn btn-lime" onClick={addOffice}>+ New Office</button>
           {currentUser && <span className="user-chip" title={`Signed in as ${currentUser.username}`}>{currentUser.username}</span>}
@@ -717,7 +817,7 @@ export default function Page() {
               <div key={office.id} className="office">
                 <div className="office-head">
                   <button className="team-caret" onClick={() => toggleOffice(office.id)} aria-label="Collapse office">{oCollapsed ? '▶' : '▼'}</button>
-                  <span className={`office-name ${String(officeView) === String(office.id) ? 'viewing' : ''}`} onClick={() => { setOfficeView(office.id); setTeamView(null); setGlobalView(false); setSidebarOpen(false); }} onDoubleClick={() => renameOffice(office)} title="Click to open office page · double-click to rename">{office.name}</span>
+                  <span className={`office-name ${String(officeView) === String(office.id) ? 'viewing' : ''}`} onClick={() => { setOfficeView(office.id); setOfficeTab('overview'); setTeamView(null); setGlobalView(false); setSidebarOpen(false); }} onDoubleClick={() => renameOffice(office)} title="Click to open office page · double-click to rename">{office.name}</span>
                   <span className="reorder">
                     <button onClick={() => moveOffice(office, -1)} title="Move up">▲</button>
                     <button onClick={() => moveOffice(office, 1)} title="Move down">▼</button>
@@ -829,9 +929,30 @@ export default function Page() {
               onUpdate={updateTask}
               onOpenProject={(id) => { setGlobalView(false); setTeamView(null); setOfficeView(null); setSelected(id); }}
             />
+          ) : viewedOffice && officeTab === 'bracket' ? (
+            <BracketView
+              office={viewedOffice}
+              tabs={<OfficeTabs tab={officeTab} onTab={setOfficeTab} />}
+              brackets={data.brackets}
+              entrants={data.bentrants}
+              matches={data.bmatches}
+              votes={data.bvotes}
+              users={data.users}
+              me={currentUser}
+              onVote={castVote}
+              onDeclare={declareWinner}
+              onUndo={undoWinner}
+              onCreate={createBracket}
+              onPatch={patchBracket}
+              onRenameEntrant={renameEntrant}
+              onDeletePast={deleteBracket}
+              onFetchPast={(id) => api(`/api/brackets/${id}`)}
+              onSetAvatar={setAvatar}
+            />
           ) : viewedOffice ? (
             <OfficeView
               office={viewedOffice}
+              tabs={<OfficeTabs tab={officeTab} onTab={setOfficeTab} />}
               meetings={data.meetings.filter((m) => String(m.office_id) === String(viewedOffice.id))}
               geoScores={data.geo.filter((g) => String(g.office_id) === String(viewedOffice.id))}
               expandedMeetings={expandedMeetings}
@@ -1117,11 +1238,12 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
   );
 }
 
-function OfficeView({ office, meetings, geoScores, expandedMeetings, onToggleMeeting, onAddMeeting, onUpdateMeeting, onDeleteMeeting, onAddGeo, onDeleteGeo, onFiveK }) {
+function OfficeView({ office, tabs, meetings, geoScores, expandedMeetings, onToggleMeeting, onAddMeeting, onUpdateMeeting, onDeleteMeeting, onAddGeo, onDeleteGeo, onFiveK }) {
   return (
     <>
       <div className="proj-head">
         <h1>🏢 {office.name}</h1>
+        {tabs}
       </div>
       <div className="office-cols">
         <div className="office-section">
