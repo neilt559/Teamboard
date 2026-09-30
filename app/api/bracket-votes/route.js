@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/db';
 import { sessionUser, COOKIE } from '@/lib/auth';
+import { ROUNDS } from '@/lib/bracket';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,13 +15,20 @@ export async function POST(req) {
     if (!me) return NextResponse.json({ error: 'Please sign in' }, { status: 401 });
     const { match_id, entrant_id } = await req.json();
     const r = await sql`
-      SELECT m.a_id, m.b_id, m.winner_id, b.archived
+      SELECT m.bracket_id, m.round, m.a_id, m.b_id, m.winner_id, b.archived
       FROM bracket_matches m JOIN brackets b ON b.id = m.bracket_id
       WHERE m.id = ${match_id}`;
     const m = r.rows[0];
     if (!m) return NextResponse.json({ error: 'Matchup not found' }, { status: 404 });
     if (m.archived) return NextResponse.json({ error: 'This bracket is closed.' }, { status: 409 });
     if (m.winner_id) return NextResponse.json({ error: 'A winner was already picked for this matchup.' }, { status: 409 });
+    // One round at a time: no voting until every earlier matchup has a winner.
+    const pending = await sql`
+      SELECT count(*)::int AS c FROM bracket_matches
+      WHERE bracket_id = ${m.bracket_id} AND round < ${m.round} AND winner_id IS NULL`;
+    if (pending.rows[0].c > 0) {
+      return NextResponse.json({ error: `Voting for the ${ROUNDS[m.round]} opens once the ${ROUNDS[m.round - 1]} is finished.` }, { status: 409 });
+    }
 
     if (!entrant_id) {
       await sql`DELETE FROM bracket_votes WHERE match_id = ${match_id} AND user_id = ${me.id}`;

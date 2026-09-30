@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { ROUNDS, nextSlot } from '@/lib/bracket';
-import { IconCrown, IconTrophy, IconTrash, IconCamera, IconPencil, IconCheck, IconNote, IconRestore } from './icons';
+import { ROUNDS, nextSlot, currentRound } from '@/lib/bracket';
+import { IconCrown, IconTrophy, IconTrash, IconCamera, IconPencil, IconCheck, IconNote, IconRestore, IconLock } from './icons';
 
 // ---- vote bracket (one shared bracket for everyone) ----------------------
 // People vote on each matchup as whoever they're logged in as; their headshot
@@ -116,11 +116,15 @@ function placeholderFor(round, idx, side, regions) {
 
 function Match({ m, ctx, placeholders }) {
   if (!m) return <div className="bk-match" />;
-  const { ent, votesByMatch, usersById, meId, readOnly, editNames, onVote, onAskWin, onAskUndo, onRename, canUndo } = ctx;
+  const { ent, votesByMatch, usersById, meId, readOnly, editNames, onVote, onAskWin, onAskUndo, onRename, canUndo, isOpen } = ctx;
   const votes = votesByMatch[String(m.id)] || [];
   const ready = !!(m.a_id && m.b_id);
   const decided = !!m.winner_id;
-  const votable = !readOnly && !editNames && ready && !decided;
+  // Rounds go one at a time: a matchup can be set but still waiting on the
+  // rest of the round before it.
+  const open = isOpen(m.round);
+  const locked = !readOnly && ready && !decided && !open;
+  const votable = !readOnly && !editNames && ready && !decided && open;
   const undoable = !readOnly && !editNames && decided && canUndo(m);
 
   const row = (side) => {
@@ -141,7 +145,8 @@ function Match({ m, ctx, placeholders }) {
         role={votable ? 'button' : undefined}
         tabIndex={votable ? 0 : undefined}
         aria-pressed={votable ? mine : undefined}
-        title={votable ? (mine ? 'Your vote — click to take it back' : `Vote for ${e.name}`) : undefined}
+        title={votable ? (mine ? 'Your vote — click to take it back' : `Vote for ${e.name}`)
+          : locked ? `Voting opens once every ${ROUNDS[Number(m.round) - 1]} matchup has a winner` : undefined}
       >
         <div className="bk-line">
           {e && <span className="bk-seed">{e.seed}</span>}
@@ -177,7 +182,7 @@ function Match({ m, ctx, placeholders }) {
   };
 
   return (
-    <div className={`bk-match${decided ? ' decided' : ''}${ready && !decided ? ' live' : ''}${Number(m.round) === 4 ? ' final' : ''}`}>
+    <div className={`bk-match${decided ? ' decided' : ''}${votable ? ' live' : ''}${locked ? ' locked' : ''}${Number(m.round) === 4 ? ' final' : ''}`}>
       {row('a')}
       {row('b')}
     </div>
@@ -197,7 +202,18 @@ function BracketBoard({ bracket, entrants, matches, votes, usersById, meId, read
     const n = at(nx.round, nx.idx);
     return !n || !n.winner_id;
   };
-  const ctx = { ent, votesByMatch, usersById, meId, readOnly, editNames, onVote, onAskWin, onAskUndo, onRename, canUndo };
+  const cr = currentRound(matches);
+  const isOpen = (r) => cr !== null && Number(r) <= cr;
+  const ctx = { ent, votesByMatch, usersById, meId, readOnly, editNames, onVote, onAskWin, onAskUndo, onRename, canUndo, isOpen };
+  // Column header for a round, with a lock while it's waiting its turn.
+  const head = (r, cls) => {
+    const waiting = !readOnly && cr !== null && r > cr;
+    return (
+      <div className={`bk-col-head ${cls || ''}${waiting ? ' waiting' : ''}`} title={waiting ? `Opens once the ${ROUNDS[r - 1]} is finished` : undefined}>
+        {waiting && <IconLock size={11} />}{ROUNDS[r]}
+      </div>
+    );
+  };
   const M = (r, i) => (
     <Match m={at(r, i)} ctx={ctx} placeholders={{ a: placeholderFor(r, i, 'a', regions), b: placeholderFor(r, i, 'b', regions) }} />
   );
@@ -223,9 +239,9 @@ function BracketBoard({ bracket, entrants, matches, votes, usersById, meId, read
             1-seed game and the Round of 8 sits centered between the two
             Round of 16 games — which keeps the connector lines straight. */}
         <div className="bk-grid">
-          <div className="bk-col-head h0">Wildcard</div>
-          <div className="bk-col-head h1">Round of 16</div>
-          <div className="bk-col-head h2">Round of 8</div>
+          {head(0, 'h0')}
+          {head(1, 'h1')}
+          {head(2, 'h2')}
           <div className="bk-slot s-wc">{M(0, q)}</div>
           <div className="bk-slot s-ra">{M(1, 2 * q)}</div>
           <div className="bk-slot s-rb">{M(1, 2 * q + 1)}</div>
@@ -241,13 +257,13 @@ function BracketBoard({ bracket, entrants, matches, votes, usersById, meId, read
       <section className="bk-final4">
         <div className="bk-final4-head"><IconTrophy size={15} /> Final Four</div>
         <div className="bk-final">
-          <div className="bk-fcol"><div className="bk-col-head">Round of 4</div>{M(3, 0)}</div>
+          <div className="bk-fcol">{head(3)}{M(3, 0)}</div>
           <div className="bk-fcol champ">
-            <div className="bk-col-head">Championship</div>
+            {head(4)}
             {M(4, 0)}
             {champ && <div className="bk-champ-tag"><IconTrophy size={15} /> {champ.name}</div>}
           </div>
-          <div className="bk-fcol"><div className="bk-col-head">Round of 4</div>{M(3, 1)}</div>
+          <div className="bk-fcol">{head(3)}{M(3, 1)}</div>
         </div>
       </section>
     </div>
@@ -423,6 +439,10 @@ export default function BracketView({
   const nameOf = (eid) => (curEntrants.find((e) => same(e.id, eid)) || {}).name || 'TBD';
   const countFor = (m, eid) => curVotes.filter((v) => same(v.match_id, m.id) && same(v.entrant_id, eid)).length;
   const champ = current && current.champion_id ? curEntrants.find((e) => same(e.id, current.champion_id)) : null;
+  const openRound = current ? currentRound(curMatches) : null;
+  const openMatches = openRound === null ? [] : curMatches.filter((m) => Number(m.round) === openRound);
+  const openDone = openMatches.filter((m) => m.winner_id).length;
+  const openTotal = openMatches.length;
 
   const askWin = (m, eid) => {
     const otherId = same(eid, m.a_id) ? m.b_id : m.a_id;
@@ -545,6 +565,15 @@ export default function BracketView({
           </div>
         </div>
         {champ && <ChampionBanner name={champ.name} bracketName={current.name} onNew={startNew} />}
+        {openRound !== null && (
+          <div className="bk-round-status">
+            <span className="bk-rs-dot" aria-hidden="true" />
+            <span>Voting open: <b>{ROUNDS[openRound]}</b> · {openDone} of {openTotal} decided</span>
+            {openRound < ROUNDS.length - 1 && (
+              <span className="bk-rs-next"><IconLock size={12} /> The {ROUNDS[openRound + 1]} opens once every {ROUNDS[openRound]} matchup has a winner</span>
+            )}
+          </div>
+        )}
         <BracketBoard
           bracket={current} entrants={curEntrants} matches={curMatches} votes={curVotes}
           usersById={usersById} meId={me ? me.id : null} readOnly={false} editNames={editNames}

@@ -13,16 +13,20 @@ export async function POST(req, { params }) {
     const { id } = await params;
     const { entrant_id } = await req.json();
     if (!entrant_id) return NextResponse.json({ error: 'entrant_id required' }, { status: 400 });
-    // One guarded UPDATE, so two people clicking at once can't both "win".
+    // One guarded UPDATE, so two people clicking at once can't both "win" —
+    // and rounds go one at a time, so every earlier matchup must be decided.
     const r = await sql`
       UPDATE bracket_matches m SET winner_id = ${entrant_id}, decided_at = now()
       FROM brackets b
       WHERE m.id = ${id} AND b.id = m.bracket_id AND NOT b.archived
         AND m.winner_id IS NULL AND m.a_id IS NOT NULL AND m.b_id IS NOT NULL
         AND (m.a_id = ${entrant_id} OR m.b_id = ${entrant_id})
+        AND NOT EXISTS (
+          SELECT 1 FROM bracket_matches p
+          WHERE p.bracket_id = m.bracket_id AND p.round < m.round AND p.winner_id IS NULL)
       RETURNING m.bracket_id, m.round, m.idx`;
     if (!r.rows.length) {
-      return NextResponse.json({ error: 'Couldn’t declare that winner — the matchup may already be decided. Refresh and try again.' }, { status: 409 });
+      return NextResponse.json({ error: 'Couldn’t declare that winner — the matchup may already be decided, or its round isn’t open yet. Refresh and try again.' }, { status: 409 });
     }
     const { bracket_id, round, idx } = r.rows[0];
     const nx = nextSlot(round, idx);
