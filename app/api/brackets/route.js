@@ -5,16 +5,12 @@ import { initialMatches, QUADRANTS, SEEDS } from '@/lib/bracket';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Start a new 20-entrant bracket for an office. Whatever bracket the office
-// already has is archived first, which moves it into the "Past brackets" list.
+// Start a new 20-entrant bracket (there's one shared bracket for everyone).
+// The current one is archived first, which moves it into "Past brackets".
 export async function POST(req) {
   try {
     await ensureSchema();
     const b = await req.json();
-    const officeId = b.office_id;
-    if (!officeId) {
-      return NextResponse.json({ error: 'office_id required' }, { status: 400 });
-    }
     const grid = Array.isArray(b.entrants) ? b.entrants : [];
     const rows = [];
     for (let q = 0; q < QUADRANTS; q++) {
@@ -28,10 +24,10 @@ export async function POST(req) {
       String((b.regions || [])[q] || '').trim().slice(0, 60) || `Quadrant ${q + 1}`);
     const name = String(b.name || '').trim().slice(0, 120) || 'Office Bracket';
 
-    await sql`UPDATE brackets SET archived = true WHERE office_id = ${officeId} AND NOT archived`;
+    await sql`UPDATE brackets SET archived = true WHERE NOT archived`;
     const created = await sql`
-      INSERT INTO brackets (office_id, name, regions)
-      VALUES (${officeId}, ${name}, ${JSON.stringify(regions)})
+      INSERT INTO brackets (name, regions)
+      VALUES (${name}, ${JSON.stringify(regions)})
       RETURNING id`;
     const bid = created.rows[0].id;
     const ents = await sql`

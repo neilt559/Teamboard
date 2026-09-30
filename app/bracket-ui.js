@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { ROUNDS, nextSlot } from '@/lib/bracket';
+import { IconCrown, IconTrophy, IconTrash, IconCamera, IconPencil, IconCheck, IconNote, IconRestore } from './icons';
 
-// ---- office vote bracket -------------------------------------------------
+// ---- vote bracket (one shared bracket for everyone) ----------------------
 // People vote on each matchup as whoever they're logged in as; their headshot
 // appears next to the entrant they picked. Someone then declares the winner by
 // hand (who's in the office changes day to day), which moves that entrant into
@@ -56,16 +57,6 @@ export async function fileToHeadshot(file) {
   }
 }
 
-function IconCrown({ size = 13 }) {
-  return (<svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true"><path d="M3 7.5l4.6 4.1L12 5l4.4 6.6L21 7.5 19.2 17.5H4.8z" /><rect x="4.8" y="19" width="14.4" height="2.4" rx="1" /></svg>);
-}
-function IconTrophy({ size = 16 }) {
-  return (<svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z" /><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" /></svg>);
-}
-function IconTrashSm() {
-  return (<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" /><path d="M6 6v14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6" /></svg>);
-}
-
 export function Headshot({ user, size = 22 }) {
   const name = user ? user.username : 'unknown';
   if (user && user.avatar_v) {
@@ -75,16 +66,6 @@ export function Headshot({ user, size = 22 }) {
     <span className="hs hs-init" title={name} style={{ width: size, height: size, fontSize: Math.round(size * 0.46), background: colorFor(name) }}>
       {name.slice(0, 1).toUpperCase()}
     </span>
-  );
-}
-
-// Tabs shown in the office page header: the regular office page vs the bracket.
-export function OfficeTabs({ tab, onTab }) {
-  return (
-    <div className="office-tabs" role="tablist">
-      <button role="tab" aria-selected={tab !== 'bracket'} className={tab !== 'bracket' ? 'on' : ''} onClick={() => onTab('overview')}>Overview</button>
-      <button role="tab" aria-selected={tab === 'bracket'} className={tab === 'bracket' ? 'on' : ''} onClick={() => onTab('bracket')}><IconTrophy size={15} /> Bracket</button>
-    </div>
   );
 }
 
@@ -183,7 +164,7 @@ function Match({ m, ctx, placeholders }) {
           )}
           {won && <span className="bk-crown-won" title="Winner"><IconCrown /></span>}
           {won && undoable && (
-            <button type="button" className="bk-undo-btn" title="Undo this result" onClick={(ev) => { ev.stopPropagation(); onAskUndo(m); }}>↺</button>
+            <button type="button" className="bk-undo-btn" title="Undo this result" onClick={(ev) => { ev.stopPropagation(); onAskUndo(m); }}><IconRestore size={13} /></button>
           )}
         </div>
         {sv.length > 0 && (
@@ -407,7 +388,7 @@ function PastBracket({ id, onFetch, onBack, usersById }) {
           />
           {(d.bracket.notes || '').trim() && (
             <div className="notes-panel bk-notes">
-              <label className="notes-label">📝 Bracket notes</label>
+              <label className="notes-label"><IconNote size={14} /> Bracket notes</label>
               <div className="bk-notes-read">{d.bracket.notes}</div>
             </div>
           )}
@@ -418,17 +399,18 @@ function PastBracket({ id, onFetch, onBack, usersById }) {
 }
 
 export default function BracketView({
-  office, tabs, brackets, entrants, matches, votes, users, me,
+  brackets, entrants, matches, votes, users, me,
   onVote, onDeclare, onUndo, onCreate, onPatch, onRenameEntrant, onDeletePast, onFetchPast, onSetAvatar,
 }) {
-  const current = brackets.find((b) => same(b.office_id, office.id) && !b.archived) || null;
-  const past = brackets.filter((b) => same(b.office_id, office.id) && b.archived);
+  // One bracket for everyone: the newest un-archived one is current, and every
+  // other bracket is history. (brackets arrive newest first.)
+  const current = brackets.find((b) => !b.archived) || null;
+  const past = brackets.filter((b) => !current || !same(b.id, current.id));
   const [setup, setSetup] = useState(false);
   const [editNames, setEditNames] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [photosOpen, setPhotosOpen] = useState(false);
   const [pastView, setPastView] = useState(null);
-  useEffect(() => { setSetup(false); setEditNames(false); setPastView(null); }, [office.id]);
 
   const usersById = {};
   users.forEach((u) => { usersById[String(u.id)] = u; });
@@ -520,7 +502,7 @@ export default function BracketView({
         canCancel={!!current}
         onCancel={() => setSetup(false)}
         onCreate={async (p) => {
-          const ok = await onCreate(office.id, p);
+          const ok = await onCreate(p);
           if (ok) { setSetup(false); setEditNames(false); }
           return ok;
         }}
@@ -555,8 +537,10 @@ export default function BracketView({
                 {!meUser.avatar_v && <button className="bk-link" onClick={() => setPhotosOpen(true)}>add your photo</button>}
               </span>
             )}
-            <button className="btn btn-plain btn-sm" onClick={() => setPhotosOpen(true)}>📸 Voter photos</button>
-            <button className="btn btn-plain btn-sm" onClick={() => setEditNames((x) => !x)}>{editNames ? '✓ Done editing' : '✎ Edit names'}</button>
+            <button className="btn btn-plain btn-sm wi" onClick={() => setPhotosOpen(true)}><IconCamera size={14} /> Voter photos</button>
+            <button className="btn btn-plain btn-sm wi" onClick={() => setEditNames((x) => !x)}>
+              {editNames ? <><IconCheck size={14} /> Done editing</> : <><IconPencil size={14} /> Edit names</>}
+            </button>
             <button className="btn btn-lime btn-sm" onClick={startNew}>+ New bracket</button>
           </div>
         </div>
@@ -568,7 +552,7 @@ export default function BracketView({
           onRename={onRenameEntrant} onRenameRegion={renameRegion}
         />
         <div className="notes-panel bk-notes">
-          <label className="notes-label">📝 Bracket notes <span>· info to help everyone make an informed vote</span></label>
+          <label className="notes-label"><IconNote size={14} /> Bracket notes <span>· info to help everyone make an informed vote</span></label>
           <SyncedTextarea
             key={current.id}
             className="notes-area bk-notes-area"
@@ -584,8 +568,7 @@ export default function BracketView({
   return (
     <>
       <div className="proj-head">
-        <h1>🏢 {office.name}</h1>
-        {tabs}
+        <h1 className="wi-h"><IconTrophy size={24} /> Bracket</h1>
       </div>
       {body}
       {past.length > 0 && (
@@ -598,7 +581,7 @@ export default function BracketView({
                 <span className="bk-past-champ">{b.champion_name ? <><IconTrophy size={14} /> {b.champion_name}</> : <i>No champion</i>}</span>
                 <span className="bk-past-date">{fmtDay(b.completed_at || b.created_at)}</span>
               </button>
-              <button className="bk-icon-btn" title="Delete from history" onClick={() => askDelete(b)}><IconTrashSm /></button>
+              <button className="bk-icon-btn" title="Delete from history" onClick={() => askDelete(b)}><IconTrash size={15} /></button>
             </div>
           ))}
         </section>

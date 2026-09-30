@@ -1,6 +1,10 @@
 'use client';
 import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
-import BracketView, { OfficeTabs } from './bracket-ui';
+import BracketView from './bracket-ui';
+import {
+  IconArchive, IconTrash, IconRestore, IconUsers, IconList, IconGlobe, IconTrophy, IconBuilding, IconFile,
+  IconNote, IconPencil, IconPaperclip, IconCalendar, IconFolder, IconAlert, IconMenu, IconExternal, IconStar,
+} from './icons';
 import { nextSlot } from '@/lib/bracket';
 
 const STATUSES = {
@@ -30,20 +34,6 @@ function fmtAdded(v) {
   const d = new Date(v);
   if (isNaN(d)) return '';
   return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
-}
-
-const svgProps = { viewBox: '0 0 24 24', width: 17, height: 17, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
-function IconArchive() {
-  return (<svg {...svgProps}><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" /></svg>);
-}
-function IconTrash() {
-  return (<svg {...svgProps}><path d="M3 6h18" /><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" /><path d="M6 6v14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6" /><path d="M10 11v6M14 11v6" /></svg>);
-}
-function IconRestore() {
-  return (<svg {...svgProps}><path d="M3 12a9 9 0 1 0 2.6-6.3" /><path d="M3 4v4h4" /></svg>);
-}
-function IconUsers() {
-  return (<svg {...svgProps}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>);
 }
 
 // Normalize a typed hex ("5b5859", "#ABC", "#5B5859") to "#rrggbb", or null if invalid.
@@ -103,10 +93,9 @@ export default function Page() {
   const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [], pseries: [], pmeetings: [], users: [], brackets: [], bentrants: [], bmatches: [], bvotes: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
-  // Full-page views reached from the header: false | 'tasks' (All Tasks) | 'geo' (GeoGuessr).
+  // Full-page views reached from the header: false | 'tasks' (All Tasks) | 'geo' (GeoGuessr) | 'bracket'.
   const [globalView, setGlobalView] = useState(false);
   const [officeView, setOfficeView] = useState(null);
-  const [officeTab, setOfficeTab] = useState('overview');
   const [expandedMeetings, setExpandedMeetings] = useState({});
   const [expandedPMeetings, setExpandedPMeetings] = useState({});
   const [addingTaskFor, setAddingTaskFor] = useState(null);
@@ -330,10 +319,10 @@ export default function Page() {
     try { await api(`/api/bracket-matches/${matchId}/winner`, { method: 'DELETE' }); await load(true); }
     catch (e) { setError(e.message); load(true); }
   }
-  async function createBracket(officeId, payload) {
+  async function createBracket(payload) {
     touch();
     try {
-      await api('/api/brackets', { method: 'POST', body: JSON.stringify({ office_id: officeId, ...payload }) });
+      await api('/api/brackets', { method: 'POST', body: JSON.stringify(payload) });
       await load(true);
       return true;
     } catch (e) { setError(e.message); return false; }
@@ -761,7 +750,7 @@ export default function Page() {
               className={`notes-btn ${hasNotes ? 'has-notes' : ''}`}
               title={hasNotes ? 'Edit note' : 'Add a note'}
               onClick={() => toggleNotes(t.id)}
-            >📝</button>
+            ><IconNote size={15} /></button>
             <button className="row-x" title={isSub ? 'Delete subtask' : 'Delete task'} onClick={() => deleteTask(t.id)}>×</button>
           </td>
         </tr>
@@ -769,7 +758,7 @@ export default function Page() {
         {hasNotes && !notesOpen && (
           <tr className="note-preview-row">
             <td colSpan={7}>
-              <div className="note-preview" title="Click to edit note" onClick={() => toggleNotes(t.id)}>📝 {t.notes}</div>
+              <div className="note-preview" title="Click to edit note" onClick={() => toggleNotes(t.id)}><IconNote size={13} /> {t.notes}</div>
             </td>
           </tr>
         )}
@@ -803,17 +792,17 @@ export default function Page() {
     <>
       <header className="app-header">
         <div className="brand">
-          <button className="menu-btn btn-ghost" onClick={() => setSidebarOpen((s) => !s)} aria-label="Toggle teams">☰</button>
+          <button className="menu-btn btn-ghost" onClick={() => setSidebarOpen((s) => !s)} aria-label="Toggle teams"><IconMenu size={18} /></button>
           <span className="dot" /> TeamBoard <small>shared project board</small>
         </div>
         <div className="header-actions">
-          <button className={`btn btn-ghost ${globalView === 'tasks' ? 'tab-on' : ''}`} onClick={() => { setGlobalView('tasks'); setTeamView(null); setOfficeView(null); setSidebarOpen(false); }}>📋 All Tasks</button>
-          <button className={`btn btn-ghost ${globalView === 'geo' ? 'tab-on' : ''}`} onClick={() => { setGlobalView('geo'); setTeamView(null); setOfficeView(null); setSidebarOpen(false); }}>🌍 GeoGuessr</button>
-          <button
-            className={`btn btn-ghost ${!globalView && viewedOffice && officeTab === 'bracket' ? 'tab-on' : ''}`}
-            disabled={!activeOffices.length}
-            onClick={() => { const o = viewedOffice || activeOffices[0]; if (!o) return; setOfficeView(o.id); setOfficeTab('bracket'); setTeamView(null); setGlobalView(false); setSidebarOpen(false); }}
-          >🏆 Bracket</button>
+          {[['tasks', IconList, 'All Tasks'], ['geo', IconGlobe, 'GeoGuessr'], ['bracket', IconTrophy, 'Bracket']].map(([key, Icon, label]) => (
+            <button
+              key={key}
+              className={`btn btn-ghost wi ${globalView === key ? 'tab-on' : ''}`}
+              onClick={() => { setGlobalView(key); setTeamView(null); setOfficeView(null); setSidebarOpen(false); }}
+            ><Icon size={16} /> {label}</button>
+          ))}
           <button className="btn btn-ghost people-btn" onClick={() => setPeopleOpen(true)}><IconUsers /> People ({data.people.length})</button>
           <button className="btn btn-lime" onClick={addOffice}>+ New Office</button>
           {currentUser && <span className="user-chip" title={`Signed in as ${currentUser.username}`}>{currentUser.username}</span>}
@@ -830,8 +819,8 @@ export default function Page() {
             return (
               <div key={office.id} className="office">
                 <div className="office-head">
-                  <button className="team-caret" onClick={() => toggleOffice(office.id)} aria-label="Collapse office">{oCollapsed ? '▶' : '▼'}</button>
-                  <span className={`office-name ${String(officeView) === String(office.id) ? 'viewing' : ''}`} onClick={() => { setOfficeView(office.id); setOfficeTab('overview'); setTeamView(null); setGlobalView(false); setSidebarOpen(false); }} onDoubleClick={() => renameOffice(office)} title="Click to open office page · double-click to rename">{office.name}</span>
+                  <button className="team-caret" onClick={() => toggleOffice(office.id)} aria-label="Collapse office">{oCollapsed ? '▶︎' : '▼'}</button>
+                  <span className={`office-name ${String(officeView) === String(office.id) ? 'viewing' : ''}`} onClick={() => { setOfficeView(office.id); setTeamView(null); setGlobalView(false); setSidebarOpen(false); }} onDoubleClick={() => renameOffice(office)} title="Click to open office page · double-click to rename">{office.name}</span>
                   <span className="reorder">
                     <button onClick={() => moveOffice(office, -1)} title="Move up">▲</button>
                     <button onClick={() => moveOffice(office, 1)} title="Move down">▼</button>
@@ -848,7 +837,7 @@ export default function Page() {
                       return (
                         <div key={team.id} className="team">
                           <div className={`team-head ${String(teamView) === String(team.id) ? 'viewing' : ''}`}>
-                            <button className="team-caret" onClick={() => toggleTeam(team.id)} aria-label="Collapse team">{collapsed ? '▶' : '▼'}</button>
+                            <button className="team-caret" onClick={() => toggleTeam(team.id)} aria-label="Collapse team">{collapsed ? '▶︎' : '▼'}</button>
                             <span className="team-name" onClick={() => { setTeamView(team.id); setGlobalView(false); setOfficeView(null); setSidebarOpen(false); }} onDoubleClick={() => renameTeam(team)} title="Click to view team · double-click to rename">{team.name}</span>
                             <span className="reorder">
                               <button onClick={() => moveTeam(team, -1)} title="Move up">▲</button>
@@ -896,27 +885,27 @@ export default function Page() {
           {(archivedOffices.length > 0 || archivedTeams.length > 0 || archivedProjects.length > 0) && (
             <div className="archived-section">
               <button className="archived-toggle" onClick={() => setShowArchivedSidebar((s) => !s)}>
-                🗄 Archived ({archivedOffices.length + archivedTeams.length + archivedProjects.length}) {showArchivedSidebar ? '▾' : '▸'}
+                <IconArchive size={14} /> Archived ({archivedOffices.length + archivedTeams.length + archivedProjects.length}) {showArchivedSidebar ? '▾' : '▸'}
               </button>
               {showArchivedSidebar && (
                 <div className="archived-list">
                   {archivedOffices.map((office) => (
                     <div key={`o${office.id}`} className="archived-item">
-                      <span className="ai-name" title={office.name}>🏢 {office.name}</span>
+                      <span className="ai-name" title={office.name}><IconBuilding size={13} /> {office.name}</span>
                       <button className="row-icon" title="Restore office" onClick={() => setOfficeArchived(office, false)}><IconRestore /></button>
                       <button className="row-icon danger" title="Delete office" onClick={() => deleteOffice(office)}><IconTrash /></button>
                     </div>
                   ))}
                   {archivedTeams.map((team) => (
                     <div key={`t${team.id}`} className="archived-item">
-                      <span className="ai-name" title={team.name}>👥 {team.name}</span>
+                      <span className="ai-name" title={team.name}><IconUsers size={13} /> {team.name}</span>
                       <button className="row-icon" title="Restore team" onClick={() => setTeamArchived(team, false)}><IconRestore /></button>
                       <button className="row-icon danger" title="Delete team" onClick={() => deleteTeam(team)}><IconTrash /></button>
                     </div>
                   ))}
                   {archivedProjects.map((p) => (
                     <div key={`p${p.id}`} className="archived-item">
-                      <span className="ai-name" title={p.name}>📄 {p.name}</span>
+                      <span className="ai-name" title={p.name}><IconFile size={13} /> {p.name}</span>
                       <button className="row-icon" title="Restore project" onClick={() => setProjectArchived(p, false)}><IconRestore /></button>
                       <button className="row-icon danger" title="Delete project" onClick={() => deleteProject(p)}><IconTrash /></button>
                     </div>
@@ -931,11 +920,30 @@ export default function Page() {
         <main className="main">
           {error && (
             <div className={`banner ${isSetup ? 'setup' : ''}`}>
-              {isSetup ? (<>⚠️ <b>Database not connected yet.</b> Connect a Postgres database in Vercel and redeploy.</>) : (<>⚠️ {error}</>)}
+              <IconAlert size={16} />
+              <span>{isSetup ? (<><b>Database not connected yet.</b> Connect a Postgres database in Vercel and redeploy.</>) : error}</span>
             </div>
           )}
 
-          {globalView === 'geo' ? (
+          {globalView === 'bracket' ? (
+            <BracketView
+              brackets={data.brackets}
+              entrants={data.bentrants}
+              matches={data.bmatches}
+              votes={data.bvotes}
+              users={data.users}
+              me={currentUser}
+              onVote={castVote}
+              onDeclare={declareWinner}
+              onUndo={undoWinner}
+              onCreate={createBracket}
+              onPatch={patchBracket}
+              onRenameEntrant={renameEntrant}
+              onDeletePast={deleteBracket}
+              onFetchPast={(id) => api(`/api/brackets/${id}`)}
+              onSetAvatar={setAvatar}
+            />
+          ) : globalView === 'geo' ? (
             <GeoPage
               offices={activeOffices.filter((o) => o.geo_on !== false)}
               available={activeOffices.filter((o) => o.geo_on === false)}
@@ -955,30 +963,9 @@ export default function Page() {
               onUpdate={updateTask}
               onOpenProject={(id) => { setGlobalView(false); setTeamView(null); setOfficeView(null); setSelected(id); }}
             />
-          ) : viewedOffice && officeTab === 'bracket' ? (
-            <BracketView
-              office={viewedOffice}
-              tabs={<OfficeTabs tab={officeTab} onTab={setOfficeTab} />}
-              brackets={data.brackets}
-              entrants={data.bentrants}
-              matches={data.bmatches}
-              votes={data.bvotes}
-              users={data.users}
-              me={currentUser}
-              onVote={castVote}
-              onDeclare={declareWinner}
-              onUndo={undoWinner}
-              onCreate={createBracket}
-              onPatch={patchBracket}
-              onRenameEntrant={renameEntrant}
-              onDeletePast={deleteBracket}
-              onFetchPast={(id) => api(`/api/brackets/${id}`)}
-              onSetAvatar={setAvatar}
-            />
           ) : viewedOffice ? (
             <OfficeView
               office={viewedOffice}
-              tabs={<OfficeTabs tab={officeTab} onTab={setOfficeTab} />}
               meetings={data.meetings.filter((m) => String(m.office_id) === String(viewedOffice.id))}
               expandedMeetings={expandedMeetings}
               onToggleMeeting={toggleMeeting}
@@ -1016,7 +1003,7 @@ export default function Page() {
               </div>
 
               <div className="notes-panel">
-                <label className="notes-label">📝 Project notes <span>· visible to your whole team</span></label>
+                <label className="notes-label"><IconNote size={14} /> Project notes <span>· visible to your whole team</span></label>
                 <textarea
                   key={project.id}
                   className="notes-area"
@@ -1056,7 +1043,7 @@ export default function Page() {
               {archivedTasks.length > 0 && (
                 <div className="archive">
                   <button className="archive-toggle" onClick={() => setShowArchived((s) => !s)}>
-                    🗄 Archived ({archivedTasks.length}) {showArchived ? '▲' : '▼'}
+                    <IconArchive size={15} /> Archived ({archivedTasks.length}) {showArchived ? '▲' : '▼'}
                   </button>
                   {showArchived && (
                     <div className="board archive-board">
@@ -1090,7 +1077,7 @@ export default function Page() {
                                   </td>
                                   <td style={{ width: '8%', textAlign: 'center' }} className="added-cell">{fmtAdded(t.created_at)}</td>
                                   <td style={{ width: '8%', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                                    <button className="restore-btn" title="Restore to the board" onClick={() => restoreTask(t.id)}>↩</button>
+                                    <button className="restore-btn" title="Restore to the board" onClick={() => restoreTask(t.id)}><IconRestore size={15} /></button>
                                     <button className="row-x" title="Delete task" onClick={() => deleteTask(t.id)}>×</button>
                                   </td>
                                 </tr>
@@ -1120,7 +1107,7 @@ export default function Page() {
 
               <div className="info-panel">
                 <div className="info-head">
-                  <label className="notes-label">📎 Additional project info <span>· links, documents &amp; references</span></label>
+                  <label className="notes-label"><IconPaperclip size={14} /> Additional project info <span>· links, documents &amp; references</span></label>
                   <button className="btn btn-lime btn-sm" onClick={addInfo}>+ Add row</button>
                 </div>
                 {infoRows.length > 0 && (
@@ -1148,7 +1135,7 @@ export default function Page() {
                             onBlur={(e) => { if (e.target.value !== r.value) updateInfo(r.id, { value: e.target.value }); }}
                           />
                           {isWebUrl(r.value) && (
-                            <a className="info-action" href={r.value} target="_blank" rel="noopener noreferrer" title="Open link in a new tab">Open ↗</a>
+                            <a className="info-action" href={r.value} target="_blank" rel="noopener noreferrer" title="Open link in a new tab">Open <IconExternal size={12} /></a>
                           )}
                           {!isWebUrl(r.value) && isFilePath(r.value) && (
                             <button className="info-action" title="Copy path — paste into File Explorer's address bar" onClick={async (e) => { const ok = await copyText(r.value); const b = e.currentTarget; if (ok) { b.textContent = 'Copied!'; setTimeout(() => { b.textContent = 'Copy'; }, 1200); } }}>Copy</button>
@@ -1232,7 +1219,7 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
   return (
     <div className="info-panel">
       <div className="section-head">
-        <label className="notes-label">📅 Meetings</label>
+        <label className="notes-label"><IconCalendar size={14} /> Meetings</label>
         <div className="pm-actions">
           <button className="btn btn-lime btn-sm" onClick={() => onAddMeeting()}>+ Meeting</button>
           <button className="btn btn-plain btn-sm" onClick={onAddSeries}>+ Meeting series</button>
@@ -1245,10 +1232,10 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
         return (
           <div key={sv.id} className="pm-series">
             <div className="pm-series-head">
-              <span className="pm-series-name">📁 {sv.name}</span>
+              <span className="pm-series-name"><IconFolder size={14} /> {sv.name}</span>
               <div className="spacer" />
               <button className="btn btn-plain btn-xs" onClick={() => onAddMeeting(sv.id)}>+ Add meeting</button>
-              <button className="row-icon" title="Rename series" onClick={() => onRenameSeries(sv)}>✎</button>
+              <button className="row-icon" title="Rename series" onClick={() => onRenameSeries(sv)}><IconPencil size={14} /></button>
               <button className="row-icon danger" title="Delete series" onClick={() => onDeleteSeries(sv)}><IconTrash /></button>
             </div>
             {sm.length === 0 && <p className="pm-series-empty">No meetings in this series yet.</p>}
@@ -1260,12 +1247,11 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
   );
 }
 
-function OfficeView({ office, tabs, meetings, expandedMeetings, onToggleMeeting, onAddMeeting, onUpdateMeeting, onDeleteMeeting }) {
+function OfficeView({ office, meetings, expandedMeetings, onToggleMeeting, onAddMeeting, onUpdateMeeting, onDeleteMeeting }) {
   return (
     <>
       <div className="proj-head">
-        <h1>🏢 {office.name}</h1>
-        {tabs}
+        <h1 className="wi-h"><IconBuilding size={24} /> {office.name}</h1>
       </div>
       <div className="office-single">
         <div className="office-section">
@@ -1313,7 +1299,7 @@ function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJo
   return (
     <>
       <div className="proj-head">
-        <h1>🌍 Daily GeoGuessr</h1>
+        <h1 className="wi-h"><IconGlobe size={24} /> Daily GeoGuessr</h1>
         <button className="btn btn-lime btn-sm" onClick={() => setAdding(true)}>+ Add office</button>
       </div>
       {offices.length === 0 && <p className="geo-page-empty">No offices are playing yet — hit “+ Add office” to start tracking scores.</p>}
@@ -1373,10 +1359,6 @@ function AddGeoOfficeModal({ available, onJoin, onCreate, onClose }) {
       </div>
     </div>
   );
-}
-
-function IconStar() {
-  return (<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" /></svg>);
 }
 
 // Big celebratory tally of perfect 5,000-point guesses. Tap to add one (with a

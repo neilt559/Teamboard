@@ -55,7 +55,10 @@ input, select { font-family: inherit; }
   box-shadow: 0 0 0 3px rgba(203, 206, 0, .25);
 }
 .brand small { font-weight: 500; opacity: .65; font-size: 12px; margin-left: 4px; }
-.header-actions { display: flex; align-items: center; gap: 10px; }
+.header-actions { display: flex; align-items: center; gap: 10px; min-width: 0; overflow-x: auto; scrollbar-width: none; margin-left: 12px; }
+.header-actions::-webkit-scrollbar { display: none; }
+.header-actions > * { flex: 0 0 auto; white-space: nowrap; }
+.brand { flex: 0 0 auto; }
 
 .btn { border: none; border-radius: 8px; padding: 8px 14px; font-weight: 600; font-size: 13px; }
 .btn-lime { background: var(--lime); color: var(--on-lime); }
@@ -527,12 +530,22 @@ tbody tr:hover .notes-btn { opacity: 1; }
   .brand small { display: none; }
 }
 
-/* ---------- office tabs ---------- */
-.office-tabs { display: inline-flex; gap: 2px; background: #ececec; border-radius: 10px; padding: 3px; }
-.office-tabs button { display: inline-flex; align-items: center; gap: 6px; border: none; background: none; border-radius: 8px; padding: 6px 13px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
-.office-tabs button:hover { color: var(--ink); }
-.office-tabs button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
-.office-tabs button.on svg { color: #c99a00; }
+/* ---------- icons (inline SVG, see app/icons.js) ---------- */
+.icon { display: inline-block; vertical-align: -0.18em; flex-shrink: 0; }
+.wi { display: inline-flex; align-items: center; gap: 6px; }
+.wi-h { display: flex; align-items: center; gap: 10px; }
+.wi-h .icon { color: var(--lime-dark); }
+.btn-ghost.wi .icon { color: var(--lime); }
+.btn-ghost.wi.tab-on .icon { color: var(--on-lime); }
+.banner { display: flex; align-items: flex-start; gap: 8px; }
+.banner .icon { margin-top: 1px; }
+.notes-btn, .restore-btn, .bk-undo-btn { display: inline-grid; place-items: center; vertical-align: middle; }
+.notes-btn { color: var(--ink-2); }
+.notes-btn.has-notes { color: var(--ink); }
+.note-preview .icon { margin-right: 2px; color: var(--ink-2); }
+.notes-label { display: flex; align-items: center; gap: 6px; }
+.notes-label .icon { color: var(--ink-2); }
+.info-action .icon { vertical-align: -1px; }
 .btn-ghost:disabled { opacity: .5; cursor: default; }
 .btn-danger { background: #e5484d; color: #fff; }
 .btn-danger:hover { background: #cf3a3f; }
