@@ -187,6 +187,13 @@ export default function Page() {
     catch (e) { setError(e.message); }
   }
   async function deleteOffice(office) {
+    // GeoGuessr history must never be lost, so an office that has any can only
+    // be archived (the server and database refuse the delete too).
+    const geoCount = data.geo.filter((g) => String(g.office_id) === String(office.id)).length;
+    if (geoCount || Number(office.fivek) > 0) {
+      alert(`“${office.name}” has GeoGuessr history (${geoCount} score${geoCount === 1 ? '' : 's'}, ${Number(office.fivek) || 0} 5Ks), so it can’t be deleted — that data is kept for good.\n\nUse the archive button instead to hide it from the sidebar.`);
+      return;
+    }
     const teamCount = data.teams.filter((t) => String(t.office_id) === String(office.id)).length;
     const extra = teamCount ? ` and its ${teamCount} team${teamCount > 1 ? 's' : ''} (and everything in them)` : '';
     if (!confirm(`Delete office “${office.name}”${extra}? This can’t be undone.`)) return;
@@ -198,7 +205,7 @@ export default function Page() {
     }));
     touch();
     try { await api(`/api/offices/${office.id}`, { method: 'DELETE' }); await load(true); }
-    catch (e) { setError(e.message); }
+    catch (e) { setError(e.message); load(true); }
   }
   async function setOfficeArchived(office, archived) {
     setData((d) => ({ ...d, offices: d.offices.map((x) => (x.id === office.id ? { ...x, archived } : x)) }));
@@ -262,7 +269,11 @@ export default function Page() {
     catch (e) { setError(e.message); }
   }
   async function deleteGeo(id) {
-    setData((d) => ({ ...d, geo: d.geo.filter((g) => g.id !== id) }));
+    const g = data.geo.find((x) => String(x.id) === String(id));
+    const office = g && data.offices.find((o) => String(o.id) === String(g.office_id));
+    const what = g ? `the ${Number(g.score).toLocaleString()} score${g.score_date ? ` from ${g.score_date}` : ''}${office ? ` (${office.name})` : ''}` : 'this score';
+    if (!confirm(`Delete ${what}?\n\nOnly do this to fix a mistake — it can’t be undone.`)) return;
+    setData((d) => ({ ...d, geo: d.geo.filter((x) => x.id !== id) }));
     touch();
     try { await api(`/api/geo/${id}`, { method: 'DELETE' }); }
     catch (e) { setError(e.message); }
@@ -359,11 +370,12 @@ export default function Page() {
     }
   }
 
-  async function setOfficeGeo(office, on) {
-    if (!on && !confirm(`Remove “${office.name}” from GeoGuessr?\n\nIts scores and 5K count are kept — you can add it back anytime with “+ Add office”.`)) return;
-    setData((d) => ({ ...d, offices: d.offices.map((x) => (x.id === office.id ? { ...x, geo_on: on } : x)) }));
+  // Joining GeoGuessr is one-way: there's deliberately no way to take an
+  // office back off the GeoGuessr page.
+  async function joinGeo(office) {
+    setData((d) => ({ ...d, offices: d.offices.map((x) => (x.id === office.id ? { ...x, geo_on: true } : x)) }));
     touch();
-    try { await api(`/api/offices/${office.id}`, { method: 'PATCH', body: JSON.stringify({ geo_on: on }) }); }
+    try { await api(`/api/offices/${office.id}`, { method: 'PATCH', body: JSON.stringify({ geo_on: true }) }); }
     catch (e) { setError(e.message); }
   }
   async function createGeoOffice(name) {
@@ -945,14 +957,15 @@ export default function Page() {
             />
           ) : globalView === 'geo' ? (
             <GeoPage
-              offices={activeOffices.filter((o) => o.geo_on !== false)}
+              // Archived offices stay on the GeoGuessr page — once an office
+              // plays, its column (and its scores) never disappear.
+              offices={[...data.offices].filter((o) => o.geo_on !== false).sort(byPos)}
               available={activeOffices.filter((o) => o.geo_on === false)}
               geo={data.geo}
               onAddGeo={addGeo}
               onDeleteGeo={deleteGeo}
               onFiveK={bumpFiveK}
-              onJoin={(o) => setOfficeGeo(o, true)}
-              onLeave={(o) => setOfficeGeo(o, false)}
+              onJoin={joinGeo}
               onCreate={createGeoOffice}
             />
           ) : globalView ? (
@@ -1294,7 +1307,7 @@ function OfficeView({ office, meetings, expandedMeetings, onToggleMeeting, onAdd
 }
 
 // Every GeoGuessr office side by side, each with its full tracker.
-function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJoin, onLeave, onCreate }) {
+function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJoin, onCreate }) {
   const [adding, setAdding] = useState(false);
   return (
     <>
@@ -1308,7 +1321,6 @@ function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJo
           <section key={o.id} className="office-section geo-office">
             <div className="section-head">
               <h2 className="geo-office-name">{o.name}</h2>
-              <button className="geo-leave" title={`Remove ${o.name} from GeoGuessr`} onClick={() => onLeave(o)}>×</button>
             </div>
             <FiveKCounter count={Number(o.fivek) || 0} onChange={(delta) => onFiveK(o.id, delta)} />
             <GeoTracker
