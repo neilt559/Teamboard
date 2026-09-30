@@ -369,6 +369,17 @@ tbody tr:hover .notes-btn { opacity: 1; }
 
 /* office page: meetings + geoguessr */
 .office-cols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; align-items: start; }
+.office-single { max-width: 900px; }
+/* GeoGuessr page: one column per office, side by side (wraps when narrow) */
+.geo-page { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; align-items: start; }
+.geo-office { min-width: 0; }
+.geo-office-name { margin: 0; font-size: 18px; color: var(--ink); border-bottom: 3px solid var(--lime); padding-bottom: 2px; }
+.geo-leave { border: none; background: none; color: #b3b1b2; font-size: 20px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+.geo-leave:hover { color: #e5484d; background: #fdecec; }
+.geo-page-empty { color: var(--muted); font-size: 14px; }
+.geo-avail-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-weight: 600; color: var(--ink); }
+.geo-modal-note { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+@media (max-width: 520px) { .geo-page { grid-template-columns: minmax(0, 1fr); } }
 .office-section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .section-title { margin: 0; font-size: 15px; color: var(--ink); }

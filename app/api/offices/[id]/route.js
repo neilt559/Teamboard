@@ -18,6 +18,9 @@ export async function PATCH(req, { params }) {
     if ('archived' in b) {
       await sql`UPDATE offices SET archived=${!!b.archived} WHERE id=${id}`;
     }
+    if ('geo_on' in b) {
+      await sql`UPDATE offices SET geo_on=${!!b.geo_on} WHERE id=${id}`;
+    }
     const r = await sql`SELECT id, name, position, archived FROM offices WHERE id=${id}`;
     return NextResponse.json(r.rows[0] || {});
   } catch (e) {

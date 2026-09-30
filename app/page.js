@@ -103,6 +103,7 @@ export default function Page() {
   const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [], pseries: [], pmeetings: [], users: [], brackets: [], bentrants: [], bmatches: [], bvotes: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
+  // Full-page views reached from the header: false | 'tasks' (All Tasks) | 'geo' (GeoGuessr).
   const [globalView, setGlobalView] = useState(false);
   const [officeView, setOfficeView] = useState(null);
   const [officeTab, setOfficeTab] = useState('overview');
@@ -369,6 +370,18 @@ export default function Page() {
     }
   }
 
+  async function setOfficeGeo(office, on) {
+    if (!on && !confirm(`Remove “${office.name}” from GeoGuessr?\n\nIts scores and 5K count are kept — you can add it back anytime with “+ Add office”.`)) return;
+    setData((d) => ({ ...d, offices: d.offices.map((x) => (x.id === office.id ? { ...x, geo_on: on } : x)) }));
+    touch();
+    try { await api(`/api/offices/${office.id}`, { method: 'PATCH', body: JSON.stringify({ geo_on: on }) }); }
+    catch (e) { setError(e.message); }
+  }
+  async function createGeoOffice(name) {
+    touch();
+    try { await api('/api/offices', { method: 'POST', body: JSON.stringify({ name, geo_on: true }) }); await load(true); }
+    catch (e) { setError(e.message); }
+  }
   async function bumpFiveK(officeId, delta) {
     setData((d) => ({
       ...d,
@@ -794,7 +807,8 @@ export default function Page() {
           <span className="dot" /> TeamBoard <small>shared project board</small>
         </div>
         <div className="header-actions">
-          <button className={`btn btn-ghost ${globalView ? 'tab-on' : ''}`} onClick={() => { setGlobalView(true); setTeamView(null); setOfficeView(null); setSidebarOpen(false); }}>📋 All Tasks</button>
+          <button className={`btn btn-ghost ${globalView === 'tasks' ? 'tab-on' : ''}`} onClick={() => { setGlobalView('tasks'); setTeamView(null); setOfficeView(null); setSidebarOpen(false); }}>📋 All Tasks</button>
+          <button className={`btn btn-ghost ${globalView === 'geo' ? 'tab-on' : ''}`} onClick={() => { setGlobalView('geo'); setTeamView(null); setOfficeView(null); setSidebarOpen(false); }}>🌍 GeoGuessr</button>
           <button
             className={`btn btn-ghost ${!globalView && viewedOffice && officeTab === 'bracket' ? 'tab-on' : ''}`}
             disabled={!activeOffices.length}
@@ -921,7 +935,19 @@ export default function Page() {
             </div>
           )}
 
-          {globalView ? (
+          {globalView === 'geo' ? (
+            <GeoPage
+              offices={activeOffices.filter((o) => o.geo_on !== false)}
+              available={activeOffices.filter((o) => o.geo_on === false)}
+              geo={data.geo}
+              onAddGeo={addGeo}
+              onDeleteGeo={deleteGeo}
+              onFiveK={bumpFiveK}
+              onJoin={(o) => setOfficeGeo(o, true)}
+              onLeave={(o) => setOfficeGeo(o, false)}
+              onCreate={createGeoOffice}
+            />
+          ) : globalView ? (
             <GlobalTasks
               tasks={globalTasks}
               people={data.people}
@@ -954,15 +980,11 @@ export default function Page() {
               office={viewedOffice}
               tabs={<OfficeTabs tab={officeTab} onTab={setOfficeTab} />}
               meetings={data.meetings.filter((m) => String(m.office_id) === String(viewedOffice.id))}
-              geoScores={data.geo.filter((g) => String(g.office_id) === String(viewedOffice.id))}
               expandedMeetings={expandedMeetings}
               onToggleMeeting={toggleMeeting}
               onAddMeeting={() => addMeeting(viewedOffice.id)}
               onUpdateMeeting={updateMeeting}
               onDeleteMeeting={deleteMeeting}
-              onAddGeo={(score, date) => addGeo(viewedOffice.id, score, date)}
-              onDeleteGeo={deleteGeo}
-              onFiveK={(delta) => bumpFiveK(viewedOffice.id, delta)}
             />
           ) : viewedTeam ? (
             <TeamOverview
@@ -1238,14 +1260,14 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
   );
 }
 
-function OfficeView({ office, tabs, meetings, geoScores, expandedMeetings, onToggleMeeting, onAddMeeting, onUpdateMeeting, onDeleteMeeting, onAddGeo, onDeleteGeo, onFiveK }) {
+function OfficeView({ office, tabs, meetings, expandedMeetings, onToggleMeeting, onAddMeeting, onUpdateMeeting, onDeleteMeeting }) {
   return (
     <>
       <div className="proj-head">
         <h1>🏢 {office.name}</h1>
         {tabs}
       </div>
-      <div className="office-cols">
+      <div className="office-single">
         <div className="office-section">
           <div className="section-head">
             <h2 className="section-title">Meetings</h2>
@@ -1280,15 +1302,76 @@ function OfficeView({ office, tabs, meetings, geoScores, expandedMeetings, onTog
             );
           })}
         </div>
-        <div className="office-section">
-          <div className="section-head">
-            <h2 className="section-title">Daily GeoGuessr 🌍</h2>
-          </div>
-          <FiveKCounter count={Number(office.fivek) || 0} onChange={onFiveK} />
-          <GeoTracker scores={geoScores} onAdd={onAddGeo} onDelete={onDeleteGeo} />
-        </div>
       </div>
     </>
+  );
+}
+
+// Every GeoGuessr office side by side, each with its full tracker.
+function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJoin, onLeave, onCreate }) {
+  const [adding, setAdding] = useState(false);
+  return (
+    <>
+      <div className="proj-head">
+        <h1>🌍 Daily GeoGuessr</h1>
+        <button className="btn btn-lime btn-sm" onClick={() => setAdding(true)}>+ Add office</button>
+      </div>
+      {offices.length === 0 && <p className="geo-page-empty">No offices are playing yet — hit “+ Add office” to start tracking scores.</p>}
+      <div className="geo-page">
+        {offices.map((o) => (
+          <section key={o.id} className="office-section geo-office">
+            <div className="section-head">
+              <h2 className="geo-office-name">{o.name}</h2>
+              <button className="geo-leave" title={`Remove ${o.name} from GeoGuessr`} onClick={() => onLeave(o)}>×</button>
+            </div>
+            <FiveKCounter count={Number(o.fivek) || 0} onChange={(delta) => onFiveK(o.id, delta)} />
+            <GeoTracker
+              scores={geo.filter((g) => String(g.office_id) === String(o.id))}
+              onAdd={(score, date) => onAddGeo(o.id, score, date)}
+              onDelete={onDeleteGeo}
+            />
+          </section>
+        ))}
+      </div>
+      {adding && <AddGeoOfficeModal available={available} onJoin={onJoin} onCreate={onCreate} onClose={() => setAdding(false)} />}
+    </>
+  );
+}
+
+function AddGeoOfficeModal({ available, onJoin, onCreate, onClose }) {
+  const [name, setName] = useState('');
+  const create = () => { const n = name.trim(); if (!n) return; onCreate(n); onClose(); };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal add-task-modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Add an office to GeoGuessr</h2>
+        {available.length > 0 && (
+          <>
+            <label className="atm-label">Existing offices</label>
+            {available.map((o) => (
+              <div key={o.id} className="geo-avail-row">
+                <span>{o.name}</span>
+                <button className="btn btn-plain btn-sm" onClick={() => { onJoin(o); onClose(); }}>Add</button>
+              </div>
+            ))}
+          </>
+        )}
+        <label className="atm-label">{available.length ? 'Or create a new office' : 'New office name'}</label>
+        <input
+          className="field"
+          autoFocus
+          placeholder="e.g. Raleigh"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') create(); }}
+        />
+        <p className="geo-modal-note">New offices also appear in the sidebar, so they can use the rest of TeamBoard too.</p>
+        <div className="modal-actions">
+          <button className="btn btn-plain" onClick={onClose}>Cancel</button>
+          <button className="btn btn-ink" onClick={create} disabled={!name.trim()}>Create office</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
