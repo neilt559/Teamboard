@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { ROUNDS, nextSlot, currentRound } from '@/lib/bracket';
-import { IconCrown, IconTrophy, IconTrash, IconCamera, IconPencil, IconCheck, IconNote, IconRestore, IconLock } from './icons';
+import { IconCrown, IconTrophy, IconTrash, IconCamera, IconPencil, IconCheck, IconNote, IconRestore, IconLock, IconCrop } from './icons';
+import PhotoCropper, { fileToSource } from './photo-cropper';
 
 // ---- vote bracket (one shared bracket for everyone) ----------------------
 // People vote on each matchup as whoever they're logged in as; their headshot
@@ -30,32 +31,6 @@ function fmtDay(v) {
 }
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-// Crop an uploaded photo to a small square JPEG (biased toward the top, where
-// faces usually are) so headshots stay tiny in the database.
-export async function fileToHeadshot(file) {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error('Couldn’t read that image — try a JPG or PNG.'));
-      i.src = url;
-    });
-    const S = 160;
-    const side = Math.min(img.naturalWidth, img.naturalHeight);
-    const sx = (img.naturalWidth - side) / 2;
-    const sy = (img.naturalHeight - side) * 0.25;
-    const c = document.createElement('canvas');
-    c.width = S;
-    c.height = S;
-    const ctx = c.getContext('2d');
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, sx, sy, side, side, 0, 0, S, S);
-    return c.toDataURL('image/jpeg', 0.86);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
 
 export function Headshot({ user, size = 22 }) {
   const name = user ? user.username : 'unknown';
@@ -341,31 +316,60 @@ function BracketSetup({ isFirst, canCancel, onCancel, onCreate }) {
 function VoterPhotosModal({ users, me, onSetAvatar, onClose }) {
   const [busy, setBusy] = useState({});
   const [err, setErr] = useState('');
+  const [editing, setEditing] = useState(null); // { user, src, crop, fresh } while the cropper is open
   // zz_* accounts are throwaway logins left over from testing the site.
   const list = users.filter((u) => !/^zz_/.test(u.username));
+
+  // A new photo opens straight into the cropper.
   const pick = async (u, file) => {
     if (!file) return;
     setErr('');
     setBusy((b) => ({ ...b, [u.id]: true }));
-    try { await onSetAvatar(u.id, await fileToHeadshot(file)); }
-    catch (e) { setErr(e.message || 'Upload failed'); }
+    try { setEditing({ user: u, src: await fileToSource(file), crop: null, fresh: true }); }
+    catch (e) { setErr(e.message || 'Couldn’t read that image'); }
     finally { setBusy((b) => ({ ...b, [u.id]: false })); }
   };
+  // Re-crop a photo that's already saved, starting from where it was left.
+  const adjust = (u) => {
+    let crop = null;
+    try { crop = JSON.parse(u.avatar_crop || 'null'); } catch {}
+    setEditing({ user: u, src: `/api/avatar/${u.id}?src=1&v=${u.avatar_v}`, crop, fresh: false });
+  };
+  const remove = (u) => {
+    if (confirm(`Remove ${u.username}’s photo?`)) onSetAvatar(u.id, null).catch((e) => setErr(e.message));
+  };
+
+  if (editing) {
+    return (
+      <PhotoCropper
+        title={`Photo for ${editing.user.username}`}
+        src={editing.src}
+        initialCrop={editing.crop}
+        fresh={editing.fresh}
+        onCancel={() => setEditing(null)}
+        onSave={async (payload) => { await onSetAvatar(editing.user.id, payload); setEditing(null); }}
+      />
+    );
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal bk-photos" onClick={(e) => e.stopPropagation()}>
         <h2>Voter photos</h2>
-        <p className="bk-photos-sub">A person’s photo shows up next to whatever they vote for. Anyone can set anyone’s, so one person can load the whole office. Photos are cropped to a square.</p>
+        <p className="bk-photos-sub">A person’s photo shows up next to whatever they vote for. Anyone can set anyone’s, so one person can load the whole office. After picking a photo you can drag and zoom it to fit the circle.</p>
         {err && <div className="bk-err">{err}</div>}
         {list.map((u) => (
           <div key={u.id} className="bk-photo-row">
             <Headshot user={u} size={40} />
             <span className="bk-photo-name">{u.username}{me && same(me.id, u.id) && <em> (you)</em>}</span>
+            {u.has_src && (
+              <button className="btn btn-plain btn-sm wi" onClick={() => adjust(u)} title="Re-crop or zoom this photo"><IconCrop size={13} /> Adjust</button>
+            )}
             <label className="btn btn-plain btn-sm bk-upload">
-              {busy[u.id] ? 'Saving…' : (u.avatar_v ? 'Change photo' : 'Upload photo')}
+              {busy[u.id] ? 'Opening…' : (u.avatar_v ? 'New photo' : 'Upload photo')}
               <input type="file" accept="image/*" hidden onChange={(e) => { pick(u, e.target.files[0]); e.target.value = ''; }} />
             </label>
-            {u.avatar_v && <button className="bk-link" onClick={() => onSetAvatar(u.id, null)}>Remove</button>}
+            {u.avatar_v && <button className="bk-link" onClick={() => remove(u)}>Remove</button>}
           </div>
         ))}
         {!list.length && <p className="bk-photos-sub">No accounts yet.</p>}

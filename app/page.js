@@ -358,13 +358,14 @@ export default function Page() {
     try { await api(`/api/brackets/${id}`, { method: 'DELETE' }); }
     catch (e) { setError(e.message); }
   }
-  async function setAvatar(userId, image) {
+  // payload = { image, crop, source? } from the photo cropper, or null to remove.
+  async function setAvatar(userId, payload) {
     touch();
-    if (image) {
-      const r = await api(`/api/avatar/${userId}`, { method: 'PUT', body: JSON.stringify({ image }) });
-      setData((d) => ({ ...d, users: d.users.map((u) => (String(u.id) === String(userId) ? { ...u, avatar_v: r.avatar_v } : u)) }));
+    if (payload) {
+      const r = await api(`/api/avatar/${userId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      setData((d) => ({ ...d, users: d.users.map((u) => (String(u.id) === String(userId) ? { ...u, avatar_v: r.avatar_v, avatar_crop: r.avatar_crop, has_src: r.has_src } : u)) }));
     } else {
-      setData((d) => ({ ...d, users: d.users.map((u) => (String(u.id) === String(userId) ? { ...u, avatar_v: null } : u)) }));
+      setData((d) => ({ ...d, users: d.users.map((u) => (String(u.id) === String(userId) ? { ...u, avatar_v: null, avatar_crop: null, has_src: false } : u)) }));
       try { await api(`/api/avatar/${userId}`, { method: 'DELETE' }); }
       catch (e) { setError(e.message); }
     }

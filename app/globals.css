@@ -705,6 +705,30 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .bk-setup-wc { margin-top: 10px; padding: 6px 8px 8px; border: 1px dashed #d6d7a0; border-radius: 8px; background: #fdfdf3; }
 .bk-setup-wc-label { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #7d7f00; }
 
+/* headshot cropper */
+.crop-modal { max-width: 400px; }
+.crop-stage {
+  position: relative; overflow: hidden; margin: 0 auto; border-radius: 14px; background: #1f1e1e;
+  touch-action: none; user-select: none; cursor: grab; outline: none;
+}
+.crop-stage:active { cursor: grabbing; }
+.crop-stage:focus-visible { box-shadow: 0 0 0 3px var(--lime); }
+.crop-img { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; will-change: transform; }
+.crop-mask { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 9999px rgba(20, 20, 20, .58); outline: 2px solid rgba(255, 255, 255, .85); outline-offset: -2px; }
+.crop-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #bbb; font-size: 13px; }
+.crop-zoom { display: flex; align-items: center; gap: 8px; margin: 14px auto 0; max-width: 300px; }
+.crop-zoom input[type="range"] { flex: 1; accent-color: var(--lime-dark); }
+.crop-icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 0; }
+.crop-icon-btn:hover:not(:disabled) { border-color: var(--lime-dark); background: #fafbef; }
+.crop-icon-btn:disabled { opacity: .45; cursor: default; }
+.crop-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.crop-tools { display: flex; gap: 8px; }
+.crop-previews { display: flex; align-items: center; gap: 10px; }
+.crop-prev { border-radius: 50%; background: #eee; box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0, 0, 0, .2); }
+.crop-prev.lg { width: 48px; height: 48px; }
+.crop-prev.sm { width: 24px; height: 24px; }
+.crop-hint { margin: 10px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+
 /* confirm + photos dialogs */
 .bk-confirm { max-width: 420px; }
 .bk-confirm p { margin: 0 0 8px; font-size: 14px; color: var(--text); line-height: 1.45; }

@@ -23,7 +23,7 @@ export async function GET() {
     const pmeetings = await sql`SELECT id, project_id, series_id, title, meeting_date, attendance, notes, position FROM project_meetings ORDER BY meeting_date DESC NULLS LAST, id DESC`;
     // Brackets: every bracket's summary (for the history list), but entrants,
     // matches and votes only for current (non-archived) ones to keep polls light.
-    const users = await sql`SELECT id, username, avatar_v FROM users ORDER BY username ASC`;
+    const users = await sql`SELECT id, username, avatar_v, avatar_crop, (avatar_src IS NOT NULL) AS has_src FROM users ORDER BY username ASC`;
     const brackets = await sql`SELECT b.id, b.office_id, b.name, b.notes, b.regions, b.champion_id, b.archived, b.created_at, b.completed_at, e.name AS champion_name
                                FROM brackets b LEFT JOIN bracket_entrants e ON e.id = b.champion_id
                                ORDER BY b.created_at DESC, b.id DESC`;
