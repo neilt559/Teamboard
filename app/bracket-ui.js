@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ROUNDS, nextSlot, currentRound } from '@/lib/bracket';
 import { IconCrown, IconTrophy, IconTrash, IconCamera, IconPencil, IconCheck, IconNote, IconRestore, IconLock, IconCrop } from './icons';
 import PhotoCropper, { fileToSource } from './photo-cropper';
+import { SyncedField, SyncedTextarea } from './synced';
 
 // ---- vote bracket (one shared bracket for everyone) ----------------------
 // People vote on each matchup as whoever they're logged in as; their headshot
@@ -41,23 +42,6 @@ export function Headshot({ user, size = 22 }) {
     <span className="hs hs-init" title={name} style={{ width: size, height: size, fontSize: Math.round(size * 0.46), background: colorFor(name) }}>
       {name.slice(0, 1).toUpperCase()}
     </span>
-  );
-}
-
-// Textarea that saves on blur but still picks up other people's edits while
-// you're not typing in it.
-function SyncedTextarea({ value, onSave, ...rest }) {
-  const [v, setV] = useState(value || '');
-  const focused = useRef(false);
-  useEffect(() => { if (!focused.current) setV(value || ''); }, [value]);
-  return (
-    <textarea
-      {...rest}
-      value={v}
-      onChange={(e) => setV(e.target.value)}
-      onFocus={() => { focused.current = true; }}
-      onBlur={() => { focused.current = false; if (v !== (value || '')) onSave(v); }}
-    />
   );
 }
 
@@ -126,12 +110,11 @@ function Match({ m, ctx, placeholders }) {
         <div className="bk-line">
           {e && <span className="bk-seed">{e.seed}</span>}
           {e && editNames ? (
-            <input
+            <SyncedField
               className="bk-name-input"
-              key={`${e.id}-${e.name}`}
-              defaultValue={e.name}
+              value={e.name}
               onKeyDown={(ev) => { if (ev.key === 'Enter') ev.target.blur(); }}
-              onBlur={(ev) => { const v = ev.target.value.trim(); if (v && v !== e.name) onRename(e.id, v); else ev.target.value = e.name; }}
+              onSave={(v) => { const n = v.trim(); if (!n) return false; onRename(e.id, n); return true; }}
             />
           ) : (
             <span className="bk-name" title={e ? e.name : undefined}>{e ? e.name : placeholders[side]}</span>
@@ -198,12 +181,11 @@ function BracketBoard({ bracket, entrants, matches, votes, usersById, meId, read
     <section key={q} className={`bk-quad bk-q${q}${q >= 2 ? ' mirror' : ''}`}>
       <div className="bk-quad-head">
         {editNames ? (
-          <input
+          <SyncedField
             className="bk-region-input"
-            key={`${q}-${regions[q]}`}
-            defaultValue={regions[q]}
+            value={regions[q]}
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-            onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== regions[q]) onRenameRegion(q, v); else e.target.value = regions[q]; }}
+            onSave={(v) => { const n = v.trim(); if (!n) return false; onRenameRegion(q, n); return true; }}
           />
         ) : (
           <h3>{regions[q]}</h3>
@@ -538,12 +520,12 @@ export default function BracketView({
         <div className="bk-head">
           <div className="bk-head-main">
             {editNames ? (
-              <input
+              <SyncedField
                 className="bk-title-input"
-                key={`t-${current.id}-${current.name}`}
-                defaultValue={current.name}
+                key={current.id}
+                value={current.name}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-                onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== current.name) onPatch(current.id, { name: v }); else e.target.value = current.name; }}
+                onSave={(v) => { const n = v.trim(); if (!n) return false; onPatch(current.id, { name: n }); return true; }}
               />
             ) : (
               <h2 className="bk-title">{current.name}</h2>

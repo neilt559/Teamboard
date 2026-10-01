@@ -44,6 +44,9 @@ export const IconZoomIn = (p) => <Svg {...p}><circle cx="11" cy="11" r="7" /><pa
 export const IconZoomOut = (p) => <Svg {...p}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5M8 11h6" /></Svg>;
 export const IconRotate = (p) => <Svg {...p}><path d="M21 12a9 9 0 1 1-2.6-6.3" /><path d="M21 4v4h-4" /></Svg>;
 export const IconCrop = (p) => <Svg {...p}><path d="M6 2v14a2 2 0 0 0 2 2h14" /><path d="M18 22V8a2 2 0 0 0-2-2H2" /></Svg>;
-export const IconLock =(p) => <Svg {...p}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></Svg>;
-export const IconStar =(p) => <Svg filled size={14} {...p}><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" /></Svg>;
+export const IconBulb = (p) => <Svg {...p}><path d="M9 18h6M10 21h4" /><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3z" /></Svg>;
+export const IconChevronUp = (p) => <Svg {...p}><path d="M6 15l6-6 6 6" /></Svg>;
+export const IconSearch = (p) => <Svg {...p}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></Svg>;
+export const IconLock = (p) => <Svg {...p}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></Svg>;
+export const IconStar = (p) => <Svg filled size={14} {...p}><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" /></Svg>;
 export const IconCrown = (p) => <Svg filled size={13} {...p}><path d="M3 7.5l4.6 4.1L12 5l4.4 6.6L21 7.5 19.2 17.5H4.8z" /><rect x="4.8" y="19" width="14.4" height="2.4" rx="1" /></Svg>;

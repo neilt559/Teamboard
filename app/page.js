@@ -1,9 +1,11 @@
 'use client';
 import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
 import BracketView from './bracket-ui';
+import { SyncedField, SyncedTextarea } from './synced';
+import SuggestionsView from './suggestions-ui';
 import {
   IconArchive, IconTrash, IconRestore, IconUsers, IconList, IconGlobe, IconTrophy, IconBuilding, IconFile,
-  IconNote, IconPencil, IconPaperclip, IconCalendar, IconFolder, IconAlert, IconMenu, IconExternal, IconStar,
+  IconNote, IconPencil, IconPaperclip, IconCalendar, IconFolder, IconAlert, IconMenu, IconExternal, IconStar, IconBulb,
 } from './icons';
 import { nextSlot } from '@/lib/bracket';
 
@@ -90,10 +92,10 @@ async function api(path, opts) {
 }
 
 export default function Page() {
-  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [], pseries: [], pmeetings: [], users: [], brackets: [], bentrants: [], bmatches: [], bvotes: [] });
+  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [], pseries: [], pmeetings: [], users: [], brackets: [], bentrants: [], bmatches: [], bvotes: [], suggestions: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
-  // Full-page views reached from the header: false | 'tasks' (All Tasks) | 'geo' (GeoGuessr) | 'bracket'.
+  // Full-page views reached from the header: false | 'tasks' (All Tasks) | 'geo' (GeoGuessr) | 'bracket' | 'ideas' (Suggestions).
   const [globalView, setGlobalView] = useState(false);
   const [officeView, setOfficeView] = useState(null);
   const [expandedMeetings, setExpandedMeetings] = useState({});
@@ -358,6 +360,32 @@ export default function Page() {
     try { await api(`/api/brackets/${id}`, { method: 'DELETE' }); }
     catch (e) { setError(e.message); }
   }
+  // ---- suggestions ----
+  const patchSuggestionLocal = (id, patch) => setData((d) => ({ ...d, suggestions: d.suggestions.map((s) => (String(s.id) === String(id) ? { ...s, ...patch } : s)) }));
+  async function addSuggestion(p) {
+    touch();
+    try { await api('/api/suggestions', { method: 'POST', body: JSON.stringify(p) }); await load(true); return true; }
+    catch (e) { setError(e.message); return false; }
+  }
+  async function patchSuggestion(id, patch) {
+    patchSuggestionLocal(id, patch);
+    touch();
+    try { await api(`/api/suggestions/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); return true; }
+    catch (e) { setError(e.message); load(true); return false; }
+  }
+  async function deleteSuggestion(id) {
+    setData((d) => ({ ...d, suggestions: d.suggestions.filter((s) => String(s.id) !== String(id)) }));
+    touch();
+    try { await api(`/api/suggestions/${id}`, { method: 'DELETE' }); }
+    catch (e) { setError(e.message); load(true); }
+  }
+  async function voteSuggestion(id, on) {
+    setData((d) => ({ ...d, suggestions: d.suggestions.map((s) => (String(s.id) === String(id) && !!s.voted !== on ? { ...s, voted: on, votes: s.votes + (on ? 1 : -1) } : s)) }));
+    touch();
+    try { await api(`/api/suggestions/${id}/vote`, { method: 'POST', body: JSON.stringify({ on }) }); }
+    catch (e) { setError(e.message); load(true); }
+  }
+
   // payload = { image, crop, source? } from the photo cropper, or null to remove.
   async function setAvatar(userId, payload) {
     touch();
@@ -696,11 +724,12 @@ export default function Page() {
                 </button>
               )}
               <div className="title-main">
-                <input
+                <SyncedField
                   className="task-title"
-                  defaultValue={t.title}
+                  value={t.title}
                   placeholder={isSub ? 'Untitled subtask' : 'Untitled task'}
-                  onBlur={(e) => { if (e.target.value !== t.title) updateTask(t.id, { title: e.target.value }); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                  onSave={(v) => updateTask(t.id, { title: v })}
                 />
               </div>
             </div>
@@ -779,11 +808,11 @@ export default function Page() {
         {notesOpen && (
           <tr className="task-notes-row">
             <td colSpan={7}>
-              <textarea
+              <SyncedTextarea
                 className="task-notes-area"
-                defaultValue={t.notes || ''}
+                value={t.notes || ''}
                 placeholder="Notes — details, blockers, links. Everyone on the team can see this."
-                onBlur={(e) => { if ((e.target.value || '') !== (t.notes || '')) updateTask(t.id, { notes: e.target.value }); }}
+                onSave={(v) => updateTask(t.id, { notes: v })}
               />
             </td>
           </tr>
@@ -809,7 +838,7 @@ export default function Page() {
           <span className="dot" /> TeamBoard <small>shared project board</small>
         </div>
         <div className="header-actions">
-          {[['tasks', IconList, 'All Tasks'], ['geo', IconGlobe, 'GeoGuessr'], ['bracket', IconTrophy, 'Bracket']].map(([key, Icon, label]) => (
+          {[['tasks', IconList, 'All Tasks'], ['geo', IconGlobe, 'GeoGuessr'], ['bracket', IconTrophy, 'Bracket'], ['ideas', IconBulb, 'Suggestions']].map(([key, Icon, label]) => (
             <button
               key={key}
               className={`btn btn-ghost wi ${globalView === key ? 'tab-on' : ''}`}
@@ -938,7 +967,16 @@ export default function Page() {
             </div>
           )}
 
-          {globalView === 'bracket' ? (
+          {globalView === 'ideas' ? (
+            <SuggestionsView
+              suggestions={data.suggestions}
+              users={data.users}
+              onAdd={addSuggestion}
+              onPatch={patchSuggestion}
+              onDelete={deleteSuggestion}
+              onVote={voteSuggestion}
+            />
+          ) : globalView === 'bracket' ? (
             <BracketView
               brackets={data.brackets}
               entrants={data.bentrants}
@@ -1018,12 +1056,12 @@ export default function Page() {
 
               <div className="notes-panel">
                 <label className="notes-label"><IconNote size={14} /> Project notes <span>· visible to your whole team</span></label>
-                <textarea
+                <SyncedTextarea
                   key={project.id}
                   className="notes-area"
-                  defaultValue={project.notes || ''}
+                  value={project.notes || ''}
                   placeholder="Notes for this project — plans, links, reminders…"
-                  onBlur={(e) => { if ((e.target.value || '') !== (project.notes || '')) saveProjectNotes(project.id, e.target.value); }}
+                  onSave={(v) => saveProjectNotes(project.id, v)}
                 />
               </div>
 
@@ -1133,20 +1171,18 @@ export default function Page() {
                     </div>
                     {infoRows.map((r) => (
                       <div key={r.id} className="info-row">
-                        <input
+                        <SyncedField
                           className="info-input"
-                          key={`${r.id}-l`}
-                          defaultValue={r.label}
+                          value={r.label}
                           placeholder="Item name"
-                          onBlur={(e) => { if (e.target.value !== r.label) updateInfo(r.id, { label: e.target.value }); }}
+                          onSave={(v) => updateInfo(r.id, { label: v })}
                         />
                         <div className="info-value-cell">
-                          <input
+                          <SyncedField
                             className="info-input"
-                            key={`${r.id}-v-${r.value}`}
-                            defaultValue={r.value}
+                            value={r.value}
                             placeholder="Type info, a web link, or a file path…"
-                            onBlur={(e) => { if (e.target.value !== r.value) updateInfo(r.id, { value: e.target.value }); }}
+                            onSave={(v) => updateInfo(r.id, { value: v })}
                           />
                           {isWebUrl(r.value) && (
                             <a className="info-action" href={r.value} target="_blank" rel="noopener noreferrer" title="Open link in a new tab">Open <IconExternal size={12} /></a>
@@ -1212,7 +1248,7 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
             </>
           ) : (
             <>
-              <input className="pm-title" key={`${m.id}-t-${m.title}`} defaultValue={m.title} onBlur={(e) => { if (e.target.value !== m.title) onUpdateMeeting(m.id, { title: e.target.value }); }} />
+              <SyncedField className="pm-title" value={m.title} onSave={(v) => onUpdateMeeting(m.id, { title: v })} />
               <input type="date" className="date-input pm-date" value={m.meeting_date || ''} onChange={(e) => onUpdateMeeting(m.id, { meeting_date: e.target.value || null })} />
             </>
           )}
@@ -1221,9 +1257,9 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
         {open && (
           <div className="pm-body">
             <label className="pm-label">Attendance</label>
-            <input className="pm-attendance" key={`${m.id}-a-${m.attendance}`} defaultValue={m.attendance || ''} placeholder="Who attended — e.g. John, Kyler, Sam" onBlur={(e) => { if (e.target.value !== (m.attendance || '')) onUpdateMeeting(m.id, { attendance: e.target.value }); }} />
+            <SyncedField className="pm-attendance" value={m.attendance || ''} placeholder="Who attended — e.g. John, Kyler, Sam" onSave={(v) => onUpdateMeeting(m.id, { attendance: v })} />
             <label className="pm-label">Notes</label>
-            <textarea className="pm-notes" key={`${m.id}-n`} defaultValue={m.notes || ''} placeholder="Meeting notes — agenda, decisions, action items…" onBlur={(e) => { if ((e.target.value || '') !== (m.notes || '')) onUpdateMeeting(m.id, { notes: e.target.value }); }} />
+            <SyncedTextarea className="pm-notes" value={m.notes || ''} placeholder="Meeting notes — agenda, decisions, action items…" onSave={(v) => onUpdateMeeting(m.id, { notes: v })} />
           </div>
         )}
       </div>
@@ -1280,22 +1316,16 @@ function OfficeView({ office, meetings, expandedMeetings, onToggleMeeting, onAdd
               <div key={m.id} className="meeting">
                 <div className="meeting-head">
                   <button className="team-caret" onClick={() => onToggleMeeting(m.id)} aria-label="Toggle minutes">{open ? '▾' : '▸'}</button>
-                  <input
-                    className="meeting-title"
-                    key={`${m.id}-t-${m.title}`}
-                    defaultValue={m.title}
-                    onBlur={(e) => { if (e.target.value !== m.title) onUpdateMeeting(m.id, { title: e.target.value }); }}
-                  />
+                  <SyncedField className="meeting-title" value={m.title} onSave={(v) => onUpdateMeeting(m.id, { title: v })} />
                   <input type="date" className="date-input meeting-date" value={m.meeting_date || ''} onChange={(e) => onUpdateMeeting(m.id, { meeting_date: e.target.value || null })} />
                   <button className="row-icon danger" title="Delete meeting" onClick={() => onDeleteMeeting(m)}><IconTrash /></button>
                 </div>
                 {open && (
-                  <textarea
+                  <SyncedTextarea
                     className="meeting-minutes"
-                    key={`${m.id}-min`}
-                    defaultValue={m.minutes || ''}
+                    value={m.minutes || ''}
                     placeholder="Meeting minutes — attendees, agenda, decisions, action items…"
-                    onBlur={(e) => { if ((e.target.value || '') !== (m.minutes || '')) onUpdateMeeting(m.id, { minutes: e.target.value }); }}
+                    onSave={(v) => onUpdateMeeting(m.id, { minutes: v })}
                   />
                 )}
               </div>
@@ -1761,12 +1791,12 @@ function TeamOverview({ team, offices, people, projects, tasks, onOpen, onAddPro
                   <button className="overview-open" onClick={() => onOpen(p.id)}>{p.name}</button>
                   <span className="count">{count} task{count !== 1 ? 's' : ''}</span>
                 </div>
-                <textarea
+                <SyncedTextarea
                   key={p.id}
                   className="overview-notes"
-                  defaultValue={p.notes || ''}
+                  value={p.notes || ''}
                   placeholder="Project notes…"
-                  onBlur={(e) => { if ((e.target.value || '') !== (p.notes || '')) onSaveNotes(p.id, e.target.value); }}
+                  onSave={(v) => onSaveNotes(p.id, v)}
                 />
                 <div className="ov-tasks">
                   {projTop.length === 0 && <div className="ov-empty">No tasks yet.</div>}
@@ -1863,12 +1893,11 @@ function PeopleModal({ people, onAdd, onUpdate, onDelete, onClose }) {
         {people.map((p) => (
           <div key={p.id} className="person-row">
             <span className="avatar" style={{ background: p.color }}>{initials(p.name)}</span>
-            <input
+            <SyncedField
               className="person-name-input"
-              key={`${p.id}-${p.name}`}
-              defaultValue={p.name}
+              value={p.name}
               onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-              onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== p.name) onUpdate(p.id, { name: v }); else e.target.value = p.name; }}
+              onSave={(v) => { const n = v.trim(); if (!n) return false; onUpdate(p.id, { name: n }); return true; }}
             />
             <ColorControl value={p.color} onChange={(c) => onUpdate(p.id, { color: c })} />
             <button className="link-x" title="Remove" onClick={() => onDelete(p.id)}>×</button>

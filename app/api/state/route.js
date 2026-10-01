@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sql, ensureSchema } from '@/lib/db';
+import { sessionUser, COOKIE } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -7,9 +8,11 @@ export const revalidate = 0;
 export const runtime = 'nodejs';
 
 // Returns the entire board in one shot: people, projects, and tasks.
-export async function GET() {
+export async function GET(req) {
   try {
     await ensureSchema();
+    const me = await sessionUser(req.cookies.get(COOKIE)?.value);
+    const meId = me ? me.id : null;
     const people = await sql`SELECT id, name, color FROM people ORDER BY lower(name) ASC, id ASC`;
     const offices = await sql`SELECT id, name, position, archived, fivek, geo_on FROM offices ORDER BY position ASC, id ASC`;
     const teams = await sql`SELECT id, name, office_id, position, archived FROM teams ORDER BY position ASC, id ASC`;
@@ -35,6 +38,15 @@ export async function GET() {
                              FROM bracket_votes v JOIN bracket_matches m ON m.id = v.match_id
                              JOIN brackets b ON b.id = m.bracket_id WHERE NOT b.archived
                              ORDER BY v.created_at ASC`;
+    // Suggestions: the author is hidden on anonymous ones (only "mine" tells
+    // the poster it's theirs, so they can still edit/delete it).
+    const suggestions = await sql`
+      SELECT s.id, s.title, s.details, s.category, s.status, s.anonymous, s.created_at, s.updated_at,
+             CASE WHEN s.anonymous THEN NULL ELSE s.user_id END AS author_id,
+             COALESCE(s.user_id = ${meId}, false) AS mine,
+             (SELECT count(*)::int FROM suggestion_votes v WHERE v.suggestion_id = s.id) AS votes,
+             EXISTS (SELECT 1 FROM suggestion_votes v WHERE v.suggestion_id = s.id AND v.user_id = ${meId}) AS voted
+      FROM suggestions s ORDER BY s.created_at DESC, s.id DESC`;
     return NextResponse.json({
       people: people.rows,
       offices: offices.rows,
@@ -51,6 +63,7 @@ export async function GET() {
       bentrants: bentrants.rows,
       bmatches: bmatches.rows,
       bvotes: bvotes.rows,
+      suggestions: suggestions.rows,
     });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
