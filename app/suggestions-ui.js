@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { CATEGORIES, STATUSES, categoryOf, statusOf } from '@/lib/suggestions';
+import { CATEGORIES, STATUSES, categoryOf, categoryKey, statusOf } from '@/lib/suggestions';
 import { IconBulb, IconChevronUp, IconSearch, IconPencil, IconTrash } from './icons';
 import { Headshot } from './bracket-ui';
 
@@ -18,7 +18,7 @@ function fmtDay(v) {
 function SuggestionForm({ initial, onCancel, onSubmit }) {
   const [title, setTitle] = useState(initial ? initial.title : '');
   const [details, setDetails] = useState(initial ? initial.details || '' : '');
-  const [category, setCategory] = useState(initial ? initial.category : '');
+  const [category, setCategory] = useState(initial ? categoryKey(initial.category) : '');
   const [anonymous, setAnonymous] = useState(initial ? !!initial.anonymous : false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -137,11 +137,11 @@ export default function SuggestionsView({ suggestions, users, onAdd, onPatch, on
   const usersById = {};
   users.forEach((u) => { usersById[String(u.id)] = u; });
   const counts = {};
-  suggestions.forEach((s) => { counts[s.category] = (counts[s.category] || 0) + 1; });
+  suggestions.forEach((s) => { const k = categoryKey(s.category); counts[k] = (counts[k] || 0) + 1; });
 
   const needle = q.trim().toLowerCase();
   let rows = suggestions.filter((s) =>
-    (cat === 'all' || s.category === cat)
+    (cat === 'all' || categoryKey(s.category) === cat)
     && (status === 'all' || s.status === status)
     && (!needle || `${s.title} ${s.details || ''}`.toLowerCase().includes(needle)));
   const newest = (a, b) => (new Date(b.created_at) - new Date(a.created_at)) || (Number(b.id) - Number(a.id));
