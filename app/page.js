@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
 import BracketView from './bracket-ui';
 import { SyncedField, SyncedTextarea } from './synced';
 import SuggestionsView from './suggestions-ui';
+import { burstConfetti } from './confetti';
 import {
   IconArchive, IconTrash, IconRestore, IconUsers, IconList, IconGlobe, IconTrophy, IconBuilding, IconFile,
   IconNote, IconPencil, IconPaperclip, IconCalendar, IconFolder, IconAlert, IconMenu, IconExternal, IconStar, IconBulb,
@@ -1526,11 +1527,24 @@ function AddGeoOfficeModal({ available, onJoin, onCreate, onClose }) {
 // little burst); "Undo one" takes it back if someone hits it by accident.
 function FiveKCounter({ count, onChange }) {
   const [burst, setBurst] = useState(0);
-  const hit = () => { onChange(1); setBurst((b) => b + 1); };
+  const btnRef = useRef(null);
+  const hit = () => {
+    onChange(1);
+    setBurst((b) => b + 1);
+    // Confetti + gold "5K"s erupt from the middle of the button, with the rings and +1.
+    const r = btnRef.current.getBoundingClientRect();
+    burstConfetti(r.left + r.width / 2, r.top + r.height / 2);
+    if (btnRef.current.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      btnRef.current.animate(
+        [{ transform: 'scale(1)', filter: 'brightness(1)' }, { transform: 'scale(1.045)', filter: 'brightness(1.3)' }, { transform: 'scale(1)', filter: 'brightness(1)' }],
+        { duration: 420, easing: 'cubic-bezier(.2, 1.4, .4, 1)' },
+      );
+    }
+  };
   return (
     <div className="fivek">
       <div className="fivek-stage">
-        <button type="button" className="fivek-btn" onClick={hit} title="Nailed a 5,000? Tap to add one!">
+        <button ref={btnRef} type="button" className="fivek-btn" onClick={hit} title="Nailed a 5,000? Tap to add one!">
           <span className="fivek-shine" aria-hidden />
           <span className="fivek-top"><IconStar /> 5K Club <IconStar /></span>
           <span key={burst} className={`fivek-count${burst ? ' pop' : ''}`}>{count.toLocaleString()}</span>
@@ -1538,9 +1552,8 @@ function FiveKCounter({ count, onChange }) {
         </button>
         {burst > 0 && (
           <div key={burst} className="fivek-burst" aria-hidden>
-            {Array.from({ length: 14 }, (_, i) => (
-              <i key={i} style={{ '--a': `${(360 / 14) * i}deg`, '--d': `${80 + (i % 3) * 26}px` }} />
-            ))}
+            <span className="fivek-ring" />
+            <span className="fivek-ring late" />
             <b>+1</b>
           </div>
         )}

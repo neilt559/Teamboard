@@ -461,18 +461,21 @@ tbody tr:hover .notes-btn { opacity: 1; }
   transform: skewX(-20deg); animation: fivek-shine 4.5s ease-in-out infinite;
 }
 .fivek-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 2; }
-.fivek-burst i {
-  position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 2px;
-  background: #ffe066; box-shadow: 0 0 6px #ffd000; opacity: 0;
-  animation: fivek-spark .75s ease-out forwards;
+/* Shockwave rings from the middle of the button (the confetti itself is a canvas). */
+.fivek-ring {
+  position: absolute; left: -60px; top: -60px; width: 120px; height: 120px; border-radius: 50%;
+  border: 5px solid #ffd23f; box-shadow: 0 0 18px rgba(255, 210, 63, .8), inset 0 0 12px rgba(255, 255, 255, .7);
+  opacity: 0; animation: fivek-ring .7s cubic-bezier(.15, .6, .3, 1) forwards;
 }
-.fivek-burst i:nth-child(3n) { background: #3ad0e0; box-shadow: 0 0 6px #3ad0e0; }
-.fivek-burst i:nth-child(3n+1) { background: #CBCE00; box-shadow: 0 0 6px #CBCE00; }
+.fivek-ring.late { border-color: #fff; border-width: 3px; animation-delay: .1s; }
 .fivek-burst b {
-  position: absolute; left: 0; top: -40px; font-size: 28px; font-weight: 900; color: #b88400; white-space: nowrap;
-  text-shadow: 0 1px 0 #fff, 0 0 10px rgba(255,255,255,.9); opacity: 0;
-  animation: fivek-float .9s ease-out forwards;
+  position: absolute; left: 0; top: -54px; font-size: 44px; font-weight: 900; white-space: nowrap; color: #ffd23f;
+  -webkit-text-stroke: 2px #6b4a00; paint-order: stroke fill;
+  text-shadow: 0 3px 0 #8a6400, 0 0 18px rgba(255, 215, 80, .95); opacity: 0;
+  animation: fivek-float 1.15s cubic-bezier(.2, .9, .3, 1) forwards;
 }
+/* The page-wide confetti layer (app/confetti.js). */
+.confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
 .fivek-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
 .fivek-undo {
   border: 1px solid var(--line); background: #fff; color: var(--ink-2); font-family: inherit;
@@ -482,14 +485,15 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .fivek-undo:disabled { opacity: .4; cursor: default; }
 @keyframes fivek-pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
 @keyframes fivek-shine { 0%, 70% { left: -60%; } 100% { left: 130%; } }
-@keyframes fivek-spark {
-  0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); }
-  100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--d))) scale(.3); }
+@keyframes fivek-ring {
+  0% { opacity: 1; transform: scale(.25); }
+  100% { opacity: 0; transform: scale(2.6); }
 }
 @keyframes fivek-float {
-  0% { opacity: 0; transform: translate(-50%, 14px) scale(.6); }
-  25% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); }
-  100% { opacity: 0; transform: translate(-50%, -60px) scale(1); }
+  0% { opacity: 0; transform: translate(-50%, 20px) scale(.4) rotate(-8deg); }
+  22% { opacity: 1; transform: translate(-50%, -10px) scale(1.35) rotate(4deg); }
+  45% { opacity: 1; transform: translate(-50%, -30px) scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: translate(-50%, -110px) scale(.95); }
 }
 @media (prefers-reduced-motion: reduce) {
   .fivek-shine, .fivek-burst { display: none; }
