@@ -47,6 +47,11 @@ export async function GET(req) {
              (SELECT count(*)::int FROM suggestion_votes v WHERE v.suggestion_id = s.id) AS votes,
              EXISTS (SELECT 1 FROM suggestion_votes v WHERE v.suggestion_id = s.id AND v.user_id = ${meId}) AS voted
       FROM suggestions s ORDER BY s.created_at DESC, s.id DESC`;
+    const sreplies = await sql`
+      SELECT r.id, r.suggestion_id, r.body, r.anonymous, r.created_at,
+             CASE WHEN r.anonymous THEN NULL ELSE r.user_id END AS author_id,
+             COALESCE(r.user_id = ${meId}, false) AS mine
+      FROM suggestion_replies r ORDER BY r.created_at ASC, r.id ASC`;
     return NextResponse.json({
       people: people.rows,
       offices: offices.rows,
@@ -64,6 +69,7 @@ export async function GET(req) {
       bmatches: bmatches.rows,
       bvotes: bvotes.rows,
       suggestions: suggestions.rows,
+      sreplies: sreplies.rows,
     });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });

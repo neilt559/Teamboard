@@ -96,7 +96,7 @@ async function api(path, opts) {
 }
 
 export default function Page() {
-  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [], pseries: [], pmeetings: [], users: [], brackets: [], bentrants: [], bmatches: [], bvotes: [], suggestions: [] });
+  const [data, setData] = useState({ people: [], offices: [], teams: [], projects: [], tasks: [], info: [], meetings: [], geo: [], pseries: [], pmeetings: [], users: [], brackets: [], bentrants: [], bmatches: [], bvotes: [], suggestions: [], sreplies: [] });
   const [selected, setSelected] = useState(null);
   const [teamView, setTeamView] = useState(null);
   // Full-page views reached from the header: false | 'tasks' (All Tasks) | 'geo' (GeoGuessr) | 'bracket' | 'ideas' (Suggestions).
@@ -423,6 +423,17 @@ export default function Page() {
     setData((d) => ({ ...d, suggestions: d.suggestions.map((s) => (String(s.id) === String(id) && !!s.voted !== on ? { ...s, voted: on, votes: s.votes + (on ? 1 : -1) } : s)) }));
     touch();
     try { await api(`/api/suggestions/${id}/vote`, { method: 'POST', body: JSON.stringify({ on }) }); }
+    catch (e) { setError(e.message); load(true); }
+  }
+  async function replySuggestion(id, body) {
+    touch();
+    try { await api(`/api/suggestions/${id}/replies`, { method: 'POST', body: JSON.stringify({ body }) }); await load(true); return true; }
+    catch (e) { setError(e.message); return false; }
+  }
+  async function deleteReply(id) {
+    setData((d) => ({ ...d, sreplies: d.sreplies.filter((r) => String(r.id) !== String(id)) }));
+    touch();
+    try { await api(`/api/suggestion-replies/${id}`, { method: 'DELETE' }); }
     catch (e) { setError(e.message); load(true); }
   }
 
@@ -1022,11 +1033,14 @@ export default function Page() {
           ) : globalView === 'ideas' ? (
             <SuggestionsView
               suggestions={data.suggestions}
+              replies={data.sreplies}
               users={data.users}
               onAdd={addSuggestion}
               onPatch={patchSuggestion}
               onDelete={deleteSuggestion}
               onVote={voteSuggestion}
+              onReply={replySuggestion}
+              onDeleteReply={deleteReply}
             />
           ) : globalView === 'bracket' ? (
             <BracketView

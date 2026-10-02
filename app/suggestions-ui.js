@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { CATEGORIES, STATUSES, categoryOf, categoryKey, statusOf } from '@/lib/suggestions';
-import { IconBulb, IconChevronUp, IconSearch, IconPencil, IconTrash } from './icons';
+import { IconBulb, IconChevronUp, IconSearch, IconPencil, IconTrash, IconChat } from './icons';
 import { Headshot } from './bracket-ui';
 
 // ---- suggestion box --------------------------------------------------------
@@ -13,6 +13,12 @@ function fmtDay(v) {
   if (!v) return '';
   const d = new Date(v);
   return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+// "Oct 2, 3:14 PM" for replies (they often happen on the same day).
+function fmtWhen(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return isNaN(d) ? '' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 function SuggestionForm({ initial, onCancel, onSubmit }) {
@@ -69,9 +75,10 @@ function SuggestionForm({ initial, onCancel, onSubmit }) {
   );
 }
 
-function SuggestionCard({ s, author, onPatch, onDelete, onVote }) {
+function SuggestionCard({ s, author, replies, usersById, onPatch, onDelete, onVote, onReply, onDeleteReply }) {
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [threadOpen, setThreadOpen] = useState(false);
   const c = categoryOf(s.category);
   const st = statusOf(s.status);
   if (editing) {
@@ -121,13 +128,76 @@ function SuggestionCard({ s, author, onPatch, onDelete, onVote }) {
               ><IconTrash size={13} /></button>
             </>
           )}
+          <button className={`sg-reply-toggle${threadOpen ? ' on' : ''}`} onClick={() => setThreadOpen((x) => !x)} aria-expanded={threadOpen}>
+            <IconChat size={14} /> {replies.length ? `${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}` : 'Reply'}
+          </button>
         </div>
+        {threadOpen && (
+          <ReplyThread
+            replies={replies}
+            usersById={usersById}
+            onReply={(body) => onReply(s.id, body)}
+            onDeleteReply={onDeleteReply}
+          />
+        )}
       </div>
     </article>
   );
 }
 
-export default function SuggestionsView({ suggestions, users, onAdd, onPatch, onDelete, onVote }) {
+function ReplyThread({ replies, usersById, onReply, onDeleteReply }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const send = async () => {
+    const body = text.trim();
+    if (!body || busy) return;
+    setBusy(true);
+    const ok = await onReply(body);
+    setBusy(false);
+    if (ok) setText('');
+  };
+  return (
+    <div className="sg-thread">
+      {replies.map((r) => {
+        const who = usersById[String(r.author_id)];
+        return (
+          <div key={r.id} className="sg-reply">
+            {r.anonymous || !who
+              ? <span className="hs hs-init sg-reply-anon" style={{ width: 22, height: 22, fontSize: 11 }}>?</span>
+              : <Headshot user={who} size={22} />}
+            <div className="sg-reply-main">
+              <div className="sg-reply-head">
+                <b>{r.anonymous ? 'Anonymous (poster)' : who ? who.username : 'Former member'}</b>
+                <span>{fmtWhen(r.created_at)}</span>
+                {r.mine && (
+                  <button
+                    className="sg-icon-btn danger"
+                    title="Delete your reply"
+                    onClick={() => { if (confirm('Delete your reply?')) onDeleteReply(r.id); }}
+                  ><IconTrash size={12} /></button>
+                )}
+              </div>
+              <div className="sg-reply-body">{r.body}</div>
+            </div>
+          </div>
+        );
+      })}
+      <div className="sg-reply-compose">
+        <textarea
+          className="notes-area"
+          rows={2}
+          placeholder="Write a reply…  (Ctrl+Enter to send)"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } }}
+        />
+        <button className="btn btn-ink btn-sm" onClick={send} disabled={busy || !text.trim()}>{busy ? 'Sending…' : 'Reply'}</button>
+      </div>
+    </div>
+  );
+}
+
+export default function SuggestionsView({ suggestions, replies = [], users, onAdd, onPatch, onDelete, onVote, onReply, onDeleteReply }) {
   const [composing, setComposing] = useState(false);
   const [cat, setCat] = useState('all');
   const [status, setStatus] = useState('all');
@@ -139,11 +209,15 @@ export default function SuggestionsView({ suggestions, users, onAdd, onPatch, on
   const counts = {};
   suggestions.forEach((s) => { const k = categoryKey(s.category); counts[k] = (counts[k] || 0) + 1; });
 
+  const repliesBy = {};
+  replies.forEach((r) => { (repliesBy[String(r.suggestion_id)] = repliesBy[String(r.suggestion_id)] || []).push(r); });
+
   const needle = q.trim().toLowerCase();
+  const haystack = (s) => `${s.title} ${s.details || ''} ${(repliesBy[String(s.id)] || []).map((r) => r.body).join(' ')}`.toLowerCase();
   let rows = suggestions.filter((s) =>
     (cat === 'all' || categoryKey(s.category) === cat)
     && (status === 'all' || s.status === status)
-    && (!needle || `${s.title} ${s.details || ''}`.toLowerCase().includes(needle)));
+    && (!needle || haystack(s).includes(needle)));
   const newest = (a, b) => (new Date(b.created_at) - new Date(a.created_at)) || (Number(b.id) - Number(a.id));
   rows = [...rows].sort(sort === 'top' ? (a, b) => (b.votes - a.votes) || newest(a, b) : newest);
 
@@ -178,7 +252,7 @@ export default function SuggestionsView({ suggestions, users, onAdd, onPatch, on
       <div className="sg-tools">
         <label className="sg-search">
           <IconSearch size={15} />
-          <input placeholder="Search suggestions" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input placeholder="Search suggestions & replies" value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
         <select className="sg-select" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filter by status">
           <option value="all">Any status</option>
@@ -195,7 +269,11 @@ export default function SuggestionsView({ suggestions, users, onAdd, onPatch, on
       ) : (
         <div className="sg-list">
           {rows.map((s) => (
-            <SuggestionCard key={s.id} s={s} author={usersById[String(s.author_id)]} onPatch={onPatch} onDelete={onDelete} onVote={onVote} />
+            <SuggestionCard
+              key={s.id} s={s} author={usersById[String(s.author_id)]}
+              replies={repliesBy[String(s.id)] || []} usersById={usersById}
+              onPatch={onPatch} onDelete={onDelete} onVote={onVote} onReply={onReply} onDeleteReply={onDeleteReply}
+            />
           ))}
         </div>
       )}
