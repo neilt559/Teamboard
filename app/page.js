@@ -1373,7 +1373,7 @@ function MeetingEditor({ meeting, inSeries, onSubmit, onCancel, onDelete }) {
         <NotesEditor
           value={f.notes}
           onChange={(v) => setF((x) => ({ ...x, notes: v }))}
-          placeholder={'%t Kickoff\n%h Decisions\n- Go with the detention pond option\n- Submit prelim plat by Friday'}
+          placeholder="Start typing — %t for a title, %h for a header, - for a bullet"
         />
       </div>
       <div className="pm-edit-actions">

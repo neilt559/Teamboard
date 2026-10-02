@@ -597,7 +597,7 @@ tbody tr:hover .notes-btn { opacity: 1; }
   background: var(--lime-dark); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
 }
 .fmt-li:not(.lvl0)::before { background: var(--ink-2); }
-.fmt-gap { height: 8px; }
+.fmt-gap { height: 1.5em; } /* a blank line, same height as in the editor */
 .fmt > :first-child { margin-top: 0; }
 .notes-ed-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
 .notes-ed-bar button {
@@ -609,7 +609,16 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .notes-ed-bar .hex { width: 11px; height: 10px; background: var(--lime-dark); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
 .notes-ed-hint { font-size: 11.5px; color: var(--muted); margin-left: 4px; }
 .notes-ed-hint code { background: #f0f0f1; border-radius: 4px; padding: 0 4px; font-size: 11px; }
-.notes-ed-preview { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: #fff; }
+.notes-ed-bar button.on { background: var(--lime); border-color: var(--lime-dark); color: var(--on-lime); }
+.notes-ed-bar button.on .hex { background: var(--on-lime); }
+/* the one editing box: each line is styled exactly like the posted notes */
+.notes-ed-box { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px 12px; min-height: 140px; cursor: text; }
+.notes-ed-box:focus-within { border-color: var(--lime); box-shadow: 0 0 0 3px rgba(203, 206, 0, .15); }
+.nb textarea {
+  display: block; width: 100%; border: none; outline: none; resize: none; overflow: hidden; background: transparent;
+  padding: 0; margin: 0; font: inherit; color: inherit; line-height: inherit; letter-spacing: inherit; min-height: 1.5em;
+}
+.nb textarea::placeholder { color: #b3b1b2; font-weight: 400; }
 
 /* meeting being written / edited */
 .pm-editing { padding: 12px; background: #fffdf5; border-color: var(--lime-dark); overflow: visible; }
