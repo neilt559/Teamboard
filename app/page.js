@@ -462,27 +462,29 @@ export default function Page() {
   }
 
   // ---- project meetings ----
-  async function addPMeeting(projectId, seriesId) {
+  // Project meetings are written up, then saved all at once on Post / Save.
+  async function createPMeeting(projectId, seriesId, fields) {
     touch();
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      const m = await api('/api/project-meetings', { method: 'POST', body: JSON.stringify({ project_id: projectId, series_id: seriesId || null, title: 'Meeting', meeting_date: today }) });
+      const m = await api('/api/project-meetings', { method: 'POST', body: JSON.stringify({ project_id: projectId, series_id: seriesId || null, ...fields }) });
       await load(true);
       if (m && m.id) setExpandedPMeetings((s) => ({ ...s, [m.id]: true }));
-    } catch (e) { setError(e.message); }
+      return true;
+    } catch (e) { setError(e.message); return false; }
   }
   async function updatePMeeting(id, patch) {
     setData((d) => ({ ...d, pmeetings: d.pmeetings.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
     touch();
-    try { await api(`/api/project-meetings/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); }
-    catch (e) { setError(e.message); }
+    try { await api(`/api/project-meetings/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); return true; }
+    catch (e) { setError(e.message); load(true); return false; }
   }
   async function deletePMeeting(m) {
-    if (!confirm(`Delete meeting “${m.title}”?`)) return;
+    const what = m.series_id ? `the ${fmtMeetingDate(m.meeting_date)} meeting` : `“${m.title || 'Meeting'}”`;
+    if (!confirm(`Delete ${what}, including its attendance and notes?\n\nThis can’t be undone.`)) return false;
     setData((d) => ({ ...d, pmeetings: d.pmeetings.filter((x) => x.id !== m.id) }));
     touch();
-    try { await api(`/api/project-meetings/${m.id}`, { method: 'DELETE' }); }
-    catch (e) { setError(e.message); }
+    try { await api(`/api/project-meetings/${m.id}`, { method: 'DELETE' }); return true; }
+    catch (e) { setError(e.message); load(true); return false; }
   }
   function togglePMeeting(id) { setExpandedPMeetings((s) => ({ ...s, [id]: !s[id] })); }
   async function addPSeries(projectId) {
@@ -1216,14 +1218,15 @@ export default function Page() {
               )}
 
               <ProjectMeetings
+                key={project.id}
                 project={project}
                 meetings={data.pmeetings.filter((m) => String(m.project_id) === String(project.id))}
                 series={data.pseries.filter((sv) => String(sv.project_id) === String(project.id))}
                 expanded={expandedPMeetings}
                 onToggle={togglePMeeting}
-                onAddMeeting={(seriesId) => addPMeeting(project.id, seriesId)}
+                onCreateMeeting={(seriesId, fields) => createPMeeting(project.id, seriesId, fields)}
+                onSaveMeeting={updatePMeeting}
                 onAddSeries={() => addPSeries(project.id)}
-                onUpdateMeeting={updatePMeeting}
                 onDeleteMeeting={deletePMeeting}
                 onRenameSeries={renamePSeries}
                 onDeleteSeries={deletePSeries}
@@ -1315,49 +1318,136 @@ export default function Page() {
   );
 }
 
-function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddMeeting, onAddSeries, onUpdateMeeting, onDeleteMeeting, onRenameSeries, onDeleteSeries }) {
+// "2026-09-29" → "Mon, Sep 29, 2026" (read as a local date, not UTC).
+function fmtMeetingDate(s) {
+  if (!s) return 'No date';
+  const [y, m, d] = String(s).split('-').map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  return isNaN(dt) ? s : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Write-up form for a meeting. Nothing is saved until Post / Save — so
+// scrolling past a meeting can never change it. Series meetings are known by
+// their date, so they don't get a title box.
+function MeetingEditor({ meeting, inSeries, onSubmit, onCancel, onDelete }) {
+  const start = {
+    title: meeting ? meeting.title || '' : '',
+    meeting_date: meeting ? meeting.meeting_date || '' : localISO(new Date()),
+    attendance: meeting ? meeting.attendance || '' : '',
+    notes: meeting ? meeting.notes || '' : '',
+  };
+  const [f, setF] = useState(start);
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+  const changed = Object.keys(start).filter((k) => f[k] !== start[k]);
+  const cancel = () => { if (!changed.length || confirm('Discard your changes to this meeting?')) onCancel(); };
+  const submit = async () => {
+    setBusy(true);
+    const fields = { ...f, title: inSeries ? 'Meeting' : (f.title.trim() || 'Meeting'), meeting_date: f.meeting_date || null };
+    // When editing, only send what changed (so two people editing different
+    // parts don't overwrite each other).
+    const ok = await onSubmit(meeting ? Object.fromEntries(changed.map((k) => [k, fields[k]])) : fields);
+    if (ok === false) setBusy(false);
+  };
+  return (
+    <div className="pm pm-editing">
+      <div className="pm-edit-grid">
+        {!inSeries && (
+          <label className="pm-field grow">
+            <span className="pm-label">Title</span>
+            <input className="field" autoFocus={!meeting} placeholder="e.g. Kickoff with the county" value={f.title} onChange={set('title')} />
+          </label>
+        )}
+        <label className="pm-field">
+          <span className="pm-label">Date</span>
+          <input type="date" className="field" value={f.meeting_date} onChange={set('meeting_date')} />
+        </label>
+      </div>
+      <label className="pm-field">
+        <span className="pm-label">Attendance</span>
+        <input className="field" placeholder="Who attended — e.g. John, Kyler, Sam" value={f.attendance} onChange={set('attendance')} />
+      </label>
+      <label className="pm-field">
+        <span className="pm-label">Notes</span>
+        <textarea className="pm-notes" placeholder="Meeting notes — agenda, decisions, action items…" value={f.notes} onChange={set('notes')} />
+      </label>
+      <div className="pm-edit-actions">
+        {onDelete && <button className="btn btn-plain btn-sm pm-delete wi" onClick={onDelete} disabled={busy}><IconTrash size={14} /> Delete meeting</button>}
+        <div className="spacer" />
+        <button className="btn btn-plain btn-sm" onClick={cancel} disabled={busy}>Cancel</button>
+        <button className="btn btn-ink btn-sm" onClick={submit} disabled={busy || (meeting && !changed.length)}>
+          {busy ? 'Saving…' : meeting ? 'Save changes' : 'Post meeting'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ProjectMeetings({ project, meetings, series, expanded, onToggle, onCreateMeeting, onSaveMeeting, onAddSeries, onDeleteMeeting, onRenameSeries, onDeleteSeries }) {
+  const [composing, setComposing] = useState(null); // 'solo' or a series id while writing up a new meeting
+  const [editing, setEditing] = useState({});       // meeting id → true while being edited
   const standalone = meetings.filter((m) => !m.series_id).sort(byPos);
+  const stopEditing = (id) => setEditing((s) => { const n = { ...s }; delete n[id]; return n; });
+
+  const composer = (seriesId) => (
+    <MeetingEditor
+      inSeries={!!seriesId}
+      onCancel={() => setComposing(null)}
+      onSubmit={async (fields) => { const ok = await onCreateMeeting(seriesId || null, fields); if (ok) setComposing(null); return ok; }}
+    />
+  );
+
   const renderMeeting = (m) => {
+    if (editing[m.id]) {
+      return (
+        <MeetingEditor
+          key={m.id}
+          meeting={m}
+          inSeries={!!m.series_id}
+          onCancel={() => stopEditing(m.id)}
+          onDelete={async () => { if (await onDeleteMeeting(m)) stopEditing(m.id); }}
+          onSubmit={async (patch) => { const ok = await onSaveMeeting(m.id, patch); if (ok !== false) stopEditing(m.id); return ok; }}
+        />
+      );
+    }
     const open = !!expanded[m.id];
     return (
       <div key={m.id} className="pm">
         <div className="pm-head">
-          <button className="team-caret" onClick={() => onToggle(m.id)} aria-label="Toggle meeting">{open ? '▾' : '▸'}</button>
-          {m.series_id ? (
-            <>
-              <input type="date" className="date-input pm-date-series" value={m.meeting_date || ''} onChange={(e) => onUpdateMeeting(m.id, { meeting_date: e.target.value || null })} />
-              <div className="spacer" />
-            </>
-          ) : (
-            <>
-              <SyncedField className="pm-title" value={m.title} onSave={(v) => onUpdateMeeting(m.id, { title: v })} />
-              <input type="date" className="date-input pm-date" value={m.meeting_date || ''} onChange={(e) => onUpdateMeeting(m.id, { meeting_date: e.target.value || null })} />
-            </>
-          )}
-          <button className="row-icon danger" title="Delete meeting" onClick={() => onDeleteMeeting(m)}><IconTrash /></button>
+          <button className="pm-toggle" onClick={() => onToggle(m.id)} aria-expanded={open}>
+            <span className="team-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
+            {m.series_id
+              ? <span className="pm-title-read">{fmtMeetingDate(m.meeting_date)}</span>
+              : <><span className="pm-title-read">{m.title || 'Meeting'}</span><span className="pm-date-read">{fmtMeetingDate(m.meeting_date)}</span></>}
+          </button>
+          <button className="btn btn-plain btn-xs wi pm-edit-btn" title="Edit this meeting" onClick={() => { setEditing((s) => ({ ...s, [m.id]: true })); }}>
+            <IconPencil size={12} /> Edit
+          </button>
         </div>
         {open && (
-          <div className="pm-body">
-            <label className="pm-label">Attendance</label>
-            <SyncedField className="pm-attendance" value={m.attendance || ''} placeholder="Who attended — e.g. John, Kyler, Sam" onSave={(v) => onUpdateMeeting(m.id, { attendance: v })} />
-            <label className="pm-label">Notes</label>
-            <SyncedTextarea className="pm-notes" value={m.notes || ''} placeholder="Meeting notes — agenda, decisions, action items…" onSave={(v) => onUpdateMeeting(m.id, { notes: v })} />
+          <div className="pm-body pm-read">
+            <div className="pm-label">Attendance</div>
+            <div className={`pm-read-text${m.attendance ? '' : ' empty'}`}>{m.attendance || 'Not recorded'}</div>
+            <div className="pm-label">Notes</div>
+            <div className={`pm-read-text notes${m.notes ? '' : ' empty'}`}>{m.notes || 'No notes yet'}</div>
           </div>
         )}
       </div>
     );
   };
+
   const hasAny = meetings.length > 0 || series.length > 0;
   return (
     <div className="info-panel">
       <div className="section-head">
         <label className="notes-label"><IconCalendar size={14} /> Meetings</label>
         <div className="pm-actions">
-          <button className="btn btn-lime btn-sm" onClick={() => onAddMeeting()}>+ Meeting</button>
+          <button className="btn btn-lime btn-sm" onClick={() => setComposing('solo')} disabled={composing === 'solo'}>+ Meeting</button>
           <button className="btn btn-plain btn-sm" onClick={onAddSeries}>+ Meeting series</button>
         </div>
       </div>
-      {!hasAny && <p className="ov-empty">No meetings yet — create a one-off meeting or a series.</p>}
+      {composing === 'solo' && composer(null)}
+      {!hasAny && composing !== 'solo' && <p className="ov-empty">No meetings yet — create a one-off meeting or a series.</p>}
       {standalone.map(renderMeeting)}
       {[...series].sort(byPos).map((sv) => {
         const sm = meetings.filter((m) => String(m.series_id) === String(sv.id)).sort(byPos);
@@ -1366,11 +1456,12 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onAddM
             <div className="pm-series-head">
               <span className="pm-series-name"><IconFolder size={14} /> {sv.name}</span>
               <div className="spacer" />
-              <button className="btn btn-plain btn-xs" onClick={() => onAddMeeting(sv.id)}>+ Add meeting</button>
+              <button className="btn btn-plain btn-xs" onClick={() => setComposing(sv.id)} disabled={String(composing) === String(sv.id)}>+ Add meeting</button>
               <button className="row-icon" title="Rename series" onClick={() => onRenameSeries(sv)}><IconPencil size={14} /></button>
               <button className="row-icon danger" title="Delete series" onClick={() => onDeleteSeries(sv)}><IconTrash /></button>
             </div>
-            {sm.length === 0 && <p className="pm-series-empty">No meetings in this series yet.</p>}
+            {String(composing) === String(sv.id) && composer(sv.id)}
+            {sm.length === 0 && String(composing) !== String(sv.id) && <p className="pm-series-empty">No meetings in this series yet.</p>}
             {sm.map(renderMeeting)}
           </div>
         );

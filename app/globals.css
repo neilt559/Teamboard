@@ -572,6 +572,25 @@ tbody tr:hover .notes-btn { opacity: 1; }
 .pm-series-head .row-icon { opacity: .6; }
 .pm-series-head:hover .row-icon { opacity: 1; }
 .pm-series-empty { font-size: 12px; color: var(--muted); margin: 4px 2px; }
+/* read-only meeting card (press Edit to change it) */
+.pm-toggle { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; border: none; background: none; padding: 4px 2px; text-align: left; font-family: inherit; cursor: pointer; }
+.pm-toggle .team-caret { flex: 0 0 auto; }
+.pm-title-read { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-date-read { flex: 0 0 auto; font-size: 12.5px; color: var(--muted); }
+.pm-edit-btn { flex: 0 0 auto; }
+.pm-read .pm-label { margin-top: 2px; }
+.pm-read-text { font-size: 13.5px; color: var(--text); line-height: 1.5; margin-bottom: 10px; white-space: pre-wrap; word-break: break-word; }
+.pm-read-text.notes { margin-bottom: 0; }
+.pm-read-text.empty { color: var(--muted); font-style: italic; }
+/* meeting being written / edited */
+.pm-editing { padding: 12px; background: #fffdf5; border-color: var(--lime-dark); overflow: visible; }
+.pm-edit-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.pm-field { display: block; margin-bottom: 10px; }
+.pm-field.grow { flex: 1 1 240px; }
+.pm-field .field { margin-top: 0; padding: 8px 10px; font-size: 13.5px; background: #fff; }
+.pm-edit-actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.pm-delete { color: #c4483e; }
+.pm-delete:hover { background: #fdecec; }
 
 /* ---------- mobile ---------- */
 .menu-btn { display: none; padding: 6px 10px; font-size: 16px; }
