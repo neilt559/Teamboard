@@ -5,6 +5,7 @@ import { SyncedField, SyncedTextarea } from './synced';
 import SuggestionsView from './suggestions-ui';
 import { burstConfetti } from './confetti';
 import AccountsView, { ChangePasswordModal, ClaimAdminModal } from './accounts-ui';
+import { FormattedNotes, NotesEditor } from './notes-format';
 import {
   IconArchive, IconTrash, IconRestore, IconUsers, IconList, IconGlobe, IconTrophy, IconBuilding, IconFile,
   IconNote, IconPencil, IconPaperclip, IconCalendar, IconFolder, IconAlert, IconMenu, IconExternal, IconStar, IconBulb,
@@ -1367,10 +1368,14 @@ function MeetingEditor({ meeting, inSeries, onSubmit, onCancel, onDelete }) {
         <span className="pm-label">Attendance</span>
         <input className="field" placeholder="Who attended — e.g. John, Kyler, Sam" value={f.attendance} onChange={set('attendance')} />
       </label>
-      <label className="pm-field">
+      <div className="pm-field">
         <span className="pm-label">Notes</span>
-        <textarea className="pm-notes" placeholder="Meeting notes — agenda, decisions, action items…" value={f.notes} onChange={set('notes')} />
-      </label>
+        <NotesEditor
+          value={f.notes}
+          onChange={(v) => setF((x) => ({ ...x, notes: v }))}
+          placeholder={'%t Kickoff\n%h Decisions\n- Go with the detention pond option\n- Submit prelim plat by Friday'}
+        />
+      </div>
       <div className="pm-edit-actions">
         {onDelete && <button className="btn btn-plain btn-sm pm-delete wi" onClick={onDelete} disabled={busy}><IconTrash size={14} /> Delete meeting</button>}
         <div className="spacer" />
@@ -1429,7 +1434,7 @@ function ProjectMeetings({ project, meetings, series, expanded, onToggle, onCrea
             <div className="pm-label">Attendance</div>
             <div className={`pm-read-text${m.attendance ? '' : ' empty'}`}>{m.attendance || 'Not recorded'}</div>
             <div className="pm-label">Notes</div>
-            <div className={`pm-read-text notes${m.notes ? '' : ' empty'}`}>{m.notes || 'No notes yet'}</div>
+            <FormattedNotes text={m.notes} />
           </div>
         )}
       </div>
