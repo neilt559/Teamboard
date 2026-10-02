@@ -4,10 +4,11 @@ import BracketView from './bracket-ui';
 import { SyncedField, SyncedTextarea } from './synced';
 import SuggestionsView from './suggestions-ui';
 import { burstConfetti } from './confetti';
+import AccountsView, { ChangePasswordModal, ClaimAdminModal } from './accounts-ui';
 import {
   IconArchive, IconTrash, IconRestore, IconUsers, IconList, IconGlobe, IconTrophy, IconBuilding, IconFile,
   IconNote, IconPencil, IconPaperclip, IconCalendar, IconFolder, IconAlert, IconMenu, IconExternal, IconStar, IconBulb,
-  IconSearch, IconHome, IconChevronRight,
+  IconSearch, IconHome, IconChevronRight, IconKey,
 } from './icons';
 import { nextSlot } from '@/lib/bracket';
 
@@ -115,6 +116,9 @@ export default function Page() {
   const [sidebarWidth, setSidebarWidth] = useState(250);
   const [showArchivedSidebar, setShowArchivedSidebar] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
+  const logoClicks = useRef([]);
   const guard = useRef(0);
 
   const load = useCallback(async (force = false) => {
@@ -163,6 +167,33 @@ export default function Page() {
   const openOffice = (id) => { setGlobalView(false); setTeamView(null); setSelected(null); setOfficeView(id); setSidebarOpen(false); };
   const openTeam = (id) => { setGlobalView(false); setOfficeView(null); setSelected(null); setTeamView(id); setSidebarOpen(false); };
   const openProject = (id) => { setGlobalView(false); setOfficeView(null); setTeamView(null); setSelected(id); setSidebarOpen(false); };
+
+  // Hidden entrance to the admin-only Accounts page: 5 quick clicks on the
+  // TeamBoard logo, or opening the site with #accounts. For non-admins it does
+  // nothing at all; if no admin exists yet it offers one-time admin setup.
+  async function openAccounts() {
+    try {
+      const s = await api('/api/admin/status');
+      if (s.isAdmin) { setGlobalView('accounts'); setOfficeView(null); setTeamView(null); setSidebarOpen(false); }
+      else if (!s.adminExists) setClaimOpen(true);
+    } catch {}
+  }
+  const onLogo = () => {
+    goHome();
+    const now = Date.now();
+    logoClicks.current = [...logoClicks.current.filter((t) => now - t < 2000), now];
+    if (logoClicks.current.length >= 5) { logoClicks.current = []; openAccounts(); }
+  };
+  useEffect(() => {
+    const check = () => {
+      if (window.location.hash !== '#accounts') return;
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      openAccounts();
+    };
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function startResize(e) {
     e.preventDefault();
@@ -847,7 +878,7 @@ export default function Page() {
       <header className="app-header">
         <div className="brand">
           <button className="menu-btn btn-ghost" onClick={() => setSidebarOpen((s) => !s)} aria-label="Toggle teams"><IconMenu size={18} /></button>
-          <button className="brand-home" onClick={goHome} title="Home — all offices"><span className="dot" /> TeamBoard <small>shared project board</small></button>
+          <button className="brand-home" onClick={onLogo} title="Home — all offices"><span className="dot" /> TeamBoard <small>shared project board</small></button>
         </div>
         <div className="header-actions">
           <button className={`btn btn-ghost wi ${isHome ? 'tab-on' : ''}`} onClick={goHome}><IconHome size={16} /> Home</button>
@@ -859,7 +890,11 @@ export default function Page() {
             ><Icon size={16} /> {label}</button>
           ))}
           <button className="btn btn-ghost wi" onClick={() => setPeopleOpen(true)}><IconUsers size={16} /> People ({data.people.length})</button>
-          {currentUser && <span className="user-chip" title={`Signed in as ${currentUser.username}`}>{currentUser.username}</span>}
+          {currentUser && (
+            <button className="user-chip wi" onClick={() => setPwOpen(true)} title={`Signed in as ${currentUser.username} — click to change your password`}>
+              <IconKey size={13} /> {currentUser.username}
+            </button>
+          )}
           <button className="btn btn-ghost" onClick={logout} title="Log out">Log out</button>
         </div>
       </header>
@@ -979,7 +1014,9 @@ export default function Page() {
             </div>
           )}
 
-          {globalView === 'ideas' ? (
+          {globalView === 'accounts' ? (
+            <AccountsView me={currentUser} onChangeMine={() => setPwOpen(true)} />
+          ) : globalView === 'ideas' ? (
             <SuggestionsView
               suggestions={data.suggestions}
               users={data.users}
@@ -1257,6 +1294,22 @@ export default function Page() {
       )}
       {addingTaskFor && (
         <AddTaskModal people={data.people} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />
+      )}
+      {/* After an admin reset, you must pick your own password before carrying on. */}
+      {(pwOpen || (currentUser && currentUser.must_change)) && (
+        <ChangePasswordModal
+          user={currentUser}
+          forced={!!(currentUser && currentUser.must_change)}
+          onDone={() => { setPwOpen(true); setCurrentUser((u) => (u ? { ...u, must_change: false } : u)); }}
+          onClose={() => setPwOpen(false)}
+        />
+      )}
+      {claimOpen && (
+        <ClaimAdminModal
+          user={currentUser}
+          onClose={() => setClaimOpen(false)}
+          onClaimed={() => { setClaimOpen(false); setCurrentUser((u) => (u ? { ...u, is_admin: true } : u)); openAccounts(); }}
+        />
       )}
     </>
   );
