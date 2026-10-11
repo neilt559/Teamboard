@@ -15,6 +15,9 @@ const CSP = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Local builds only: lets several build agents work in one checkout without
+  // overwriting each other's output. Never set on Vercel.
+  distDir: process.env.TB_DIST_DIR || '.next',
   poweredByHeader: false,
   experimental: {
     // Link navigations always fetch fresh server data. Back/forward does not consult staleTimes in 14.2
