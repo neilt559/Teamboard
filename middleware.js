@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import { neon, neonConfig } from '@neondatabase/serverless';
+
+// Local testing only (see lib/db.js). Never set on Vercel.
+if (process.env.TB_SQL_ENDPOINT) neonConfig.fetchEndpoint = process.env.TB_SQL_ENDPOINT;
 
 // Paths reachable without a session (the login page and the auth endpoints).
 const PUBLIC = new Set([
