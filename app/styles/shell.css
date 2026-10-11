@@ -1,0 +1,191 @@
+/* ---------- app shell (app/_ui/AppShell.js): header, sidebar, phone drawer and bottom bar ----------
+   Builds on the existing classes in globals.css (.app-header, .btn-ghost.tab-on, .sidebar, .office-head,
+   .team-head, .proj, .crumbs, .banner, .modal...). Desktop >= 721 px; phone <= 720 px. */
+
+.skip-link { position: absolute; left: 8px; top: -40px; z-index: 40; background: var(--lime); color: var(--on-lime); font-weight: 700; font-size: 13px; padding: 8px 12px; border-radius: 8px; text-decoration: none; }
+.skip-link:focus { top: 8px; }
+.main:focus { outline: none; }
+.muted { color: var(--muted); }
+
+/* links that look like the old buttons */
+a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.btn:disabled { opacity: .55; cursor: default; }
+
+/* ---------- header ---------- */
+.shell-header { gap: 12px; }
+.shell-header .header-tabs { flex: 1 1 auto; margin-left: 4px; }
+.brand-home { text-decoration: none; }
+/* Eight tabs: make room on mid-size screens first by dropping the subtitle, then the tab icons, then the
+   name on the user chip; below that the tab row scrolls sideways (as the old header did). */
+@media (max-width: 1440px) { .shell-header .brand small { display: none; } }
+@media (max-width: 1240px) {
+  .shell-header .header-tabs { gap: 6px; }
+  .shell-header .header-tabs .btn { padding: 8px 11px; }
+}
+@media (max-width: 1120px) { .shell-header .header-tabs .btn > .icon { display: none; } }
+@media (max-width: 980px) { .user-chip-name, .user-chip .dept-chip { display: none; } }
+.tab-badge {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px;
+  border-radius: 999px; background: var(--lime); color: var(--on-lime); font-size: 11px; font-weight: 800; line-height: 1;
+}
+
+/* user menu: avatar, name, department tag */
+.user-menu-wrap { position: relative; flex: 0 0 auto; }
+.user-menu-wrap .user-chip { gap: 7px; padding: 4px 10px 4px 4px; cursor: pointer; }
+.user-chip-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-chip .dept-chip { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 999px; padding: 2px 7px; background: rgba(255, 255, 255, .18); color: #fff; }
+.user-chip .user-chip-caret { color: rgba(255, 255, 255, .7); }
+.user-chip .hs { box-shadow: none; }
+.user-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); min-width: 230px; z-index: 30;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .18); padding: 6px;
+}
+.user-menu-head { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.user-menu-head b { color: var(--ink); font-size: 14px; }
+.user-menu-head span { color: var(--muted); font-size: 12px; }
+.user-menu a, .user-menu button {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 10px; border: none; border-radius: 8px;
+  background: none; color: var(--text); font-size: 13.5px; font-weight: 600; text-decoration: none; text-align: left; font-family: inherit;
+}
+.user-menu a:hover, .user-menu button:hover, .user-menu a:focus-visible, .user-menu button:focus-visible { background: #f3f4ec; outline: none; }
+.user-menu .icon { color: var(--ink-2); }
+
+/* ---------- desktop sidebar (navigation only) ---------- */
+.shell-side { position: sticky; top: 56px; align-self: flex-start; height: calc(100vh - 56px); z-index: 5; }
+.shell-side .sidebar { width: 100%; flex: none; height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+.nav-section { margin-bottom: 14px; }
+.nav-h, .sidebar h2.nav-h {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+  margin: 6px 8px 10px; display: flex; justify-content: space-between; align-items: center; font-weight: 700;
+}
+.nav-tree a { color: inherit; text-decoration: none; }
+.nav-tree .office-name { color: var(--ink); }
+.nav-tree .office-head.viewing { background: #f3f4ec; box-shadow: inset 3px 0 0 var(--lime); }
+.nav-tree .team-name { cursor: pointer; }
+.nav-tree .proj { color: var(--text); }
+.nav-tree .proj .count { flex: 0 0 auto; }
+.nav-tree .proj-pin { color: var(--lime-dark); }
+.nav-tree .proj-archived .name { color: var(--ink-2); text-decoration: line-through; text-decoration-color: #c9c9c9; }
+.nav-follow { flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.nav-empty a { color: var(--ink); font-weight: 600; text-decoration: underline; }
+.tree-caret { display: inline-grid; place-items: center; height: 22px; flex: 0 0 auto; border-radius: 5px; }
+.tree-caret:hover { color: var(--ink); background: rgba(0, 0, 0, .05); }
+.tree-caret .icon { transition: transform .15s; }
+.tree-caret .icon.caret-collapsed { transform: rotate(-90deg); }
+.nav-more { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+.side-link { display: flex; align-items: center; gap: 4px; padding: 7px 8px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.side-link:hover { background: #f1f1f2; color: var(--ink); }
+.side-link .icon { color: var(--lime-dark); }
+.side-archived { display: flex; align-items: center; gap: 6px; }
+
+/* breadcrumbs as links (same look as the old buttons) */
+.crumbs a { padding: 2px 4px; border-radius: 5px; color: var(--ink-2); font-weight: 600; font-size: 13px; text-decoration: none; }
+.crumbs a:hover { background: #ececec; color: var(--ink); }
+
+/* ---------- banners, notices, stubs ---------- */
+.shell-banner { align-items: center; }
+.shell-banner .btn { flex: 0 0 auto; }
+.coming-soon .empty { padding: 40px 24px; }
+.shell-error { margin-top: 8px; }
+.shell-error .btn { margin-top: 4px; }
+.refresh-pill {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 25;
+  border: none; border-radius: 999px; padding: 9px 16px; background: var(--ink); color: #fff; font-weight: 700; font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .2), inset 0 -3px 0 var(--lime);
+}
+.refresh-pill:hover { background: var(--ink-hover); }
+
+/* conflict notice under a field (app/_ui/ConflictNotice.js) */
+.conflict { margin: 6px 0 8px; padding: 9px 12px; border-radius: 8px; background: #fffbe6; border: 1px solid #ffe58f; color: #7a5c00; font-size: 13px; }
+.conflict-msg { display: flex; align-items: flex-start; gap: 7px; line-height: 1.45; }
+.conflict-msg .icon { margin-top: 2px; }
+.conflict-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.conflict-fields { margin: 8px 0 0; }
+.conflict-fields dt { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-top: 6px; }
+.conflict-fields dd { margin: 2px 0 0; white-space: pre-wrap; color: var(--text); background: #fff; border: 1px solid #ffe58f; border-radius: 6px; padding: 6px 8px; max-height: 160px; overflow: auto; }
+
+/* names: display name plus the "@username · unverified" chip */
+.name-label { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
+.name-label a { color: inherit; text-decoration: none; font-weight: 600; }
+.name-label a:hover { text-decoration: underline; }
+.unverified-chip { font-size: 11px; font-weight: 600; color: var(--muted); background: #f3f3f4; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+
+/* links inside formatted notes (FormattedNotes linkify) */
+.fmt-link { color: #0077b6; text-decoration: underline; word-break: break-all; }
+
+/* ---------- phone drawer and bottom bar (hidden on desktop) ---------- */
+.drawer, .bottom-nav { display: none; }
+
+@media (max-width: 720px) {
+  .shell-side { display: none; }
+  .shell-header { padding: 0 12px; gap: 8px; }
+  .shell-header .header-tabs { display: none; }
+  .shell-header .brand { flex: 1 1 auto; min-width: 0; }
+  .user-chip-name, .user-chip .dept-chip, .user-chip .user-chip-caret, .user-chip-badge { display: none; }
+  .user-menu-wrap .user-chip { padding: 4px; min-width: 44px; min-height: 44px; justify-content: center; background: transparent; }
+  .user-menu-wrap .user-chip .hs { width: 30px !important; height: 30px !important; }
+  .shell-header .menu-btn { min-width: 44px; min-height: 40px; border: none; border-radius: 8px; color: #fff; }
+  .app-shell .main { padding-bottom: calc(58px + env(safe-area-inset-bottom) + 20px); }
+  .refresh-pill { bottom: calc(58px + env(safe-area-inset-bottom) + 14px); }
+
+  .drawer { display: block; position: fixed; left: 0; right: 0; top: 56px; bottom: 0; z-index: 30; visibility: hidden; pointer-events: none; transition: visibility 0s linear .2s; }
+  .drawer.open { visibility: visible; pointer-events: auto; transition: none; }
+  .drawer-backdrop { position: absolute; inset: 0; background: rgba(20, 20, 20, .45); opacity: 0; transition: opacity .2s; }
+  .drawer.open .drawer-backdrop { opacity: 1; }
+  .drawer-panel {
+    position: absolute; left: 0; top: 0; bottom: 0; width: min(86vw, 360px); overflow-y: auto; overscroll-behavior: contain;
+    background: var(--panel); box-shadow: 2px 0 16px rgba(0, 0, 0, .12); padding: 12px 10px calc(16px + env(safe-area-inset-bottom));
+    transform: translateX(-100%); transition: transform .2s;
+  }
+  .drawer.open .drawer-panel { transform: none; }
+  .drawer-links { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .drawer-account { border-bottom: none; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
+  .drawer-link {
+    display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 10px; border: none; border-radius: 8px; width: 100%;
+    background: none; color: var(--text); font-size: 15px; font-weight: 600; text-decoration: none; text-align: left; font-family: inherit;
+  }
+  .drawer-link .icon { color: var(--ink-2); }
+  .drawer-link.on { background: #f3f4ec; box-shadow: inset 3px 0 0 var(--lime); }
+  .drawer-link:hover { background: #f1f1f2; }
+  /* tree rows are tap targets on a phone */
+  .drawer .office-head, .drawer .team-head, .drawer .proj, .drawer .side-link { min-height: 44px; }
+  .drawer .tree-caret { width: 32px; height: 32px; }
+  .drawer .office-name, .drawer .team-name, .drawer .proj .name { font-size: 15px; }
+
+  .bottom-nav {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    height: calc(58px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+    background: var(--ink); box-shadow: 0 -2px 12px rgba(0, 0, 0, .12);
+  }
+  .bn-item {
+    flex: 1 1 0; min-width: 0; height: 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    color: rgba(255, 255, 255, .72); text-decoration: none; font-size: 11px; font-weight: 600;
+  }
+  .bn-item .icon { color: inherit; }
+  .bn-item.on { color: #fff; background: rgba(255, 255, 255, .1); box-shadow: inset 0 -3px 0 var(--lime); }
+  .bn-item.on .icon { color: var(--lime); }
+  .bn-icon { position: relative; display: inline-flex; }
+  .bn-icon .tab-badge { position: absolute; top: -6px; right: -12px; height: 16px; min-width: 16px; font-size: 10px; }
+  .bn-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* inputs at 16 px so iOS doesn't zoom in on focus */
+  .app-shell input:not([type=checkbox]):not([type=radio]):not([type=color]), .app-shell select, .app-shell textarea { font-size: 16px; }
+}
+
+/* touch screens: controls that used to appear on hover are always visible */
+@media (hover: none) {
+  .row-icon, .row-x, .reorder, .notes-btn, .info-del { opacity: 1; }
+}
+
+/* ---------- density (Settings > Customize) ---------- */
+[data-density='compact'] tbody td { padding: 4px 10px; }
+[data-density='compact'] thead th { padding: 8px 10px; }
+[data-density='compact'] .home-grid, [data-density='compact'] .overview-grid { gap: 8px; }
+[data-density='compact'] .home-card { padding: 11px 12px; }
+[data-density='compact'] .proj { padding: 6px 10px; }
+[data-density='compact'] .main { padding-top: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer, .drawer-backdrop, .drawer-panel, .tree-caret .icon { transition: none; }
+}

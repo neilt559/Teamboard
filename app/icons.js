@@ -1,11 +1,13 @@
 // Inline SVG line icons used across TeamBoard (instead of emoji, which render
 // differently on every device). They draw in currentColor, so they pick up the
-// surrounding text color; pass size to scale them.
+// surrounding text color; pass size to scale them. className and style pass
+// through (e.g. IconCaret rotated with CSS for collapsed tree rows).
 
-function Svg({ size = 17, children, filled = false }) {
+function Svg({ size = 17, children, filled = false, className, style }) {
   return (
     <svg
-      className="icon"
+      className={className ? `icon ${className}` : 'icon'}
+      style={style}
       viewBox="0 0 24 24"
       width={size}
       height={size}
@@ -55,3 +57,13 @@ export const IconSearch = (p) => <Svg {...p}><circle cx="11" cy="11" r="7" /><pa
 export const IconLock = (p) => <Svg {...p}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></Svg>;
 export const IconStar = (p) => <Svg filled size={14} {...p}><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" /></Svg>;
 export const IconCrown = (p) => <Svg filled size={13} {...p}><path d="M3 7.5l4.6 4.1L12 5l4.4 6.6L21 7.5 19.2 17.5H4.8z" /><rect x="4.8" y="19" width="14.4" height="2.4" rx="1" /></Svg>;
+export const IconMore = (p) => <Svg {...p}><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></Svg>;
+export const IconPin = (p) => <Svg {...p}><path d="M9 3h6l-1 6 3.5 3.5V15h-11v-2.5L10 9z" /><path d="M12 15v6" /></Svg>;
+export const IconBell = (p) => <Svg {...p}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></Svg>;
+export const IconSettings = (p) => <Svg {...p}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></Svg>;
+export const IconLogOut = (p) => <Svg {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></Svg>;
+export const IconUser = (p) => <Svg {...p}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Svg>;
+export const IconTag = (p) => <Svg {...p}><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" /><path d="M7.5 7.5h.01" /></Svg>;
+export const IconFilter = (p) => <Svg {...p}><path d="M22 3H2l8 9.5V19l4 2v-8.5z" /></Svg>;
+// Expand/collapse caret for tree rows: points down; rotate it with CSS for "collapsed".
+export const IconCaret = (p) => <Svg {...p}><path d="M6 9l6 6 6-6" /></Svg>;

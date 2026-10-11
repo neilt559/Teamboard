@@ -33,13 +33,35 @@ const blockClass = (type, level) => (type === 'title' ? 'fmt-title'
     : type === 'bullet' ? `fmt-li lvl${level}`
       : 'fmt-p');
 
-export function FormattedNotes({ text, empty = 'No notes yet' }) {
+// Opt-in (threads, events): web links in the text become clickable. Only
+// http(s) links, so a pasted "javascript:" never turns into a link; trailing
+// punctuation stays text ("see https://x.com." links https://x.com).
+const URL_RE = /https?:\/\/[^\s<>"]+/gi;
+const TRAIL_RE = /[.,;:!?)\]}'"]+$/;
+export function linkify(s) {
+  const str = String(s ?? '');
+  const out = [];
+  let last = 0;
+  for (const m of str.matchAll(URL_RE)) {
+    const url = m[0].replace(TRAIL_RE, '');
+    if (!url || url.length <= 8) continue;
+    if (m.index > last) out.push(str.slice(last, m.index));
+    out.push(<a key={m.index} href={url} target="_blank" rel="noopener noreferrer" className="fmt-link">{url}</a>);
+    last = m.index + url.length;
+  }
+  if (!out.length) return str;
+  if (last < str.length) out.push(str.slice(last));
+  return out;
+}
+
+export function FormattedNotes({ text, empty = 'No notes yet', linkify: links = false }) {
   if (!String(text || '').trim()) return <div className="fmt fmt-empty">{empty}</div>;
+  const show = links ? linkify : (s) => s;
   return (
     <div className="fmt">
       {parseNotes(text).map((b, i) => (b.type === 'gap'
         ? <div key={i} className="fmt-gap" />
-        : <div key={i} className={blockClass(b.type, b.level)} style={b.type === 'bullet' ? { '--lvl': b.level } : undefined}>{b.text}</div>))}
+        : <div key={i} className={blockClass(b.type, b.level)} style={b.type === 'bullet' ? { '--lvl': b.level } : undefined}>{show(b.text)}</div>))}
     </div>
   );
 }

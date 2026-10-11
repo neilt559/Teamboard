@@ -1,77 +1,13 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
-import { sessionUser, COOKIE } from '@/lib/auth';
+import { handle, HttpError } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-// Returns the entire board in one shot: people, projects, and tasks.
-export async function GET(req) {
-  try {
-    await ensureSchema();
-    const me = await sessionUser(req.cookies.get(COOKIE)?.value);
-    const meId = me ? me.id : null;
-    const people = await sql`SELECT id, name, color FROM people ORDER BY lower(name) ASC, id ASC`;
-    const offices = await sql`SELECT id, name, position, archived, fivek, geo_on FROM offices ORDER BY position ASC, id ASC`;
-    const teams = await sql`SELECT id, name, office_id, position, archived FROM teams ORDER BY position ASC, id ASC`;
-    const projects = await sql`SELECT id, team_id, name, notes, position, archived FROM projects ORDER BY position ASC, id ASC`;
-    const tasks = await sql`SELECT id, project_id, parent_id, title, assignee_id, due_date, status, archived, notes, stoplight, created_at
-                            FROM tasks ORDER BY position ASC, id ASC`;
-    const info = await sql`SELECT id, project_id, label, value, position FROM project_info ORDER BY position ASC, id ASC`;
-    const meetings = await sql`SELECT id, office_id, title, meeting_date, minutes, position FROM meetings ORDER BY meeting_date DESC NULLS LAST, id DESC`;
-    const geo = await sql`SELECT id, office_id, score, score_date FROM geo_scores ORDER BY score_date ASC NULLS LAST, id ASC`;
-    const pseries = await sql`SELECT id, project_id, name, position FROM meeting_series ORDER BY position ASC, id ASC`;
-    const pmeetings = await sql`SELECT id, project_id, series_id, title, meeting_date, attendance, notes, position FROM project_meetings ORDER BY meeting_date DESC NULLS LAST, id DESC`;
-    // Brackets: every bracket's summary (for the history list), but entrants,
-    // matches and votes only for current (non-archived) ones to keep polls light.
-    const users = await sql`SELECT id, username, avatar_v, avatar_crop, (avatar_src IS NOT NULL) AS has_src FROM users ORDER BY username ASC`;
-    const brackets = await sql`SELECT b.id, b.office_id, b.name, b.notes, b.regions, b.champion_id, b.archived, b.created_at, b.completed_at, e.name AS champion_name
-                               FROM brackets b LEFT JOIN bracket_entrants e ON e.id = b.champion_id
-                               ORDER BY b.created_at DESC, b.id DESC`;
-    const bentrants = await sql`SELECT e.id, e.bracket_id, e.name, e.quadrant, e.seed
-                                FROM bracket_entrants e JOIN brackets b ON b.id = e.bracket_id WHERE NOT b.archived`;
-    const bmatches = await sql`SELECT m.id, m.bracket_id, m.round, m.idx, m.a_id, m.b_id, m.winner_id
-                               FROM bracket_matches m JOIN brackets b ON b.id = m.bracket_id WHERE NOT b.archived`;
-    const bvotes = await sql`SELECT v.match_id, v.user_id, v.entrant_id
-                             FROM bracket_votes v JOIN bracket_matches m ON m.id = v.match_id
-                             JOIN brackets b ON b.id = m.bracket_id WHERE NOT b.archived
-                             ORDER BY v.created_at ASC`;
-    // Suggestions: the author is hidden on anonymous ones (only "mine" tells
-    // the poster it's theirs, so they can still edit/delete it).
-    const suggestions = await sql`
-      SELECT s.id, s.title, s.details, s.category, s.status, s.anonymous, s.created_at, s.updated_at,
-             CASE WHEN s.anonymous THEN NULL ELSE s.user_id END AS author_id,
-             COALESCE(s.user_id = ${meId}, false) AS mine,
-             (SELECT count(*)::int FROM suggestion_votes v WHERE v.suggestion_id = s.id) AS votes,
-             EXISTS (SELECT 1 FROM suggestion_votes v WHERE v.suggestion_id = s.id AND v.user_id = ${meId}) AS voted
-      FROM suggestions s ORDER BY s.created_at DESC, s.id DESC`;
-    const sreplies = await sql`
-      SELECT r.id, r.suggestion_id, r.body, r.anonymous, r.created_at,
-             CASE WHEN r.anonymous THEN NULL ELSE r.user_id END AS author_id,
-             COALESCE(r.user_id = ${meId}, false) AS mine
-      FROM suggestion_replies r ORDER BY r.created_at ASC, r.id ASC`;
-    return NextResponse.json({
-      people: people.rows,
-      offices: offices.rows,
-      teams: teams.rows,
-      projects: projects.rows,
-      tasks: tasks.rows,
-      info: info.rows,
-      meetings: meetings.rows,
-      geo: geo.rows,
-      pseries: pseries.rows,
-      pmeetings: pmeetings.rows,
-      users: users.rows,
-      brackets: brackets.rows,
-      bentrants: bentrants.rows,
-      bmatches: bmatches.rows,
-      bvotes: bvotes.rows,
-      suggestions: suggestions.rows,
-      sreplies: sreplies.rows,
-    });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// The old single page polled this for the whole database every 4 s. Pages now load their own filtered data,
+// so tabs left open across the deploy get this message in their banner (design §8.2).
+export const GET = handle(async () => {
+  throw new HttpError(410, 'TeamBoard was updated — please reload this page.');
+}, { auth: 'public' });
