@@ -6,6 +6,8 @@
 /* ---------- department tag (app/_ui/DeptTag.js) ---------- */
 .dept-tag { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
 .dept-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+/* The tag is inline-flex, so the ellipsis has to live on the text itself (a long department on a narrow phone). */
+.dept-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- sign-in card extras ---------- */
 .login-hint { display: block; margin-top: 4px; font-size: 11.5px; color: var(--muted); }

@@ -5,7 +5,7 @@ import { api, ConflictError } from '@/app/_ui/api';
 import { IconCheck, IconAlert, IconShield } from '@/app/icons';
 import { useConfirm } from '@/app/_ui/ConfirmDialog';
 import {
-  OfficeCards, DeptChips, PositionGroups, TeamSelect, BossPicker, positionNote,
+  OfficeCards, DeptChips, PositionGroups, TeamSelect, BossPicker, RosterLine, positionNote,
 } from '@/app/welcome/fields';
 
 // Settings > Profile (design §5.3): the wizard's form, saved with the same PUT /api/profile.
@@ -155,8 +155,10 @@ export default function ProfileForm({ viewer, data }) {
 
       <div className="pf-section">
         <h2 className="pf-h"><label htmlFor="pf-team">Team</label></h2>
+        <p className="pf-help">Your home team. Your team’s PM or an admin adds you to the team roster. The roster is what adds you to the team’s projects.</p>
         <TeamSelect id="pf-team" teams={data.teams} officeIds={teamOffices} offices={data.offices} value={f.team_id}
           currentId={officeChanging ? null : base.team_id} onChange={(v) => set({ team_id: v || '' })} />
+        <RosterLine rosters={data.rosters} />
       </div>
 
       <div className="pf-section">

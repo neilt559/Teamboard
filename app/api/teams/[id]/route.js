@@ -99,7 +99,7 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
 }, { legacyWrite: true });
 
 // DELETE /api/teams/:id: admins only (two confirms in the UI). One statement deletes the team (its projects
-// and everything in them cascade; members' team is cleared by the FK) and writes a JSON snapshot of all of
+// and everything in them cascade, its roster too; members' team is cleared by the FK) and writes a JSON snapshot of all of
 // it to audit_log, so the delete can never happen without its record (§13 #12). Already gone -> { ok: true }.
 export const DELETE = handle(async ({ viewer, params }) => {
   const id = parseId(params.id);
@@ -122,7 +122,9 @@ export const DELETE = handle(async ({ viewer, params }) => {
          'project_members', COALESCE((SELECT jsonb_agg(to_jsonb(pmb) ORDER BY pmb.project_id, pmb.user_id)
                                       FROM project_members pmb WHERE pmb.project_id IN (SELECT id FROM pr)), '[]'::jsonb),
          'member_user_ids', COALESCE((SELECT jsonb_agg(u.id ORDER BY u.id) FROM users u
-                                      WHERE u.team_id IN (SELECT id FROM s)), '[]'::jsonb)) AS detail),
+                                      WHERE u.team_id IN (SELECT id FROM s)), '[]'::jsonb),
+         'team_members', COALESCE((SELECT jsonb_agg(to_jsonb(x) ORDER BY x.user_id) FROM team_members x
+                                   WHERE x.team_id IN (SELECT id FROM s)), '[]'::jsonb)) AS detail),
      d AS (DELETE FROM teams t USING s WHERE t.id = s.id RETURNING t.id),
      a AS (INSERT INTO audit_log (actor_id, action, entity, entity_id, detail)
            SELECT $2::bigint, 'team.delete', 'teams', d.id::text, snap.detail FROM d CROSS JOIN snap)

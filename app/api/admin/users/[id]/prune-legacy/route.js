@@ -8,9 +8,10 @@ export const revalidate = 0;
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// "Apply new rules" to one person (§6): their legacy memberships are soft-removed, except their own team's
-// projects and projects where they own tasks. Undo with POST /api/admin/legacy/undo/:batch.
-// -> { ok, batch, removed, people }
+// "Apply new rules" to one person (§6): their legacy memberships are soft-removed, except their own (home) team's
+// projects, the projects of every team on their active roster (A4 rule 3d; those kept rows become source 'team_legacy')
+// and projects where they own tasks. Undo with POST /api/admin/legacy/undo/:batch.
+// -> { ok, batch, removed, people, relabeled }
 export const POST = handle(async ({ viewer, params }) => {
   const uid = parseId(params.id);
   const found = await query(`SELECT 1 FROM users WHERE id = $1::bigint`, [uid]);

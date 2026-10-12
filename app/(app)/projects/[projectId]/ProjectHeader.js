@@ -5,7 +5,7 @@ import { SyncedField } from '@/app/synced';
 
 // Project header (design §2.3): the name (inline rename for people who may manage the project), progress over
 // ALL top-level tasks (archived Done tasks still count, rule 21), the team select (move), "+ Add Task", and a
-// "more" menu with Archive / Restore and Delete. Capabilities come from the loader (canManageProject,
+// "more" menu with Archive / Restore and Delete. A team move asks first (it changes who is on the project, A4). Capabilities come from the loader (canManageProject,
 // canMoveProject targets, canDeleteProject), so the header shows exactly what the API allows.
 export default function ProjectHeader({ project: p, can, teams, pct, doneCount, total, memberCount, ro, actions, conflictUI, ask }) {
   const [menu, setMenu] = useState(false);
@@ -66,7 +66,7 @@ export default function ProjectHeader({ project: p, can, teams, pct, doneCount, 
         </div>
         {can.move && !ro ? (
           <label className="team-select-wrap">Team
-            <select className="team-select" value={p.team_id ?? ''} onChange={(e) => actions.patchProject({ team_id: e.target.value })}>
+            <select className="team-select" value={p.team_id ?? ''} onChange={(e) => actions.moveProject(e.target.value)}>
               {groups.map((g) => (
                 <optgroup key={g.office_id ?? 'none'} label={g.office_name}>
                   {g.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}

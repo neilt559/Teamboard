@@ -22,7 +22,7 @@ export default function DeptTag({ dept, name, color, className = '', title }) {
       title={title || `Department: ${label}`}
     >
       <span className="dept-dot" style={{ background: c }} aria-hidden="true" />
-      {label}
+      <span className="dept-label">{label}</span>
     </span>
   );
 }

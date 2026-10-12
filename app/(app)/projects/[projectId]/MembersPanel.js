@@ -18,6 +18,10 @@ function sourceText(m) {
     case 'manual': return m.added_by_name ? `Added by ${m.added_by_name}` : 'Added';
     case 'legacy': return 'Had access before the update';
     case 'admin': return 'Team access (admin)';
+    // A4: added from the team roster ("via Team Potato"); removing them from the roster removes this row.
+    // team_legacy: access from before the update that the roster now manages (A4 rule 3d).
+    case 'team':
+    case 'team_legacy': return m.team_name ? `via ${m.team_name}` : 'Team member';
     default: return 'Member';
   }
 }
@@ -74,7 +78,7 @@ export default function MembersPanel({ project, members, ro, actions, ask }) {
           ))}
         </ul>
       )}
-      <p className="info-hint">Anyone on a project can add people to it. People also see projects through their office or their position.</p>
+      <p className="info-hint">Anyone on a project can add people to it. People on the team’s roster join its projects automatically. People also see projects through their office or their position.</p>
       {picking && (
         <AddPeople
           projectId={project.id}

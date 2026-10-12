@@ -23,6 +23,7 @@ import useBoardSync from './useBoardSync';
 // project's rev counter instead of the old whole-database poll (§7.5).
 
 const same = (a, b) => a != null && b != null && String(a) === String(b);
+const nPeople = (n) => `${n} ${n === 1 ? 'person' : 'people'}`;
 const LISTS = { task: 'tasks', info: 'info', meeting: 'meetings', series: 'series' };
 const URLS = {
   task: (id) => `/api/tasks/${id}`,
@@ -221,6 +222,43 @@ export default function ProjectBoard({ initial }) {
     } catch (e) { fail(e); refreshNow(); return false; }
   }, [touch, pid, mergeLocal, refreshNow, fail, wrote]);
 
+  // Team move (A4 rules 3b/3c): it changes who is on the project, so it asks first, with the counts the loader
+  // computed for that team (move_leaves: roster members here who aren't on its roster and own no task here;
+  // move_joins: people on its roster who aren't members yet), and reports what the server actually did.
+  const moveProject = useCallback(async (teamId) => {
+    const target = (d.teams || []).find((t) => same(t.id, teamId));
+    if (!target || same(teamId, p.team_id)) return false;
+    const leaves = Number(target.move_leaves) || 0;
+    const joins = Number(target.move_joins) || 0;
+    const from = p.team_name || 'the current team';
+    const ok = await ask({
+      title: `Move “${p.name}” to ${target.name}?`,
+      lines: [
+        leaves ? `${nPeople(leaves)} who got this project from ${from}’s roster ${leaves === 1 ? 'comes' : 'come'} off it.` : null,
+        joins ? `${nPeople(joins)} on ${target.name}’s roster ${joins === 1 ? 'joins' : 'join'} it.` : null,
+        leaves || joins
+          ? 'People who own tasks here, were added by hand or created it stay.'
+          : 'Nobody’s project membership changes.',
+      ],
+      confirmLabel: 'Move project',
+    });
+    if (!ok) return false;
+    touch();
+    try {
+      const r = await api(URLS.project(pid), { method: 'PATCH', body: { team_id: teamId } });
+      wrote();
+      if (r?.row) mergeLocal('project', pid, r.row);
+      const m = r?.team_move;
+      if (m) {
+        const bits = [m.added ? `${nPeople(m.added)} joined` : null, m.removed ? `${nPeople(m.removed)} came off` : null,
+          m.kept ? `${nPeople(m.kept)} stayed for their tasks` : null].filter(Boolean);
+        showToast(`Moved to ${target.name}. ${bits.length ? `${bits.join(', ')}.` : 'Nobody’s membership changed.'}`);
+      }
+      refreshNow();
+      return true;
+    } catch (e) { fail(e); refreshNow(); return false; }
+  }, [d.teams, p.team_id, p.team_name, p.name, ask, touch, pid, wrote, mergeLocal, showToast, refreshNow, fail]);
+
   const deleteProject = useCallback(async () => {
     try {
       await api(URLS.project(pid), { method: 'DELETE' });
@@ -330,7 +368,7 @@ export default function ProjectBoard({ initial }) {
     saveTaskText: (id, field, v, base) => saveText('task', id, field, v, base),
     saveInfoText: (id, field, v, base) => saveText('info', id, field, v, base),
     saveProjectText: (field, v, base) => saveText('project', pid, field, v, base),
-    patchProject, deleteProject, addInfo, deleteInfo, addMembers, removeMember,
+    patchProject, moveProject, deleteProject, addInfo, deleteInfo, addMembers, removeMember,
   };
   const ctx = {
     pid, people: d.people, ro, mounted, focusId, actions, conflictUI,

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/app/_ui/api';
 import useServerState, { mergeById } from '@/app/_ui/useServerState';
@@ -198,14 +199,14 @@ function Teams({ data, setData, act, busy, ask }) {
   };
   const grant = async (t) => {
     const ok = await ask({
-      title: `Give everyone on “${t.name}” all ${plural(t.project_count, 'project')} of the team?`,
-      lines: [`${plural(t.members, 'team member')} become members of each of the team’s projects (archived ones too). Nobody is removed.`],
+      title: `Give everyone who picked “${t.name}” all ${plural(t.project_count, 'project')} of the team?`,
+      lines: [`${plural(t.members, 'person', 'people')} who chose this team in their profile become members of each of the team’s projects (archived ones too). Nobody is removed. People on the roster already get the team’s projects.`],
       confirmLabel: 'Give access',
     });
     if (!ok) return;
     await act(`grant-${t.id}`, async () => {
       const r = await api(`/api/admin/teams/${t.id}/grant-projects`, { method: 'POST' });
-      return { flash: r.added ? `Added ${plural(r.added, 'membership')} for ${plural(r.people, 'person', 'people')} on “${t.name}”.` : `Everyone on “${t.name}” already had all of its projects.` };
+      return { flash: r.added ? `Added ${plural(r.added, 'membership')} for ${plural(r.people, 'person', 'people')} on “${t.name}”.` : `Everyone who picked “${t.name}” already had all of its projects.` };
     });
   };
   const add = (o) => act(`tadd-${o.id}`, async () => {
@@ -243,7 +244,8 @@ function Teams({ data, setData, act, busy, ask }) {
                       </div>
                       <div className="adm-row-meta">
                         {plural(t.active_projects, 'project')}{t.project_count > t.active_projects ? ` (+${t.project_count - t.active_projects} archived)` : ''}
-                        {' · '}{plural(t.members, 'member')}
+                        {' · '}<Link href={`/teams/${t.id}#roster`} prefetch={false} className="adm-roster-link">{plural(t.roster || 0, 'person', 'people')} on the roster{t.roster_pms ? ` (${plural(t.roster_pms, 'PM')})` : ''}</Link>
+                        {' · '}{plural(t.members, 'person', 'people')} picked it in their profile
                       </div>
                     </div>
                     <div className="adm-row-controls">
@@ -258,8 +260,8 @@ function Teams({ data, setData, act, busy, ask }) {
                           onDown={i >= 0 && i < activeTeams.length - 1 ? () => move(t, activeTeams, 1) : null} />
                       )}
                       <button type="button" className="btn btn-plain btn-sm" disabled={!!busy || !t.members || !t.project_count} onClick={() => grant(t)}
-                        title="Give this team’s members all of its projects">
-                        {busy === `grant-${t.id}` ? 'Adding…' : 'Give members its projects'}
+                        title="Give everyone who picked this team in their profile all of its projects">
+                        {busy === `grant-${t.id}` ? 'Adding…' : 'Give profile picks its projects'}
                       </button>
                       <button type="button" className="adm-icon-btn" title={t.archived ? 'Restore' : 'Archive'} aria-label={`${t.archived ? 'Restore' : 'Archive'} ${t.name}`}
                         disabled={!!busy} onClick={() => patch(t, { archived: !t.archived })}>

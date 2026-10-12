@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { IconBuilding, IconCheck, IconCrop, IconCamera } from '@/app/icons';
 import PhotoCropper, { fileToSource } from '@/app/photo-cropper';
 import DeptTag from '@/app/_ui/DeptTag';
@@ -130,7 +130,8 @@ export function positionNote({ positions, positionId, approvedId, approvedLevel 
   return `${p.name}: pending admin approval. Until then you see the projects you’re assigned to. You’ll keep working normally meanwhile.`;
 }
 
-// Teams in one office (plus extra offices for Settings), and "No team yet".
+// Teams in one office (plus extra offices for Settings), and "No home team yet" (the pick is the home team; the
+// rosters the person is on are listed under it, RosterLine).
 export function TeamSelect({ teams, officeIds, value, onChange, id = 'pf-team', currentId = null, offices = [] }) {
   const want = (officeIds || []).filter(Boolean).map(String);
   const list = teams.filter((t) => (want.includes(String(t.office_id)) && !t.archived) || String(t.id) === String(currentId ?? ''));
@@ -138,11 +139,33 @@ export function TeamSelect({ teams, officeIds, value, onChange, id = 'pf-team', 
   const multi = want.length > 1;
   return (
     <select id={id} className="field pf-select" value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-      <option value="">No team yet</option>
+      <option value="">No home team yet</option>
       {list.map((t) => (
         <option key={t.id} value={t.id}>{t.name}{multi ? ` (${officeName(t.office_id)})` : ''}{t.archived ? ' (archived)' : ''}</option>
       ))}
     </select>
+  );
+}
+
+// The team rosters the person is on (A4), read-only under the home-team pick: the roster (set by the team's PM or
+// an admin), not the pick, adds them to a team's projects, so a person with no home team can still be on rosters.
+//   rosters: [{ id, name, role: 'pm' | 'member', archived }] (lib/queries/profile.js)
+export function RosterLine({ rosters }) {
+  const list = Array.isArray(rosters) ? rosters : [];
+  return (
+    <p className="pf-help pf-rosters" data-testid="my-rosters">
+      {list.length ? (
+        <>
+          On the roster of{' '}
+          {list.map((t, i) => (
+            <Fragment key={t.id}>
+              {i ? ', ' : ''}<b>{t.name}</b>{t.role === 'pm' ? ' (PM)' : ''}{t.archived ? ' (archived)' : ''}
+            </Fragment>
+          ))}
+          .
+        </>
+      ) : 'Not on any team roster yet.'}
+    </p>
   );
 }
 

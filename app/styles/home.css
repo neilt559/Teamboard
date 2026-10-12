@@ -206,3 +206,56 @@ a.ov-menu-btn { text-decoration: none; display: inline-flex; align-items: center
    its own stacking context). */
 .home-card:focus-within, .home-card:has(.ofc-more-pop), .overview-card:has(.ofc-more-pop) { z-index: 5; }
 .overview-card { position: relative; }
+
+/* ---------- team roster (design-amendments A4): /teams/[teamId] "Team members" ---------- */
+.roster-hint { margin: -4px 0 10px; font-size: 12.5px; color: var(--muted); }
+.roster-row { flex-wrap: wrap; }
+.roster-row .member-main { flex: 1 1 0; }
+.roster-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+.roster-name .name-label { font-size: 14px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
+/* "@long.username@cagecivil.com · unverified" stays inside a 320 px row (cut with an ellipsis; the title explains). */
+.roster-name .unverified-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.acct-tag.pm { background: #f6f7e4; color: #6b6d00; border: 1px solid #d6d7a0; }
+.roster-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: auto; }
+.roster-seg { display: inline-flex; background: #ececec; border-radius: 9px; padding: 3px; }
+.roster-seg button {
+  border: none; background: none; padding: 5px 11px; border-radius: 7px; font: inherit; font-size: 12.5px; font-weight: 700;
+  color: var(--ink-2); cursor: pointer;
+}
+.roster-seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .1), inset 0 -2px 0 var(--lime); }
+.roster-seg button:disabled { cursor: default; }
+.roster-seg button:focus-visible { outline: 2px solid var(--lime); outline-offset: 1px; }
+.roster-picked { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.roster-picked-h { margin: 0 0 8px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+.roster-picked-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.roster-picked-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.roster-picked-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; flex: 1 1 auto; min-width: 0; font-size: 13px; }
+.roster-picked-meta { font-size: 12px; color: var(--muted); }
+.roster-picked-add { flex: 0 0 auto; }
+.roster-add-note { margin: -4px 0 10px; font-size: 13px; color: var(--muted); }
+.roster-add-role { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.roster-add-label { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.roster-add-modal .pick-warn { margin: 0 0 10px; }
+/* The roster's own result / error line (TeamRoster.js): next to the controls, not at the top of the page. */
+.roster-status:empty { display: none; }
+.roster-banner { margin: 0 0 10px; }
+.roster-banner > span:not(.spacer) { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .roster .section-head { flex-wrap: wrap; }
+  .roster-actions { width: 100%; padding-left: 44px; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-width: 0; }
+  .roster-seg button { min-height: 40px; padding: 6px 16px; }
+  .roster-picked-add { min-height: 40px; padding: 6px 14px; }
+  .roster .section-head .btn { min-height: 40px; }
+  /* Add member on a phone: the picker list is shorter and Cancel / Add stay pinned to the dialog's bottom edge, so
+     the buttons are reachable without scrolling the dialog (or tapping outside the list, which closes it). */
+  .roster-add-modal .up-list { max-height: 32vh; }
+  .roster-add-modal .modal-actions {
+    position: sticky; bottom: -22px; z-index: 2; margin: 14px -22px -22px; padding: 12px 22px 22px;
+    background: #fff; border-top: 1px solid var(--line);
+  }
+}
+/* Narrow phones (320-400 px): the 44 px indent no longer fits the role switch and Remove side by side. */
+@media (max-width: 400px) {
+  .roster-actions { padding-left: 0; }
+  .roster-seg button { padding: 6px 13px; }
+}

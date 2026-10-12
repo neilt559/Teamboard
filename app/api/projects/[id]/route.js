@@ -2,6 +2,7 @@ import { handle, bad, forbidden, parseId, str, HttpError } from '@/lib/http';
 import { projectAccess, requireVisibleProject, canManageProject, canMoveProject, canDeleteProject } from '@/lib/access';
 import { guardedPatch, norm } from '@/lib/patch';
 import { moveTarget, deleteProject } from '@/lib/queries/project';
+import { ROSTER_LOCK_SQL, TEAM_MOVE_SELECT, teamMoveCtes } from '@/lib/rosters';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -22,8 +23,12 @@ const COLUMNS = {
 // PATCH /api/projects/:id (design §8.2), one statement that also bumps projects.rev:
 //   notes (+base): anyone who can see the project.
 //   name (+base, non-empty), archived, position: canManageProject (creator, legacy manager, office L2+, L3+).
-//   team_id: canMoveProject (manage rights, and the target team in the caller's scope).
-// Returns { ok: true, row }.
+//   team_id: canMoveProject (manage rights, and the target team in the caller's scope). In the same statement
+//     (A4 rule 3b/3c): the new team's roster joins the project as 'team' members, roster rows of people who
+//     aren't on the new team's roster are soft-removed (kept, as task rows, where the person owns a task here),
+//     and the move is audited (project.move_team). It runs under the roster lock (lib/rosters.js), so it never
+//     races a roster change or another move of the same project.
+// Returns { ok: true, row }, plus team_move: { added, removed, kept } (membership counts) on a move.
 export const PATCH = handle(async ({ viewer, params, body, now }) => {
   const id = parseId(params.id);
   const b = await body();
@@ -46,12 +51,23 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
       patch.team_id = tid;
     }
   }
+  const moving = has(patch, 'team_id');
   const { row } = await guardedPatch({
     table: 'projects', id, body: patch, columns: COLUMNS, actorId: viewer.id,
     scopeSql: 'tb_can_see_project($1::bigint, id)', scopeParams: [String(viewer.id)], bumpProjectRev: true, now,
     notFound: new HttpError(404, 'Project not found'),
+    ...(moving ? {
+      prelude: [ROSTER_LOCK_SQL],
+      extraCtes: (bind) => teamMoveCtes(bind, { actorId: viewer.id }),
+      extraSelect: TEAM_MOVE_SELECT,
+    } : {}),
   });
-  return { ok: true, row };
+  if (!moving) return { ok: true, row };
+  const { team_move_added: added, team_move_removed: removed, team_move_kept: kept, ...stored } = row;
+  return {
+    ok: true, row: stored,
+    team_move: added === undefined ? null : { added: Number(added) || 0, removed: Number(removed) || 0, kept: Number(kept) || 0 },
+  };
 }, { legacyWrite: true });
 
 // DELETE /api/projects/:id: Associates and up (L4) and admins (design §4.5). Two confirms in the UI; a JSON

@@ -17,6 +17,7 @@ import DeptTag from './DeptTag';
 // value objects only need { id, name | display_name | username }. exclude: ids never offered (e.g. current
 // members, yourself). noneLabel (single mode): an extra first choice that sets null ("Not listed yet").
 // defaultOpen: show the result list right away (the Members panel's Add people dialog) instead of on focus.
+// officeId: list people whose home office it is first (the team roster's Add member); anyone can still be picked.
 // Keyboard: arrows move, Enter picks, Escape closes; rows are 44 px tall on phones.
 
 const norm = (s) => String(s ?? '').toLowerCase();
@@ -37,7 +38,7 @@ export function filterUsers(list, q, exclude = []) {
 }
 
 export default function UserPicker({
-  value = null, onChange, multiple = false, projectId = null, exclude = [], options = null,
+  value = null, onChange, multiple = false, projectId = null, officeId = null, exclude = [], options = null,
   placeholder = 'Search by name', noneLabel = '', autoFocus = false, defaultOpen = false, disabled = false, label = 'Search people',
   limit = 20, className = '',
 }) {
@@ -72,6 +73,7 @@ export default function UserPicker({
       try {
         const params = new URLSearchParams({ q: q.trim(), limit: String(limit) });
         if (projectId != null) params.set('project_id', String(projectId));
+        if (officeId != null) params.set('office_id', String(officeId));
         const r = await api(`/api/users/search?${params}`, { quiet: true });
         if (my !== seq.current) return;
         const ex = new Set(hidden);
@@ -83,7 +85,7 @@ export default function UserPicker({
       }
     }, q ? 200 : 0);
     return () => clearTimeout(t);
-  }, [q, open, options, projectId, limit, hidden]);
+  }, [q, open, options, projectId, officeId, limit, hidden]);
 
   // Close when focus or a click leaves the picker.
   useEffect(() => {

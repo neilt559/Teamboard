@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, logout } from '@/app/_ui/api';
 import { IconCheck, IconUser, IconBuilding, IconTag, IconCamera } from '@/app/icons';
 import {
-  OfficeCards, DeptChips, PositionGroups, TeamSelect, BossPicker, PersonChoice, PhotoEditor, positionNote,
+  OfficeCards, DeptChips, PositionGroups, TeamSelect, BossPicker, PersonChoice, PhotoEditor, RosterLine, positionNote,
 } from './fields';
 import { bestPersonMatch, guessFromUsername } from './match';
 
@@ -205,10 +205,12 @@ export default function WelcomeWizard({ viewer, data }) {
           {posNote && <p className="pf-note">{posNote}</p>}
 
           <h2 className="pf-h"><label htmlFor="wz-team">Team</label></h2>
+          <p className="pf-help">Your home team. Your team’s PM or an admin adds you to the team roster. The roster is what adds you to the team’s projects.</p>
           {d.office_id ? (
             <TeamSelect id="wz-team" teams={data.teams} officeIds={[d.office_id]} value={d.team_id} onChange={(v) => set({ team_id: v || '' })}
               offices={data.offices} />
           ) : <p className="pf-help">Pick your office first.</p>}
+          <RosterLine rosters={data.rosters} />
 
           <h2 className="pf-h">Boss</h2>
           <p className="pf-help">Who you report to. If they haven’t signed up yet, pick “Not listed yet”.</p>

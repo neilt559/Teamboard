@@ -2,7 +2,7 @@
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconUsers, IconCheck, IconArchive, IconTrash } from '@/app/icons';
+import { IconCheck, IconArchive, IconTrash } from '@/app/icons';
 import Crumbs from '@/app/_ui/Crumbs';
 import { api, ConflictError } from '@/app/_ui/api';
 import ConflictNotice from '@/app/_ui/ConflictNotice';
@@ -15,8 +15,8 @@ import { canManageTeamsIn, canCreateProjectIn, canManageProject, canDeleteProjec
 import NameDialog from '../../offices/_ui/NameDialog';
 import MoreMenu from '../../offices/_ui/MoreMenu';
 import ErrorBanner from '../../offices/_ui/ErrorBanner';
-import PersonRow from '../../offices/_ui/PersonRow';
 import AddTaskModal from './AddTaskModal';
+import TeamRoster from './TeamRoster';
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const same = (a, b) => a != null && b != null && String(a) === String(b);
@@ -28,7 +28,8 @@ function Owner({ person }) {
 }
 
 // The Team overview (inventory §1.10, design §2.1/§2.3): the team's visible projects as cards with their notes,
-// open task lists, "Mark done" and "+ Add task", plus the team's members and (Release 2) its thread.
+// open task lists, "Mark done" and "+ Add task", plus the team's roster (A4: it drives project membership) and
+// (Release 2) its thread.
 // Moving the team to another office needs team rights in both offices; project add / rename / archive /
 // delete follow lib/policy.js exactly as the API does.
 export default function TeamOverview({ viewer, data, threadSlot = null }) {
@@ -42,7 +43,8 @@ export default function TeamOverview({ viewer, data, threadSlot = null }) {
   const [notice, setNotice] = useState(null);
   const [conflicts, setConflicts] = useState({});      // projectId -> { err, mine }
   const [confirmUI, ask] = useConfirm();
-  const { team, office, projects, tasks, people, members } = state;
+  const { team, office, projects, tasks, people, roster } = state;
+  const setRoster = (fn) => setState((s) => ({ ...s, roster: fn(s.roster) }));
   const admin = isAdmin(viewer);
   const canManageTeam = canManageTeamsIn(viewer, team.office_id);
   const canAddProject = canCreateProjectIn(viewer, team);
@@ -323,15 +325,16 @@ export default function TeamOverview({ viewer, data, threadSlot = null }) {
         </div>
       )}
 
-      <div className="office-section office-block team-members">
-        <div className="section-head">
-          <h2 className="section-title wi"><IconUsers size={16} /> Team members</h2>
-          <span className="progress-label">{members.length === 1 ? '1 person' : `${members.length} people`}</span>
-        </div>
-        {members.length === 0
-          ? <p className="ov-empty">Nobody has picked this team yet. People choose their team in their profile.</p>
-          : <ul className="ofc-people">{members.map((m) => <PersonRow key={m.id} person={m} showTeam={false} />)}</ul>}
-      </div>
+      <TeamRoster
+        team={team}
+        office={office}
+        roster={roster}
+        setRoster={setRoster}
+        archived={team.archived || !!office?.archived}
+        ask={ask}
+        refresh={() => router.refresh()}
+        pmOnlyEditor={!admin && !canManageTeam}
+      />
       {threadSlot}
 
       {addingTaskFor && (

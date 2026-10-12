@@ -7,18 +7,20 @@ export const revalidate = 0;
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// GET /api/users/search?q=&project_id=&limit=&photos=1 (design §4.6, §8.2): people pickers.
+// GET /api/users/search?q=&project_id=&office_id=&limit=&photos=1 (design §4.6, §8.2): people pickers.
 // Only public fields: id, name (display_name || username), username, display_name, identity_verified, office,
 // department { name, color }, team, approved position name, avatar_v. Never email, position_pending, is_admin
 // or image data. photos=1 (Voter photos) adds avatar_crop and has_src, which the re-crop needs.
 // project_id orders members first and adds is_member ONLY when the caller can see that project
-// (tb_can_see_project); otherwise it is ignored, so membership never leaks.
+// (tb_can_see_project); otherwise it is ignored, so membership never leaks. office_id (the team roster's Add
+// member, A4) lists people whose home office it is first; home offices are public, so it reveals nothing.
 // Disabled accounts never show; zz_ test accounts show only to other zz_ accounts (rule 51; the local harness).
 // An empty q lists everyone (by name), up to limit (default 20, max 500).
 export const GET = handle(async ({ req, viewer }) => {
   const sp = new URL(req.url).searchParams;
   const q = String(sp.get('q') || '').trim().toLowerCase().slice(0, 80);
   const pid = /^[0-9]{1,18}$/.test(sp.get('project_id') || '') ? sp.get('project_id') : null;
+  const officeFirst = /^[0-9]{1,18}$/.test(sp.get('office_id') || '') ? sp.get('office_id') : null;
   const limit = Math.min(500, Math.max(1, Number.parseInt(sp.get('limit') || '20', 10) || 20));
   const photos = sp.get('photos') === '1';
   const zz = /^zz_/.test(viewer.username || '');
@@ -47,9 +49,10 @@ export const GET = handle(async ({ req, viewer }) => {
             OR strpos(u.username, $3::text) > 0)
      ORDER BY (CASE WHEN pv.ok AND EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = $2::bigint
                                              AND m.user_id = u.id AND m.removed_at IS NULL) THEN 0 ELSE 1 END),
+              (CASE WHEN $7::bigint IS NOT NULL AND u.office_id = $7::bigint THEN 0 ELSE 1 END),
               rank, lower(COALESCE(NULLIF(u.display_name, ''), u.username)), u.id
      LIMIT $5::int`,
-    [String(viewer.id), pid, q, zz, limit, photos]);
+    [String(viewer.id), pid, q, zz, limit, photos, officeFirst]);
 
   return {
     users: r.rows.map((u) => ({

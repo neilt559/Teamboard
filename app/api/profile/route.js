@@ -130,7 +130,7 @@ export const PUT = handle(async ({ viewer: me, body }) => {
     let reqTeam = null;
     if (teamId) {
       const t = teamR[0];
-      if (!t || t.archived || !same(t.office_id, officeId)) throw bad('Pick a team in that office, or “No team yet”.');
+      if (!t || t.archived || !same(t.office_id, officeId)) throw bad('Pick a team in that office, or “No home team yet”.');
       reqTeam = teamId;
     }
     officeRequest = { office_id: officeId, team_id: reqTeam };

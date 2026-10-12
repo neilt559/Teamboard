@@ -117,7 +117,7 @@ function AccountEditor({ u, me, lists, accounts, onPatch, onAfter, ask }) {
     const ok = await ask({
       title: `Apply the new rules to ${u.name}?`,
       lines: [
-        `They keep their own team’s projects and the projects where they own tasks; the rest of their ${plural(u.legacy_count, 'legacy membership')} are removed.`,
+        `They keep the projects of every team they’re on (their roster teams and the team in their profile) and the projects where they own tasks; the rest of their ${plural(u.legacy_count, 'legacy membership')} are removed.`,
         'You can undo this right after, or later from Legacy access on this page.',
       ],
       confirmLabel: 'Apply new rules',
@@ -125,7 +125,7 @@ function AccountEditor({ u, me, lists, accounts, onPatch, onAfter, ask }) {
     if (!ok) return;
     await call('prune', `/api/admin/users/${u.id}/prune-legacy`, { method: 'POST' }, (r) => setMsg({
       text: r.removed ? `Removed ${plural(r.removed, 'legacy membership')}.` : 'Nothing to remove: every legacy project is their team’s or has their tasks.',
-      batch: r.removed ? r.batch : null,
+      batch: r.removed || r.relabeled ? r.batch : null,
     }));
   };
   const undo = (batch) => call('undo', `/api/admin/legacy/undo/${batch}`, { method: 'POST' },
@@ -316,7 +316,7 @@ function LegacyTools({ totals, batches, ask, onChanged, tz }) {
     const ok = await ask({
       title: 'Apply the new rules to every legacy user?',
       lines: [
-        'Each person keeps their own team’s projects and the projects where they own tasks; the rest of their legacy access is removed.',
+        'Each person keeps the projects of every team they’re on (roster teams and the team in their profile) and the projects where they own tasks; the rest of their legacy access is removed.',
         'People with an approved office-level or higher position still see what their position allows.',
         'You can undo this right after, or later from this list.',
       ],
@@ -327,7 +327,7 @@ function LegacyTools({ totals, batches, ask, onChanged, tz }) {
       const r = await api('/api/admin/legacy/apply-rules', { method: 'POST' });
       setMsg({
         text: r.removed ? `Removed ${plural(r.removed, 'legacy membership')} across ${plural(r.people, 'person', 'people')}.` : 'Nothing to remove.',
-        batch: r.removed ? r.batch : null,
+        batch: r.removed || r.relabeled ? r.batch : null,
       });
       onChanged();
     });
@@ -344,7 +344,7 @@ function LegacyTools({ totals, batches, ask, onChanged, tz }) {
         Accounts that existed before the company update keep every pre-launch project until you apply the new rules:
         {' '}<b>{Number(totals.legacy_active || 0).toLocaleString('en-US')}</b> legacy memberships are active
         {totals.legacy_removed ? `, ${Number(totals.legacy_removed).toLocaleString('en-US')} removed` : ''}.
-        Applying keeps each person’s own team’s projects and the projects where they own tasks. It can be undone.
+        Applying keeps the projects of each person’s teams (roster and profile) and the projects where they own tasks. It can be undone.
       </p>
       {err && <div className="bk-err" role="alert">{err}</div>}
       {msg && (
