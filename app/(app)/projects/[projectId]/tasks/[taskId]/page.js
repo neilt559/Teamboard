@@ -1,28 +1,29 @@
-import { requirePageViewer } from '@/lib/viewer';
 import { notFound } from 'next/navigation';
-import { IconCheck } from '@/app/icons';
+import { requirePageViewer } from '@/lib/viewer';
+import { loadTaskPage } from '@/lib/queries/project';
+import TaskDetail from './TaskDetail';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M2 (B2) (design §2.1, §15).
+// /projects/[projectId]/tasks/[taskId] (design §2.1): one task, phone-first (the board's cards open this page).
+// Same visibility as the project; a task that isn't in that project is a 404 too.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const maxDuration = 60;
 
-export const metadata = { title: 'Task' };
+const ID = /^[0-9]{1,18}$/;
+
+export async function generateMetadata({ params }) {
+  const viewer = await requirePageViewer();
+  const ok = ID.test(String(params.projectId)) && ID.test(String(params.taskId));
+  const data = ok ? await loadTaskPage(viewer, String(params.projectId), String(params.taskId)) : null;
+  if (!data) notFound();                                  // before streaming starts: a real 404 status
+  return { title: `${data.task.title || (data.task.parent_id ? 'Untitled subtask' : 'Untitled task')} · ${data.project.name}` };
+}
 
 export default async function TaskPage({ params }) {
   const viewer = await requirePageViewer();
-  if (!/^[0-9]{1,18}$/.test(String(params.projectId))) notFound();
-  if (!/^[0-9]{1,18}$/.test(String(params.taskId))) notFound();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconCheck size={24} /> Task</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>One task, phone-friendly: owner, stoplight, due date, status, notes and subtasks.</p>
-      </div>
-    </div>
-  );
+  if (!ID.test(String(params.projectId)) || !ID.test(String(params.taskId))) notFound();
+  const data = await loadTaskPage(viewer, String(params.projectId), String(params.taskId));
+  if (!data) notFound();
+  return <TaskDetail key={data.task.id} initial={data} />;
 }

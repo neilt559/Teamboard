@@ -1,1 +1,258 @@
-/* board styles (design §2.3, owned by the agent that builds this area). Imported from app/layout.js. */
+/* board styles (design §2.3): the project page and the task page. Builds on the board classes in globals.css
+   (.proj-head, .board, .task-title, .status-select, .sl-dot, .info-*, .pm-*, .archive*) and adds what the
+   multi-page board needs: rename-in-place, the "more" menu, phone task cards, the Members panel, the task page.
+   Imported from app/layout.js. Desktop >= 721 px; phone <= 720 px. */
+
+/* SVG carets (instead of the old triangle glyphs): IconCaret points down; rotate for collapsed / "up". */
+.subtask-toggle .icon, .archive-toggle .icon, .pm-toggle .icon { transition: transform .15s; }
+.icon.caret-closed { transform: rotate(-90deg); }
+.icon.caret-up { transform: rotate(180deg); }
+.archive-toggle.wi { gap: 6px; }
+.pm-toggle .team-caret { display: inline-grid; place-items: center; color: var(--muted); }
+
+/* ---------- header ---------- */
+.project-board .proj-head { gap: 12px 16px; }
+.proj-title { margin: 0; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.proj-title-input {
+  font: inherit; font-size: 24px; font-weight: 700; color: var(--ink); background: transparent; border: 1px solid transparent;
+  border-radius: 8px; padding: 2px 8px; margin-left: -9px; width: min(640px, 100%); min-width: 180px; text-overflow: ellipsis;
+}
+.proj-title-input:hover { border-color: var(--line); background: #fff; }
+.proj-title-input:focus { outline: none; border-color: var(--lime); background: #fff; box-shadow: 0 0 0 3px rgba(203, 206, 0, .18); }
+.proj-title-ro { margin: 0; font-size: 24px; color: var(--ink); overflow-wrap: anywhere; }
+.proj-progress { display: inline-flex; align-items: center; gap: 10px; }
+.team-name-ro { color: var(--text); font-weight: 600; font-size: 13px; }
+.members-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ink-2); text-decoration: none; padding: 4px 8px; border-radius: 6px; }
+.members-link:hover { background: #ececec; color: var(--ink); }
+.more-wrap { position: relative; flex: 0 0 auto; }
+.more-btn { display: inline-grid; place-items: center; padding: 6px 9px; min-width: 38px; min-height: 34px; }
+.more-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 210px; padding: 6px;
+  background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .14);
+}
+.more-menu button {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; padding: 8px 10px; border: none; border-radius: 7px;
+  background: none; color: var(--text); font-size: 13.5px; font-weight: 600; text-align: left;
+}
+.more-menu button:hover { background: #f1f1f2; }
+.more-menu button .icon { color: var(--ink-2); }
+.more-menu button.danger { color: #c4483e; }
+.more-menu button.danger .icon { color: #c4483e; }
+.more-menu button.danger:hover { background: #fdecec; }
+.proj-archived-banner { align-items: center; }
+.proj-archived-banner .btn { flex: 0 0 auto; }
+
+/* read-only text (archived project) */
+.notes-ro { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 0; }
+.task-title-ro { display: block; border-color: transparent !important; overflow-wrap: anywhere; }
+.task-notes-ro { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 0; background: #fff; }
+.info-ro { display: block; min-height: 32px; overflow-wrap: anywhere; }
+
+/* ---------- task table ---------- */
+.board-empty { padding: 28px !important; text-align: center; color: var(--muted); }
+.row-open {
+  flex: 0 0 auto; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px;
+  color: var(--muted); opacity: 0; text-decoration: none;
+}
+tbody tr:hover .row-open, .row-open:focus-visible { opacity: 1; }
+.row-open:hover { background: #ececec; color: var(--ink); }
+/* The open chevron overlays the end of the title instead of taking a slot in the row, so titles keep their
+   width on small desktop windows. It only takes clicks while it shows (row hover, keyboard focus, touch
+   screens), and the title leaves room for it then. */
+.board-desktop .title-cell, .board-desktop .subtask-title-cell { position: relative; }
+.board-desktop .row-open { position: absolute; right: 4px; top: 5px; pointer-events: none; }
+.board-desktop tbody tr:hover .row-open, .board-desktop .row-open:focus-visible { pointer-events: auto; }
+.board-desktop tbody tr:hover .title-main .task-title, .board-desktop .title-main .task-title-ro { padding-right: 32px; }
+/* the scroller is the containing block of everything in the table (the header's sr-only "Actions" label is
+   position: absolute), so nothing in it can widen the page */
+.board-desktop .board-scroll { position: relative; }
+/* a title never gets narrower than this; on a small window the board scrolls sideways inside its card instead */
+.board-desktop .title-main { min-width: 100px; }
+button.note-preview { text-align: left; font-family: inherit; }
+.title-cell .archived-title { flex: 1 1 auto; min-width: 0; }
+
+/* phone cards (hidden on desktop) */
+.task-cards { display: none; }
+
+/* toast ("Kyler Hugg was added to this project.") */
+.board-toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 26; max-width: min(92vw, 520px);
+  background: var(--ink); color: #fff; font-size: 13.5px; font-weight: 600; padding: 10px 16px; border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .22), inset 3px 0 0 var(--lime);
+}
+
+/* ---------- info rows ---------- */
+.info-label-cell { min-width: 0; }
+.info-conflicts { padding: 0 8px 4px; border-bottom: 1px solid var(--line); }
+
+/* ---------- meetings ---------- */
+.pm-error { margin: 6px 0; padding: 8px 11px; border-radius: 8px; background: #fdecec; color: #b42318; font-size: 13px; }
+
+/* ---------- members ---------- */
+.member-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.member-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.member-row:last-child { border-bottom: none; }
+.member-main { flex: 1 1 auto; min-width: 0; }
+.member-main .name-label { font-size: 14px; font-weight: 600; color: var(--text); }
+.member-you { margin-left: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); background: #ececec; border-radius: 999px; padding: 1px 7px; }
+.member-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.member-dept {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 999px; padding: 1px 8px;
+  color: var(--dc); background: #f3f3f4; border: 1px solid var(--line);
+}
+@supports (background: color-mix(in srgb, red 10%, #fff)) {
+  .member-dept { background: color-mix(in srgb, var(--dc) 12%, #fff); border-color: color-mix(in srgb, var(--dc) 35%, #fff); }
+}
+.member-remove { flex: 0 0 auto; }
+
+/* add-people dialog: the shared UserPicker (profile.css) with its result list shown in the dialog itself */
+.add-people-modal { max-width: 480px; }
+.add-people-modal .up-list { position: static; margin-top: 8px; box-shadow: none; max-height: 46vh; }
+.pick-warn { display: flex; align-items: flex-start; gap: 7px; margin: 10px 0 0; padding: 8px 11px; border-radius: 8px; background: #fffbe6; border: 1px solid #ffe58f; color: #7a5c00; font-size: 12.5px; line-height: 1.45; }
+.pick-warn .icon { margin-top: 2px; }
+
+/* ---------- task page ---------- */
+.task-detail { max-width: 780px; }
+.td-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.td-kind { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+.td-kind a { color: var(--ink-2); font-weight: 600; }
+.td-title {
+  display: block; width: 100%; margin: 0 0 6px -9px; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent;
+  font: inherit; font-size: 22px; font-weight: 700; color: var(--ink);
+}
+input.td-title { width: calc(100% + 9px); }
+input.td-title:hover { border-color: var(--line); background: #fff; }
+input.td-title:focus { outline: none; border-color: var(--lime); background: #fff; box-shadow: 0 0 0 3px rgba(203, 206, 0, .18); }
+.td-title-ro { margin-left: 0; padding-left: 0; overflow-wrap: anywhere; }
+.td-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin: 12px 0 16px; }
+.td-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.td-label { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.td-field .status-select { max-width: 220px; }
+.td-field .stoplight { justify-content: flex-start; min-height: 32px; }
+.td-field .date-input { max-width: 220px; }
+.td-field .owner-select { max-width: 100%; min-width: 0; }
+.td-notes { margin-bottom: 16px; }
+.td-notes-area { min-height: 120px; }
+.td-subtasks { border-top: 1px solid var(--line); padding-top: 12px; margin-bottom: 12px; }
+.td-sub-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.td-sub-head .sub-badge { margin-left: 6px; }
+.td-sub-list { list-style: none; margin: 0; padding: 0; }
+.td-sub { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.td-sub:last-child { border-bottom: none; }
+.td-sub-main { flex: 1 1 auto; min-width: 0; }
+.td-sub-title { font-size: 14px; font-weight: 600; }
+span.td-sub-title { display: block; padding: 7px 0; }
+.td-sub-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.td-sub-meta .status-select { width: auto; min-width: 130px; padding: 5px 8px; font-size: 12.5px; }
+.td-sub-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.td-sub-actions .row-x { opacity: 1; }
+.td-open { gap: 2px; }
+.td-add-sub { margin-top: 8px; }
+.td-foot { font-size: 12px; color: var(--muted); margin: 6px 0 12px; min-height: 1em; }
+.td-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; }
+.td-delete { color: #c4483e; }
+.td-delete:hover { background: #fdecec; }
+.td-archived { align-items: center; }
+
+/* ---------- loading skeleton ---------- */
+.sk { background: linear-gradient(90deg, #ececed 0%, #f6f6f7 50%, #ececed 100%); background-size: 200% 100%; border-radius: 6px; animation: sk-shine 1.2s linear infinite; }
+.sk-crumbs { width: 260px; height: 14px; margin-bottom: 14px; }
+.sk-title { width: min(360px, 70%); height: 28px; }
+.sk-progress { width: 180px; height: 8px; }
+.sk-notes { height: 70px; }
+.sk-row { padding: 14px; border-bottom: 1px solid var(--line); }
+.sk-row:last-child { border-bottom: none; }
+.sk-line { height: 16px; width: 70%; }
+@keyframes sk-shine { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; }
+  .subtask-toggle .icon, .archive-toggle .icon, .pm-toggle .icon { transition: none; }
+}
+
+/* touch screens: hover-only controls stay visible */
+@media (hover: none) {
+  .row-open { opacity: 1; }
+  .board-desktop .row-open { pointer-events: auto; }
+  .board-desktop .title-main .task-title { padding-right: 32px; }
+}
+
+/* ---------- phones (design §2.2): cards, 44 px targets, 16 px inputs (shell.css) ---------- */
+@media (max-width: 720px) {
+  .board-desktop { display: none; }
+  .task-cards { display: flex; flex-direction: column; gap: 8px; }
+  .archive-cards { margin-top: 8px; }
+  .task-card {
+    display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 10px 10px 10px 14px; text-decoration: none; color: var(--text);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  }
+  .task-card:active { background: #fafaf3; }
+  .task-card-archived { background: #fbfbfb; }
+  .tc-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .tc-title { font-size: 15px; font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+  .tc-title.muted { color: var(--muted); font-weight: 600; }
+  .tc-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; font-size: 12.5px; color: var(--ink-2); }
+  .tc-owner { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tc-due { font-variant-numeric: tabular-nums; }
+  .tc-note { display: inline-flex; color: var(--ink-2); }
+  .tc-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: 0 0 auto; }
+  .tc-sl { cursor: default; }
+  .tc-go { color: var(--muted); flex: 0 0 auto; }
+  .tc-empty { margin: 0; padding: 22px 12px; text-align: center; color: var(--muted); background: var(--panel); border: 1px dashed #d7d7d8; border-radius: 12px; }
+  .task-card-add { min-height: 48px; border: 1px dashed #cfd0a8; border-radius: 12px; background: #fafbf3; color: var(--ink); font-weight: 700; font-size: 15px; }
+
+  .project-board .proj-head { gap: 10px 12px; margin-bottom: 14px; }
+  .proj-title { flex: 1 1 100%; }
+  .proj-title-input, .proj-title-ro { font-size: 21px; }
+  .proj-title-input { width: calc(100% + 9px); min-width: 0; }
+  .proj-progress { flex: 1 1 auto; }
+  .proj-progress .progress { width: auto; flex: 1 1 auto; max-width: 220px; }
+  .team-select-wrap { flex: 1 1 100%; }
+  .team-select { flex: 1 1 auto; min-height: 44px; }
+  .members-link { min-height: 44px; }
+  .add-task-top { display: none; }               /* the cards have their own "+ Add task" */
+  .more-btn { min-width: 44px; min-height: 44px; }
+  .more-menu button { min-height: 44px; }
+
+  .archive-toggle { min-height: 44px; }
+  .info-panel .btn-sm, .pm-actions .btn, .pm-series-head .btn { min-height: 40px; }
+  .pm-edit-btn { min-height: 40px; padding: 6px 12px; }
+  .pm-toggle { min-height: 44px; }
+  .pm-series-head { flex-wrap: wrap; }
+  .pm-series-head .row-icon { opacity: 1; min-width: 40px; height: 40px; }
+  .pm-edit-actions { flex-wrap: wrap; }
+  .pm-edit-actions .btn { min-height: 44px; }
+
+  /* info rows: label on top, value below, delete at the right */
+  .info-row-head { display: none !important; }
+  .info-row { grid-template-columns: minmax(0, 1fr) 40px; grid-template-areas: "label del" "value value"; row-gap: 2px; padding: 8px; }
+  .info-label-cell { grid-area: label; }
+  .info-value-cell { grid-area: value; }
+  .info-del { grid-area: del; opacity: 1; min-width: 40px; min-height: 40px; }
+  .info-label-cell .info-input { font-weight: 700; }
+  .info-action { min-height: 36px; display: inline-flex; align-items: center; }
+
+  .member-row { padding: 10px; }
+  .member-remove { min-height: 40px; padding: 6px 12px; }
+
+  .board-toast { bottom: calc(58px + env(safe-area-inset-bottom) + 14px); }
+
+  /* the shell sets every phone input to 16 px; the two title inputs stay larger (still no iOS zoom) */
+  .project-board input.proj-title-input:not([type=checkbox]):not([type=radio]):not([type=color]) { font-size: 21px; }
+  .task-detail input.td-title:not([type=checkbox]):not([type=radio]):not([type=color]) { font-size: 20px; }
+  .td-card { padding: 14px 12px; }
+  .td-title { font-size: 20px; }
+  .td-fields { grid-template-columns: minmax(0, 1fr); }
+  .td-field .status-select, .td-field .date-input, .td-field .owner-select { max-width: none; width: 100%; min-height: 44px; }
+  .td-field .cell-owner { width: 100%; }
+  .td-field .sl-dot { width: 26px; height: 26px; position: relative; }
+  /* a 40x44 hit area per dot (design §2.2: 44 px targets); with the 14 px gap the areas meet but don't overlap */
+  .td-field .sl-dot::after { content: ''; position: absolute; inset: -9px -7px; }
+  .td-field .stoplight { gap: 14px; min-height: 44px; }
+  .td-sub-meta .status-select { min-height: 40px; font-size: 16px; }
+  /* a newly added subtask's title is focused (and scrolled to): keep it clear of the fixed bottom bar */
+  .td-sub-title { scroll-margin-bottom: calc(58px + env(safe-area-inset-bottom) + 12px); }
+  .td-open { min-height: 40px; }
+  .td-sub-actions .row-x { min-width: 40px; min-height: 40px; }
+  .td-actions .btn { min-height: 44px; }
+  .td-add-sub { min-height: 44px; }
+}

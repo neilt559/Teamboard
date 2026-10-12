@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation';
-import { requirePageViewer } from '@/lib/viewer';
+import { requirePageViewer, publicViewer } from '@/lib/viewer';
+import ForcedPassword from './ForcedPassword';
 
-// Placeholder from M0: the forced "Choose a new password" page (design §2.1) replaces it in M1 (I1).
-// Only for a session whose password was reset by an admin (must_change); it comes before the profile
-// wizard, so an incomplete profile is allowed here. Everyone else changes their password in Settings.
+// /password (design §2.1, §13 #3): the forced "Choose a new password" after an admin reset (must_change).
+// It comes before the profile wizard, so an incomplete profile is allowed here. Every API refuses this session
+// (403 must_change) until the password is changed, and every page sends it here. It can't be dismissed (rule
+// 48); signing out is the only other way off this page. Everyone else changes their password in Settings.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -14,13 +16,5 @@ export const metadata = { title: 'Choose a new password' };
 export default async function PasswordPage() {
   const viewer = await requirePageViewer({ allowMustChange: true, allowIncomplete: true });
   if (!viewer.must_change) redirect('/settings?tab=password');
-  return (
-    <div className="login-wrap">
-      <div className="login-card">
-        <div className="login-brand"><span className="dot" /> TeamBoard</div>
-        <h1 className="login-h">Choose a new password</h1>
-        <p className="login-sub">Coming soon: pick your own password to replace the temporary one.</p>
-      </div>
-    </div>
-  );
+  return <ForcedPassword viewer={publicViewer(viewer)} />;
 }

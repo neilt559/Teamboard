@@ -1,22 +1,12 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { handle } from '@/lib/http';
+import { createSeries } from '@/lib/queries/project';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-export async function POST(req) {
-  try {
-    await ensureSchema();
-    const { project_id, name } = await req.json();
-    if (!project_id) {
-      return NextResponse.json({ error: 'project_id required' }, { status: 400 });
-    }
-    const r = await sql`
-      INSERT INTO meeting_series (project_id, name, position)
-      VALUES (${project_id}, ${(name || 'Series').slice(0, 300)}, ${Date.now()})
-      RETURNING id, project_id, name, position`;
-    return NextResponse.json(r.rows[0]);
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// POST /api/meeting-series {project_id, name}: a new meeting series (blank name -> 'Series'). Anyone who can
+// see the project. Today's response shape: { id, project_id, name, position }.
+export const POST = handle(async ({ viewer, body }) => createSeries(viewer, await body()), { legacyWrite: true });

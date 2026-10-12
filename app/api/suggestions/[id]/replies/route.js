@@ -1,29 +1,32 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
-import { sessionUser, COOKIE } from '@/lib/auth';
+import { handle, str, bad, notFound, parseId } from '@/lib/http';
+import { query } from '@/lib/db';
+import { isAdmin } from '@/lib/policy';
+import { loadReply } from '@/lib/queries/suggestions';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-// Reply to a suggestion as the signed-in user. If you posted the suggestion
-// anonymously, your reply is anonymous too.
-export async function POST(req, { params }) {
-  try {
-    await ensureSchema();
-    const me = await sessionUser(req.cookies.get(COOKIE)?.value);
-    if (!me) return NextResponse.json({ error: 'Please sign in' }, { status: 401 });
-    const { id } = await params;
-    const body = String((await req.json()).body || '').trim().slice(0, 5000);
-    if (!body) return NextResponse.json({ error: 'Write something first.' }, { status: 400 });
-    const s = (await sql`SELECT user_id, anonymous FROM suggestions WHERE id = ${id}`).rows[0];
-    if (!s) return NextResponse.json({ error: 'That suggestion was deleted.' }, { status: 404 });
-    const anonymous = !!s.anonymous && String(s.user_id) === String(me.id);
-    const r = await sql`
-      INSERT INTO suggestion_replies (suggestion_id, user_id, body, anonymous)
-      VALUES (${id}, ${me.id}, ${body}, ${anonymous})
-      RETURNING id`;
-    return NextResponse.json(r.rows[0]);
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// Reply to a suggestion as the signed-in user (rule 23). Anyone can reply. If you posted the suggestion
+// anonymously, your reply is anonymous too (rule 28): the flag is still stored as today (old code reads it),
+// and every read computes it again from the suggestion (design §13 #13). One statement, so a suggestion
+// deleted or hidden meanwhile simply matches nothing.
+export const POST = handle(async ({ viewer, params, body }) => {
+  const id = parseId(params.id);
+  const text = str((await body()).body, 5000);
+  if (!text) throw bad('Write something first.');
+  const uid = String(viewer.id);
+  const r = await query(
+    `WITH s AS (SELECT id, user_id, anonymous FROM suggestions
+                WHERE id = $1::bigint AND (hidden_at IS NULL OR $4::boolean))
+     INSERT INTO suggestion_replies (suggestion_id, user_id, body, anonymous)
+     SELECT s.id, $2::bigint, $3::text, COALESCE(s.anonymous AND s.user_id = $2::bigint, false) FROM s
+     RETURNING id`,
+    [id, uid, text, isAdmin(viewer)]);
+  if (!r.rows.length) throw notFound('That suggestion was deleted.');
+  const rid = String(r.rows[0].id);
+  const row = await loadReply(viewer, rid);
+  return { ...(row || {}), id: rid };
+}, { legacyWrite: true });

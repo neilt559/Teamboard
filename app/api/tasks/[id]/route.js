@@ -1,57 +1,31 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { handle, parseId } from '@/lib/http';
+import { deleteWithSnapshot } from '@/lib/audit';
+import { patchTask } from '@/lib/queries/project';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-// Only the fields present in the body are updated, so the client can send
-// a single changed column (title / assignee_id / due_date / status).
-export async function PATCH(req, { params }) {
-  try {
-    await ensureSchema();
-    const { id } = await params;
-    const b = await req.json();
-    if ('title' in b) {
-      await sql`UPDATE tasks SET title=${(b.title ?? '').slice(0, 500)} WHERE id=${id}`;
-    }
-    if ('assignee_id' in b) {
-      await sql`UPDATE tasks SET assignee_id=${b.assignee_id || null} WHERE id=${id}`;
-    }
-    if ('due_date' in b) {
-      await sql`UPDATE tasks SET due_date=${b.due_date || null} WHERE id=${id}`;
-    }
-    if ('status' in b) {
-      await sql`UPDATE tasks SET status=${b.status || 'not_started'} WHERE id=${id}`;
-    }
-    // A top-level task set to Done always archives (subtasks stay put).
-    if (b.status === 'done') {
-      await sql`UPDATE tasks SET archived=true WHERE id=${id} AND parent_id IS NULL`;
-    }
-    if ('archived' in b) {
-      await sql`UPDATE tasks SET archived=${!!b.archived} WHERE id=${id}`;
-    }
-    if ('notes' in b) {
-      await sql`UPDATE tasks SET notes=${(b.notes ?? '').slice(0, 5000)} WHERE id=${id}`;
-    }
-    if ('stoplight' in b) {
-      await sql`UPDATE tasks SET stoplight=${b.stoplight || ''} WHERE id=${id}`;
-    }
-    const r = await sql`
-      SELECT id, project_id, parent_id, title, assignee_id, due_date, status, archived, notes, stoplight
-      FROM tasks WHERE id=${id}`;
-    return NextResponse.json(r.rows[0] || {});
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// PATCH /api/tasks/:id (design §7, §8.2): only the keys present are written, in one statement.
+// title / notes (+base), status (Done archives a top-level task), stoplight, due_date, assignee_id (auto
+// membership), archived. -> { ok, row, added_members: [{user_id, name}], added_member: count (§6) }; 409
+// conflict, 404 gone.
+export const PATCH = handle(async ({ viewer, params, body, now }) => {
+  const r = await patchTask({ viewer, id: params.id, body: await body(), now });
+  return { ok: true, ...r, added_member: (r.added_members || []).length };
+}, { legacyWrite: true });
 
-export async function DELETE(req, { params }) {
-  try {
-    await ensureSchema();
-    const { id } = await params;
-    await sql`DELETE FROM tasks WHERE id=${id}`;
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// DELETE /api/tasks/:id: the task and its subtasks (DB cascade), with a JSON snapshot of both in audit_log.
+// Already gone, or in a project the caller can't see: { ok } either way (design §4.6: a row you can't see answers
+// exactly like a missing one; §7.1: deleting a missing row is ok). The scoped statement never deletes a hidden row.
+export const DELETE = handle(async ({ viewer, params }) => {
+  const id = parseId(params.id);
+  await deleteWithSnapshot({
+    table: 'tasks', id, actorId: viewer.id, action: 'task.delete',
+    scopeSql: 'tb_can_see_project($1::bigint, project_id)', scopeParams: [String(viewer.id)],
+    children: { subtasks: { table: 'tasks', fk: 'parent_id' } }, bumpProjectRev: true,
+  });
+  return { ok: true };
+}, { legacyWrite: true });

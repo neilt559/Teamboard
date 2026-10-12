@@ -1,25 +1,16 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
-import { sessionUser, COOKIE } from '@/lib/auth';
+import { handle, HttpError } from '@/lib/http';
+import { adminClaimAllowed, claimAdmin } from '@/lib/queries/admin';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-// One-time setup: while NO admin exists, the signed-in user can become the
-// first admin. Done in a single guarded UPDATE so two people can't both win.
-// After that, only admins can make more admins (on the Accounts page).
-export async function POST(req) {
-  try {
-    await ensureSchema();
-    const me = await sessionUser(req.cookies.get(COOKIE)?.value);
-    if (!me) return NextResponse.json({ error: 'Please sign in' }, { status: 401 });
-    const r = await sql`
-      UPDATE users SET is_admin = true
-      WHERE id = ${me.id} AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin)
-      RETURNING id`;
-    if (!r.rows.length) return NextResponse.json({ error: 'An admin is already set up.' }, { status: 403 });
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// First-admin bootstrap (§13 #6). 404 unless TB_ALLOW_ADMIN_CLAIM=1 (never set on Vercel). One
+// advisory-locked transaction, so two people can't both become the first admin.
+export const POST = handle(async ({ viewer }) => {
+  if (!adminClaimAllowed()) throw new HttpError(404, 'Not found');
+  if (!(await claimAdmin(viewer.id))) throw new HttpError(403, 'An admin is already set up.');
+  return { ok: true };
+}, { allowIncomplete: true });

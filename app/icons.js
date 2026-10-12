@@ -67,3 +67,13 @@ export const IconTag = (p) => <Svg {...p}><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1
 export const IconFilter = (p) => <Svg {...p}><path d="M22 3H2l8 9.5V19l4 2v-8.5z" /></Svg>;
 // Expand/collapse caret for tree rows: points down; rotate it with CSS for "collapsed".
 export const IconCaret = (p) => <Svg {...p}><path d="M6 9l6 6 6-6" /></Svg>;
+export const IconEye = (p) => <Svg {...p}><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></Svg>;
+export const IconEyeOff = (p) => (
+  <Svg {...p}>
+    <path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.6 3.6" />
+    <path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    <path d="M3 3l18 18" />
+  </Svg>
+);
+export const IconX = (p) => <Svg {...p}><path d="M6 6l12 12M18 6L6 18" /></Svg>;

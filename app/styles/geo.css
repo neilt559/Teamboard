@@ -1,1 +1,16 @@
-/* geo styles (design §2.3, owned by the agent that builds this area). Imported from app/layout.js. */
+/* geo styles (design §2.3, owned by C1). Imported from app/layout.js.
+   The GeoGuessr page itself still uses its original rules in app/globals.css (the "GeoGuessr page" and
+   "5K Club counter" blocks, old css:431-548), untouched, so it looks exactly as before. They are not copied
+   here: duplicating them would change nothing. If integration moves them out of globals.css, move them here
+   verbatim. */
+
+/* Home widget 'geo' (app/(app)/_widgets/GeoWidget.js): a .home-card link with one line per playing office. */
+.geo-widget { text-decoration: none; align-items: flex-start; min-height: 44px; }
+.geo-widget .home-card-icon { margin-top: 2px; }
+.geo-widget-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+/* Name and stats share a line when they fit; otherwise the stats wrap under the name (never truncate the name). */
+.geo-widget-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; font-size: 12.5px; min-width: 0; }
+.geo-widget-office { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.geo-widget-meta { color: var(--muted); white-space: nowrap; margin-left: auto; }
+.geo-widget-go { flex: 0 0 auto; align-self: center; color: var(--muted); }
+.geo-widget:hover .geo-widget-go { color: var(--lime-dark); }

@@ -1,22 +1,16 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { handle } from '@/lib/http';
+import { createTask } from '@/lib/queries/project';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-export async function POST(req) {
-  try {
-    await ensureSchema();
-    const { project_id, parent_id, title, assignee_id } = await req.json();
-    if (!project_id) {
-      return NextResponse.json({ error: 'project_id required' }, { status: 400 });
-    }
-    const r = await sql`
-      INSERT INTO tasks (project_id, parent_id, title, assignee_id, position)
-      VALUES (${project_id}, ${parent_id || null}, ${(title || '').slice(0, 500)}, ${assignee_id || null}, ${Date.now()})
-      RETURNING id, project_id, parent_id, title, assignee_id, due_date, status, archived, notes, stoplight`;
-    return NextResponse.json(r.rows[0]);
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// POST /api/tasks {project_id, parent_id?, title?, assignee_id?} (design §8.2). Anyone who can see the project.
+// parent_id must be a top-level task in the same project. Assigning a name linked to an account makes that
+// account a member (§6). Response: today's task row (old tabs read its id) plus added_members.
+export const POST = handle(async ({ viewer, body }) => {
+  const { row, added_members } = await createTask(viewer, await body());
+  return { ...row, added_members };
+}, { legacyWrite: true });

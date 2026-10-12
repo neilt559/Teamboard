@@ -1,23 +1,26 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { handle, bad, parseId, str } from '@/lib/http';
+import { query } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-export async function POST(req) {
-  try {
-    await ensureSchema();
-    const { office_id, score, score_date } = await req.json();
-    if (!office_id) {
-      return NextResponse.json({ error: 'office_id required' }, { status: 400 });
-    }
-    const n = Math.round(Number(score) || 0);
-    const r = await sql`
-      INSERT INTO geo_scores (office_id, score, score_date)
-      VALUES (${office_id}, ${n}, ${score_date || null})
-      RETURNING id, office_id, score, score_date`;
-    return NextResponse.json(r.rows[0]);
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// Add a GeoGuessr score (design §8.2, §10(d)): today's rules, unchanged. Anyone signed in, for any office;
+// scores belong to the office (no user), duplicates per day are fine, there is no range check, and an empty
+// date is stored as NULL. Body { office_id, score, score_date }; answers the inserted row as before.
+export const POST = handle(async ({ body }) => {
+  const { office_id, score, score_date } = await body();
+  if (!office_id) throw bad('office_id required');
+  const officeId = parseId(office_id);
+  const n = Math.round(Number(score) || 0);
+  // Stored as sent (TEXT, untrimmed, as before); capped only so a runaway value can't bloat the table.
+  const date = score_date ? str(score_date, 100, { trim: false }) : '';
+  const r = await query(
+    `INSERT INTO geo_scores (office_id, score, score_date)
+     VALUES ($1::bigint, $2::int, $3::text)
+     RETURNING id, office_id, score, score_date`,
+    [officeId, n, date || null]);
+  return r.rows[0];
+}, { legacyWrite: true });

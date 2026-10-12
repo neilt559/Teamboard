@@ -1,0 +1,29 @@
+/* Suggestions additions (C3). The ported .sg-* look lives in app/globals.css (inventory §1.15, css:824-890). */
+
+/* status shown read-only once only organizers and admins may change it */
+.sg-status-ro { cursor: default; display: inline-block; }
+
+/* admin moderation: a hidden suggestion or reply stays visible to admins, dimmed */
+.sg-card.sg-hidden { opacity: .62; border-style: dashed; }
+.sg-reply.sg-hidden { opacity: .55; }
+.sg-reply-head .name-label { font-weight: 700; }
+.sg-author .name-label a { font-weight: 600; }
+
+/* page-level error banner (the old page's red banner) */
+.sg-banner { max-width: 900px; }
+.sg-banner .spacer { flex: 1 1 auto; }
+
+/* phones: 44 px tap targets (design §2.2) */
+@media (max-width: 720px) {
+  .sg-card { gap: 10px; padding: 12px; }
+  .sg-icon-btn { min-width: 44px; min-height: 44px; }
+  .sg-reply-toggle { min-height: 44px; padding: 6px 12px; }
+  select.sg-status { min-height: 44px; padding: 4px 12px; }
+  .sg-filter .sg-chip, .sg-form .sg-chip { min-height: 44px; }
+  .sg-search { max-width: none; flex-basis: 100%; }
+  .sg-search input { padding: 10px 0; }
+  .sg-select { min-height: 44px; flex: 1 1 0; }
+  .sg-reply-compose { flex-wrap: wrap; }
+  .sg-reply-compose .btn { min-height: 44px; }
+  .sg-form .modal-actions .btn { min-height: 44px; }
+}

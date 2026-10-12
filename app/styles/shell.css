@@ -6,24 +6,52 @@
 .skip-link:focus { top: 8px; }
 .main:focus { outline: none; }
 .muted { color: var(--muted); }
+/* visually hidden, still read by screen readers (table headers, field labels) */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 /* links that look like the old buttons */
 a.btn { text-decoration: none; display: inline-flex; align-items: center; }
-.btn:disabled { opacity: .55; cursor: default; }
+/* GeoGuessr (.geo-route, app/(app)/culture/geoguessr/page.js) keeps exactly its old look (requirements #7,
+   design §10(d)), so the shell's global form and button rules below skip it. */
+.btn:disabled:not(.geo-route *) { opacity: .55; cursor: default; }
 
 /* ---------- header ---------- */
 .shell-header { gap: 12px; }
 .shell-header .header-tabs { flex: 1 1 auto; margin-left: 4px; }
 .brand-home { text-decoration: none; }
-/* Eight tabs: make room on mid-size screens first by dropping the subtitle, then the tab icons, then the
-   name on the user chip; below that the tab row scrolls sideways (as the old header did). */
-@media (max-width: 1440px) { .shell-header .brand small { display: none; } }
+/* Eight tabs. Desktop (>= 981 px): the tabs keep their full width and the user chip gives way instead (its name
+   and department tag truncate, the tag goes first), so every tab, People included, stays visible at laptop
+   widths. Room is made by dropping the subtitle, then the department tag, then the tab icons. 721-980 px: the
+   chip is just the photo and the tab row scrolls sideways, with a fade on the side that has more tabs
+   (Header.js sets data-more) and the mouse wheel scrolling it. */
+@media (max-width: 1680px) { .shell-header .brand small { display: none; } }
+@media (max-width: 1500px) { .user-chip .dept-chip { display: none; } }
 @media (max-width: 1240px) {
   .shell-header .header-tabs { gap: 6px; }
   .shell-header .header-tabs .btn { padding: 8px 11px; }
 }
 @media (max-width: 1120px) { .shell-header .header-tabs .btn > .icon { display: none; } }
 @media (max-width: 980px) { .user-chip-name, .user-chip .dept-chip { display: none; } }
+@media (min-width: 981px) {
+  .shell-header .header-tabs { flex: 0 0 auto; }
+  .shell-header .user-menu-wrap { flex: 0 1 auto; min-width: 0; margin-left: auto; }
+  .user-menu-wrap .user-chip { max-width: 100%; min-width: 0; overflow: hidden; }
+  .user-chip .hs, .user-chip .user-chip-caret, .user-chip .user-chip-badge { flex: 0 0 auto; }
+  .user-chip-name { min-width: 0; flex: 0 1 auto; }
+  .user-chip .dept-chip { min-width: 0; flex: 0 1 auto; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.shell-header .header-tabs[data-more='right'] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+.shell-header .header-tabs[data-more='left'] {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+}
+.shell-header .header-tabs[data-more='both'] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
 .tab-badge {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px;
   border-radius: 999px; background: var(--lime); color: var(--on-lime); font-size: 11px; font-weight: 800; line-height: 1;
@@ -169,8 +197,11 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   .bn-icon .tab-badge { position: absolute; top: -6px; right: -12px; height: 16px; min-width: 16px; font-size: 10px; }
   .bn-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* inputs at 16 px so iOS doesn't zoom in on focus */
-  .app-shell input:not([type=checkbox]):not([type=radio]):not([type=color]), .app-shell select, .app-shell textarea { font-size: 16px; }
+  /* inputs at 16 px so iOS doesn't zoom in on focus (not GeoGuessr, which keeps its own sizes: see .btn:disabled) */
+  .app-shell input:not([type=checkbox]):not([type=radio]):not([type=color]):not(.geo-route *),
+  .app-shell select:not(.geo-route *), .app-shell textarea:not(.geo-route *) { font-size: 16px; }
+  /* every button in the page is at least a 44 px tap target (design §2.2); GeoGuessr keeps its own look */
+  .app-shell .main .btn:not(.geo-route *) { min-height: 44px; }
 }
 
 /* touch screens: controls that used to appear on hover are always visible */

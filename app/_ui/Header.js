@@ -8,6 +8,7 @@ import {
 } from '../icons';
 import { Headshot } from './Headshot';
 import { logout } from './api';
+import { openAdminEntrance } from './ClaimAdmin';
 
 // The sticky 56 px header (design §2.2). Desktop: brand, tabs, user menu. Phone (<= 720 px): hamburger,
 // brand, avatar; the tabs move to the bottom bar and the drawer.
@@ -71,7 +72,7 @@ function UserMenu({ viewer, nav, pathname }) {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        title={`Signed in as ${viewer.username}`}
+        title={`Signed in as ${viewer.name || viewer.username} (@${viewer.username})${dept ? ` · ${dept}` : ''}`}
       >
         <Headshot user={me} size={22} />
         <span className="user-chip-name">{viewer.name}</span>
@@ -106,13 +107,15 @@ export default function Header({ viewer, nav, pathname, drawerOpen, onMenu }) {
   const isAdmin = !!viewer?.is_admin;
 
   // Hidden Admin entrance (rule 43): five clicks on the brand within 2 s, or opening any page with #accounts.
-  // Admins land on /admin; for everyone else it does nothing visible (the brand still goes Home).
+  // Admins land on /admin. Everyone else goes through openAdminEntrance() (ClaimAdmin.js, mounted by AppShell):
+  // it offers the one-time first-admin claim only when /api/admin/status says canClaim, and otherwise does
+  // nothing visible (the brand still goes Home).
   const onLogo = (e) => {
     const now = Date.now();
     clicks.current = [...clicks.current.filter((t) => now - t < 2000), now];
     if (clicks.current.length >= 5) {
       clicks.current = [];
-      if (isAdmin) { e.preventDefault(); router.push('/admin'); }
+      if (isAdmin) { e.preventDefault(); router.push('/admin'); } else openAdminEntrance();
     }
   };
   useEffect(() => {
@@ -120,11 +123,48 @@ export default function Header({ viewer, nav, pathname, drawerOpen, onMenu }) {
       if (window.location.hash !== '#accounts') return;
       window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
       if (isAdmin) router.push('/admin');
+      // Deferred: on a page opened with #accounts this effect runs before AppShell's ClaimAdminHost (a later
+      // sibling) has attached its listener.
+      else setTimeout(openAdminEntrance, 0);
     };
     check();
     window.addEventListener('hashchange', check);
     return () => window.removeEventListener('hashchange', check);
   }, [isAdmin, router]);
+
+  // When the tab row is wider than its space (721-980 px; app/styles/shell.css), it scrolls sideways: fade the
+  // side that has more tabs (data-more) and let a plain mouse wheel scroll it, so the hidden tabs are findable.
+  const tabsRef = useRef(null);
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return undefined;
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      const left = max > 1 && el.scrollLeft > 1;
+      const right = max > 1 && el.scrollLeft < max - 1;
+      const v = left && right ? 'both' : left ? 'left' : right ? 'right' : '';
+      if ((el.dataset.more || '') !== v) {
+        if (v) el.dataset.more = v; else delete el.dataset.more;
+      }
+    };
+    const wheel = (e) => {
+      if (el.scrollWidth - el.clientWidth <= 1 || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    update();
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    el.addEventListener('scroll', update, { passive: true });
+    el.addEventListener('wheel', wheel, { passive: false });
+    window.addEventListener('resize', update);
+    return () => {
+      ro?.disconnect();
+      el.removeEventListener('scroll', update);
+      el.removeEventListener('wheel', wheel);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
 
   const unread = unreadCount(nav);
   return (
@@ -144,7 +184,7 @@ export default function Header({ viewer, nav, pathname, drawerOpen, onMenu }) {
           <span className="dot" /> TeamBoard <small>shared project board</small>
         </Link>
       </div>
-      <nav className="header-actions header-tabs" aria-label="Main">
+      <nav className="header-actions header-tabs" aria-label="Main" ref={tabsRef}>
         {TABS.map(({ key, href, label, Icon }) => (
           <Link
             key={key}

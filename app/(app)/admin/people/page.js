@@ -1,8 +1,11 @@
-import { requirePageViewer } from '@/lib/viewer';
 import { notFound } from 'next/navigation';
-import { IconUsers } from '@/app/icons';
+import { requirePageViewer, tagUpdating } from '@/lib/viewer';
+import { listPeopleAdmin, loadApprovalCounts } from '@/lib/queries/admin';
+import AdminNav from '../_parts/AdminNav';
+import PeopleAdmin from './PeopleAdmin';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M1 (I2) (design §2.1, §15).
+// /admin/people (design §2.1): the admin side of "Names on tasks": link and unlink accounts, person or group,
+// archive linked names, restore archived ones. Adding, renaming and recoloring live on /people/names.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -13,15 +16,17 @@ export const metadata = { title: 'Names on tasks (admin)' };
 export default async function AdminPeoplePage() {
   const viewer = await requirePageViewer();
   if (!viewer.is_admin) notFound();
+  let data;
+  let counts;
+  try {
+    [data, counts] = await Promise.all([listPeopleAdmin(), loadApprovalCounts()]);
+  } catch (e) {
+    throw tagUpdating(e);
+  }
   return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconUsers size={24} /> Names on tasks (admin)</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>Link names on tasks to accounts, change kinds, restore archived names.</p>
-      </div>
+    <div className="admin-page">
+      <AdminNav active="people" pending={counts.total} />
+      <PeopleAdmin initial={data} />
     </div>
   );
 }

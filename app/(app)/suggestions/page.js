@@ -1,7 +1,9 @@
-import { requirePageViewer } from '@/lib/viewer';
-import { IconBulb } from '@/app/icons';
+import { requirePageViewer, tagUpdating } from '@/lib/viewer';
+import { loadSuggestions } from '@/lib/queries/suggestions';
+import SuggestionsClient from './SuggestionsClient';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M2 (C3) (design §2.1, §15).
+// /suggestions: the company-wide suggestion box (design §2.1; inventory §1.15). Everything the page shows is
+// masked on the server (lib/queries/suggestions.js): anonymous authors never reach the browser.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -11,15 +13,11 @@ export const metadata = { title: 'Suggestions' };
 
 export default async function SuggestionsPage() {
   const viewer = await requirePageViewer();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconBulb size={24} /> Suggestions</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>Ideas to make work better, with +1s and replies.</p>
-      </div>
-    </div>
-  );
+  let data;
+  try {
+    data = await loadSuggestions(viewer);
+  } catch (e) {
+    throw tagUpdating(e);
+  }
+  return <SuggestionsClient initial={data} tz={viewer.tz} />;
 }

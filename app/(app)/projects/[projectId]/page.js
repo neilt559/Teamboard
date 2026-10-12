@@ -1,27 +1,32 @@
-import { requirePageViewer } from '@/lib/viewer';
 import { notFound } from 'next/navigation';
-import { IconFile } from '@/app/icons';
+import { requirePageViewer } from '@/lib/viewer';
+import { loadProjectPage } from '@/lib/queries/project';
+import ProjectBoard from './ProjectBoard';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M2 (B2) (design §2.1, §15).
+// /projects/[projectId] (design §2.1): the project board for anyone who can see the project (tb_can_see_project:
+// a member, an L2 in the project's office, PMs and up, admins). Anything else is the same 404 as a project that
+// doesn't exist. An archived project renders read-only with Restore for people who may manage it.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const maxDuration = 60;
 
-export const metadata = { title: 'Project' };
+const ID = /^[0-9]{1,18}$/;
+
+// No loading.js for this segment on purpose: in Next 14.2 a loading boundary starts streaming with HTTP 200
+// before the page runs, so a hidden or missing project would answer 200 instead of 404 (§14.2). The loader
+// is cached per request, so the page reuses this read.
+export async function generateMetadata({ params }) {
+  const viewer = await requirePageViewer();
+  const data = ID.test(String(params.projectId)) ? await loadProjectPage(viewer, String(params.projectId)) : null;
+  if (!data) notFound();
+  return { title: data.project.name };
+}
 
 export default async function ProjectPage({ params }) {
   const viewer = await requirePageViewer();
-  if (!/^[0-9]{1,18}$/.test(String(params.projectId))) notFound();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconFile size={24} /> Project</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>The project board: tasks, notes, meetings, info and members.</p>
-      </div>
-    </div>
-  );
+  if (!ID.test(String(params.projectId))) notFound();
+  const data = await loadProjectPage(viewer, String(params.projectId));
+  if (!data) notFound();
+  return <ProjectBoard key={data.project.id} initial={data} />;
 }

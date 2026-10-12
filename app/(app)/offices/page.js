@@ -1,7 +1,12 @@
-import { requirePageViewer } from '@/lib/viewer';
-import { IconBuilding } from '@/app/icons';
+import { requirePageViewer, publicViewer, tagUpdating } from '@/lib/viewer';
+import { listOffices } from '@/lib/queries/offices';
+import { nowFromRequestContext } from '@/lib/clock';
+import OfficesIndex from './OfficesIndex';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M2 (B1) (design §2.1, §15).
+// All offices (design §2.1): every active office as a card with people count, local time, team names and
+// "your projects here: N" (visible projects only), "Your office" / "Following" badges and a follow toggle.
+// Office information is company-public; the counts are filtered per viewer. Replaces the old Home office grid
+// (HomeView + workCounts, inventory §1.10); Home itself is the dashboard now.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -11,15 +16,11 @@ export const metadata = { title: 'Offices' };
 
 export default async function OfficesPage() {
   const viewer = await requirePageViewer();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconBuilding size={24} /> Offices</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>All offices: people, local time, teams and your projects in each.</p>
-      </div>
-    </div>
-  );
+  let data;
+  try {
+    data = await listOffices(viewer);
+  } catch (e) {
+    throw tagUpdating(e);
+  }
+  return <OfficesIndex viewer={publicViewer(viewer)} data={data} now={nowFromRequestContext()} />;
 }

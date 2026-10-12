@@ -1,40 +1,40 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { handle, parseId } from '@/lib/http';
+import { guardedPatch } from '@/lib/patch';
+import { deleteWithSnapshot } from '@/lib/audit';
+import { MEETING_NORM } from '@/lib/queries/project';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-export async function PATCH(req, { params }) {
-  try {
-    await ensureSchema();
-    const { id } = await params;
-    const b = await req.json();
-    if ('title' in b) {
-      await sql`UPDATE project_meetings SET title=${(b.title || 'Meeting').slice(0, 300)} WHERE id=${id}`;
-    }
-    if ('meeting_date' in b) {
-      await sql`UPDATE project_meetings SET meeting_date=${b.meeting_date || null} WHERE id=${id}`;
-    }
-    if ('attendance' in b) {
-      await sql`UPDATE project_meetings SET attendance=${(b.attendance ?? '').slice(0, 4000)} WHERE id=${id}`;
-    }
-    if ('notes' in b) {
-      await sql`UPDATE project_meetings SET notes=${(b.notes ?? '').slice(0, 100000)} WHERE id=${id}`;
-    }
-    const r = await sql`SELECT id, project_id, series_id, title, meeting_date, attendance, notes, position FROM project_meetings WHERE id=${id}`;
-    return NextResponse.json(r.rows[0] || {});
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+const SCOPE = 'tb_can_see_project($1::bigint, project_id)';
+// Attendance is coerced with String() (a non-string no longer gives a 500). A meeting can't change series
+// or project.
+const COLUMNS = {
+  title: { type: 'text', text: true, norm: MEETING_NORM.title },
+  attendance: { type: 'text', text: true, norm: MEETING_NORM.attendance },
+  notes: { type: 'text', text: true, norm: MEETING_NORM.notes },
+  meeting_date: { type: 'text', norm: MEETING_NORM.meeting_date },
+};
 
-export async function DELETE(req, { params }) {
-  try {
-    await ensureSchema();
-    const { id } = await params;
-    await sql`DELETE FROM project_meetings WHERE id=${id}`;
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// PATCH /api/project-meetings/:id: the editor sends only the fields that changed, each text field with the
+// value it opened with (base). -> { ok, row }; 409 lists the fields someone else changed.
+export const PATCH = handle(async ({ viewer, params, body, now }) => {
+  const { row } = await guardedPatch({
+    table: 'project_meetings', id: parseId(params.id), body: await body(), columns: COLUMNS, actorId: viewer.id,
+    scopeSql: SCOPE, scopeParams: [String(viewer.id)], bumpProjectRev: true, now,
+  });
+  return { ok: true, row };
+}, { legacyWrite: true });
+
+// DELETE /api/project-meetings/:id: confirmed in the UI; snapshot in audit_log.
+// Missing or not visible: { ok } either way (no existence leak, design §4.6 / §7.1).
+export const DELETE = handle(async ({ viewer, params }) => {
+  await deleteWithSnapshot({
+    table: 'project_meetings', id: parseId(params.id), actorId: viewer.id, action: 'project_meeting.delete',
+    scopeSql: SCOPE, scopeParams: [String(viewer.id)], bumpProjectRev: true,
+  });
+  return { ok: true };
+}, { legacyWrite: true });

@@ -8,6 +8,7 @@ import Sidebar from './Sidebar';
 import Drawer from './Drawer';
 import BottomNav from './BottomNav';
 import { onApiBanner } from './api';
+import { ClaimAdminHost } from './ClaimAdmin';
 
 // The signed-in frame around every page in app/(app) (design §2.2): header, desktop sidebar, phone drawer
 // and bottom bar, plus the banner api.js raises for 428 (reload) and 503 (updating).
@@ -68,6 +69,8 @@ export default function AppShell({ viewer, nav, children }) {
       </div>
       <Drawer open={drawerOpen} onClose={closeDrawer} viewer={viewer} nav={nav} pathname={pathname} />
       <BottomNav nav={nav} pathname={pathname} />
+      {/* The hidden Admin entrance's one-time first-admin claim (Header -> openAdminEntrance). */}
+      {!viewer?.is_admin && <ClaimAdminHost viewer={viewer} />}
     </div>
   );
 }

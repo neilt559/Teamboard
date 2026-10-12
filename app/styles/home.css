@@ -1,1 +1,208 @@
-/* home styles (design §2.3, owned by the agent that builds this area). Imported from app/layout.js. */
+/* Home dashboard, Offices, Office and Team pages (design §2.1-§2.3, §11; agent B1). Imported from app/layout.js.
+   Builds on the existing classes in globals.css (.home-grid, .home-card, .office-section, .meeting, .overview-*,
+   .ov-*, .acct-tag, .modal). Phone (<= 720 px): cards stack, tap targets are at least 44 px. */
+
+/* ---------- small shared pieces ---------- */
+.ofc-badge {
+  display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+}
+.ofc-badge-mine { background: #f6f7e4; color: #7d7f00; border: 1px solid #d6d7a0; }
+.ofc-badge-follow { background: #ececec; color: var(--ink-2); }
+.ofc-badge-pending { background: #fff4e0; color: #b45309; }
+.dash-link-btn { border: none; background: none; padding: 0; color: var(--ink); font-weight: 600; text-decoration: underline; font-size: inherit; }
+.ofc-danger { color: #c4483e; }
+.ofc-danger:hover { background: #fdecec; }
+.office-block { margin-bottom: 16px; }
+.ofc-dialog-err { margin: 10px 0 0; background: #fff4f4; border: 1px solid #ffd0d0; color: #a12222; padding: 8px 10px; border-radius: 8px; font-size: 13px; }
+
+/* "more actions" menu (app/(app)/offices/_ui/MoreMenu.js) */
+.ofc-more { position: relative; display: inline-flex; flex: 0 0 auto; }
+.ofc-more-btn {
+  display: inline-grid; place-items: center; width: 30px; height: 30px; border: none; border-radius: 7px;
+  background: none; color: var(--muted); position: relative; z-index: 1;
+}
+.ofc-more-btn:hover, .ofc-more-btn[aria-expanded='true'] { background: #ececec; color: var(--ink); }
+.ofc-more-pop {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 170px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .16); padding: 5px;
+}
+.ofc-more-pop button {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: none; border-radius: 7px;
+  background: none; color: var(--text); font-size: 13px; font-weight: 600; text-align: left; white-space: nowrap;
+}
+.ofc-more-pop button:hover, .ofc-more-pop button:focus-visible { background: #f3f4ec; outline: none; }
+.ofc-more-pop button.danger { color: #c4483e; }
+.ofc-more-pop button.danger:hover { background: #fdecec; }
+.ofc-more-pop button:disabled { opacity: .5; cursor: default; }
+.ofc-more-pop .icon { color: inherit; }
+
+/* ---------- /offices and office / team cards ---------- */
+.ofc-office-card, .ofc-team-card { position: relative; cursor: pointer; }
+.ofc-office-card.is-mine { border-color: #d6d7a0; }
+/* The name is the link; it stretches over the whole card, and the buttons sit above it. */
+.ofc-office-link, .ofc-card-link { color: var(--ink); text-decoration: none; }
+.ofc-office-link::after, .ofc-card-link::after { content: ''; position: absolute; inset: 0; border-radius: 12px; }
+.ofc-office-link:focus-visible, .ofc-card-link:focus-visible { outline: none; }
+.ofc-office-link:focus-visible::after, .ofc-card-link:focus-visible::after { box-shadow: 0 0 0 3px rgba(203, 206, 0, .45); }
+.ofc-office-top { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.ofc-office-side, .ofc-card-side { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 8px; align-self: stretch; color: var(--muted); }
+.ofc-card-side { flex-direction: row; align-items: center; align-self: center; }
+.ofc-office-side .icon:last-child { margin-top: auto; }
+.ofc-yours b { color: var(--ink); }
+.ofc-follow {
+  position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--line); background: #fff; color: var(--ink-2); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700;
+}
+.ofc-follow:hover { border-color: var(--lime-dark); color: var(--ink); }
+.ofc-follow .icon { color: #c4c4c4; }
+.ofc-follow.on { background: #f6f7e4; border-color: #d6d7a0; color: #7d7f00; }
+.ofc-follow.on .icon { color: var(--lime-dark); }
+.local-time { font-variant-numeric: tabular-nums; }
+
+/* ---------- office page ---------- */
+.office-locked { display: flex; align-items: flex-start; gap: 12px; color: var(--ink-2); max-width: 900px; }
+.office-locked .icon { color: var(--muted); margin-top: 2px; }
+.office-locked b { color: var(--ink); }
+.office-locked p { margin: 3px 0 0; font-size: 13px; color: var(--muted); }
+.ofc-archived-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ofc-archived-item { display: flex; align-items: center; gap: 8px; padding: 4px 8px; color: var(--ink-2); }
+.ofc-archived-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; font-weight: 600; }
+.archived-section .archived-toggle .icon { transition: transform .15s; }
+.archived-section .archived-toggle .icon.caret-collapsed { transform: rotate(-90deg); }
+
+/* people (office and team pages) */
+.ofc-people { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.ofc-person { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; min-width: 0; }
+.ofc-person-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ofc-person-main .name-label { font-size: 14px; color: var(--ink); }
+.ofc-person-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 12px; color: var(--muted); }
+
+/* office meetings */
+.meeting-caret { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; flex: 0 0 auto; }
+.meeting-caret:hover { background: #ececec; color: var(--ink); }
+.meeting-caret .icon { transition: transform .15s; }
+.meeting-caret .icon.caret-collapsed { transform: rotate(-90deg); }
+.meeting .conflict { margin: 0 10px 10px; }
+
+/* ---------- team overview ---------- */
+.team-head-row { row-gap: 10px; }
+.team-office-link { color: var(--ink); font-weight: 600; }
+.overview-card .count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ov-head-side { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+a.overview-open, a.overview-open-link { text-decoration: none; }
+a.overview-open { min-width: 0; overflow-wrap: anywhere; }
+button.ov-task-row, button.ov-sub { width: 100%; border: none; background: none; font-family: inherit; text-align: left; color: inherit; }
+button.ov-task-row { font-size: 13px; }
+button.ov-sub { padding: 2px 4px 2px 20px; }
+.ov-sub-done .ov-sub-text { color: var(--muted); text-decoration: line-through; text-decoration-color: #c9c9c9; }
+.ov-done-chip { flex: 0 0 auto; gap: 3px; font-size: 11px; font-weight: 700; color: #029457; }
+a.ov-menu-btn { text-decoration: none; display: inline-flex; align-items: center; }
+.overview-card .conflict { margin-top: 6px; }
+.atm-project { margin: -8px 0 4px; font-size: 13px; color: var(--muted); }
+.atm-manage { display: inline-block; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.atm-manage:hover { color: var(--ink); }
+.team-members { margin-top: 18px; }
+
+/* ---------- Home dashboard ---------- */
+.dash-head { margin-bottom: 12px; }
+.dash-hello { font-size: 14px; color: var(--muted); font-weight: 600; }
+.dash-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.dash-links .icon { color: var(--ink-2); }
+.dash-notice { align-items: center; }
+.dash-notice-ok { background: #eefaf2; border-color: #bfe6d2; color: #237a3b; }
+.dash-waiting {
+  display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 16px; padding: 10px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--ink-2);
+}
+.dash-waiting ul { margin: 0; padding: 0; list-style: none; flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; }
+.dash-waiting-link { font-weight: 600; color: var(--ink); }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 14px; align-items: start; }
+
+.widget { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.widget-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.widget-title { margin: 0; font-size: 15px; color: var(--ink); }
+.widget-title .tab-badge { margin-left: 4px; }
+.widget-more, .widget-foot { font-size: 12.5px; font-weight: 600; color: var(--ink-2); text-decoration: none; white-space: nowrap; }
+.widget-more:hover, .widget-foot:hover { color: var(--lime-dark); }
+.widget-foot { display: inline-block; margin-top: 8px; }
+.widget-empty { margin: 4px 0 2px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.widget-empty a { color: var(--ink); font-weight: 600; }
+.widget-err { margin: 4px 0 8px; font-size: 12.5px; color: #a12222; }
+.widget-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 12.5px; color: var(--muted); }
+.widget-list { list-style: none; margin: 0; padding: 0; }
+.widget-list > li { border-top: 1px dashed var(--line); }
+.widget-list > li:first-child { border-top: none; }
+.wl-item { display: flex; align-items: center; gap: 4px; }
+.wl-item .wl-row { flex: 1 1 auto; }
+.wl-row {
+  display: flex; align-items: center; gap: 10px; min-width: 0; padding: 7px 6px 7px 8px; border-radius: 8px;
+  color: var(--text); text-decoration: none; border-left: 3px solid var(--sl, transparent);
+}
+.wl-row:hover { background: #f8f9e8; }
+.wl-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.wl-name { font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-meta { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-status { font-weight: 600; }
+.wl-count { flex: 0 0 auto; font-size: 11px; color: var(--muted); background: #eee; border-radius: 10px; padding: 1px 7px; }
+.wl-when { flex: 0 0 auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.wl-action { flex: 0 0 auto; display: inline-grid; place-items: center; width: 30px; height: 30px; border: none; border-radius: 7px; background: none; color: var(--lime-dark); }
+.wl-action:hover { background: #ececec; color: var(--ink); }
+.due-chip { flex: 0 0 auto; display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: #f1f1f2; color: var(--ink-2); }
+.due-chip.overdue { background: #fdecef; color: #cf3350; }
+.due-chip.today { background: #f6f7e4; color: #7d7f00; }
+.due-chip.soon { background: #fff4e0; color: #b45309; }
+.widget-failed { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.widget-loading { min-height: 120px; background: linear-gradient(90deg, #fff 0%, #f6f6f7 50%, #fff 100%); background-size: 200% 100%; animation: widget-shimmer 1.2s linear infinite; }
+@keyframes widget-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+.whats-new { margin-bottom: 14px; border-left: 4px solid var(--lime); background: #fdfdf6; }
+.whats-new-list { margin: 0; padding: 0 0 0 4px; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 6px 22px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.whats-new-list li { position: relative; padding-left: 16px; }
+.whats-new-list li::before {
+  content: ''; position: absolute; left: 0; top: .5em; width: 8px; height: 7px; background: var(--lime-dark);
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+.whats-new-list b { color: var(--ink); }
+.whats-new-list a { color: var(--ink); font-weight: 600; }
+.whats-new-actions { margin-top: 12px; display: flex; justify-content: flex-end; }
+
+[data-density='compact'] .widget { padding: 10px 12px; }
+[data-density='compact'] .dash-grid { gap: 8px; }
+[data-density='compact'] .wl-row { padding-top: 4px; padding-bottom: 4px; }
+[data-density='compact'] .ofc-people { gap: 5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .widget-loading { animation: none; }
+  .meeting-caret .icon, .archived-section .archived-toggle .icon { transition: none; }
+}
+
+/* ---------- phones ---------- */
+@media (max-width: 720px) {
+  .dash-head .dash-links { width: 100%; }
+  .dash-links .btn { min-height: 40px; }
+  .ofc-more-btn, .wl-action { width: 44px; height: 44px; }
+  .meeting-caret { width: 40px; height: 40px; }
+  .meeting-head { flex-wrap: wrap; }
+  .meeting-head .meeting-title { flex: 1 1 calc(100% - 100px); }
+  .meeting-head .row-icon { min-width: 40px; height: 40px; }
+  .meeting-head .meeting-date { flex: 1 1 auto; min-height: 40px; }
+  .wl-row { min-height: 44px; }
+  .ofc-follow { min-height: 36px; padding: 6px 12px; }
+  .home-card { padding: 14px; }
+  .ofc-office-side { flex-direction: row; align-items: center; align-self: center; }
+  button.ov-task-row, button.ov-sub { min-height: 40px; }
+  .ov-menu-btn { min-height: 40px; padding: 8px 12px; }
+  .ov-add { min-height: 44px; }
+  .overview-open-link { padding: 10px 0; }
+  .team-select { min-height: 40px; }
+  .ofc-archived-item .btn { min-height: 36px; }
+  .ofc-people { grid-template-columns: 1fr; }
+  .atm-manage { padding: 8px 0; }
+}
+
+/* An open "more" menu must sit above the neighboring cards (a hovered card is transformed, which makes it
+   its own stacking context). */
+.home-card:focus-within, .home-card:has(.ofc-more-pop), .overview-card:has(.ofc-more-pop) { z-index: 5; }
+.overview-card { position: relative; }

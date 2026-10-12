@@ -1,7 +1,10 @@
-import { requirePageViewer } from '@/lib/viewer';
-import { IconList } from '@/app/icons';
+import { requirePageViewer, publicViewer, tagUpdating } from '@/lib/viewer';
+import { listVisibleOpenTasks } from '@/lib/queries/tasks';
+import GlobalTasks from './GlobalTasks';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M2 (B3) (design §2.1, §15).
+// All tasks (design §2.1, inventory §1.9): every open task on the projects the viewer can see, with today's
+// filters, sorting and inline edits. Archived teams and offices are left out, and so are subtasks whose
+// parent is archived (lib/queries/tasks.js).
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -11,15 +14,11 @@ export const metadata = { title: 'All tasks' };
 
 export default async function AllTasksPage() {
   const viewer = await requirePageViewer();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconList size={24} /> All tasks</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>Every open task on the projects you can see, with filters and sorting.</p>
-      </div>
-    </div>
-  );
+  let data;
+  try {
+    data = await listVisibleOpenTasks(viewer);
+  } catch (e) {
+    throw tagUpdating(e);
+  }
+  return <GlobalTasks data={data} viewer={publicViewer(viewer)} />;
 }

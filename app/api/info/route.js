@@ -1,22 +1,12 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { handle } from '@/lib/http';
+import { createInfo } from '@/lib/queries/project';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-export async function POST(req) {
-  try {
-    await ensureSchema();
-    const { project_id } = await req.json();
-    if (!project_id) {
-      return NextResponse.json({ error: 'project_id required' }, { status: 400 });
-    }
-    const r = await sql`
-      INSERT INTO project_info (project_id, position)
-      VALUES (${project_id}, ${Date.now()})
-      RETURNING id, project_id, label, value, position`;
-    return NextResponse.json(r.rows[0]);
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// POST /api/info {project_id}: a blank "Additional project info" row at the end (design §8.2). Anyone who can
+// see the project. Today's response shape: { id, project_id, label, value, position }.
+export const POST = handle(async ({ viewer, body }) => createInfo(viewer, await body()), { legacyWrite: true });

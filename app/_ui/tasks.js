@@ -56,8 +56,13 @@ export function Avatar({ person, xs = false }) {
 
 // Owner picker. The last option opens "Names on tasks" (/people/names), where anyone can add a name.
 // onManageNames defaults to a plain page load; pass () => router.push('/people/names') for a client navigation.
+// Group names (kind 'group': *Everyone, Team Beaver, ...) are listed under "Groups" after the people (§3.5);
+// a list without groups stays flat.
 const MANAGE = '__manage_names__';
 export function OwnerSelect({ value, people, onChange, onManageNames, className = 'owner-select', disabled, ...rest }) {
+  const all = people || [];
+  const groups = all.filter((p) => p.kind === 'group');
+  const persons = groups.length ? all.filter((p) => p.kind !== 'group') : all;
   return (
     <select
       {...rest}
@@ -75,7 +80,12 @@ export function OwnerSelect({ value, people, onChange, onManageNames, className 
       }}
     >
       <option value="">Unassigned</option>
-      {(people || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      {persons.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      {groups.length > 0 && (
+        <optgroup label="Groups">
+          {groups.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </optgroup>
+      )}
       <option value={MANAGE}>Manage names…</option>
     </select>
   );

@@ -1,19 +1,13 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
+import { handle } from '@/lib/http';
+import { createProject } from '@/lib/queries/project';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-export async function POST(req) {
-  try {
-    await ensureSchema();
-    const { name, team_id } = await req.json();
-    const r = await sql`
-      INSERT INTO projects (name, team_id, position)
-      VALUES (${(name || 'New Project').slice(0, 200)}, ${team_id || null}, ${Date.now()})
-      RETURNING id, team_id, name, notes`;
-    return NextResponse.json(r.rows[0]);
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-}
+// POST /api/projects {name, team_id}: create a project in a team (design §8.2). Anyone may create in their own
+// offices' teams, PMs and up anywhere (canCreateProjectIn); the creator becomes a member in the same statement.
+// Response keeps today's shape ({ id, team_id, name, notes, ... }), so tabs open across the deploy still work.
+export const POST = handle(async ({ viewer, body }) => createProject(viewer, await body()), { legacyWrite: true });

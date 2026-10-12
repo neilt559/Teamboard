@@ -1,7 +1,10 @@
-import { requirePageViewer } from '@/lib/viewer';
-import { IconGlobe } from '@/app/icons';
+import { requirePageViewer, tagUpdating } from '@/lib/viewer';
+import { loadGeo } from './geo-data';
+import GeoClient from './GeoClient';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M2 (C1) (design §2.1, §15).
+// /culture/geoguessr (design §2.1, §10(d)): GeoGuessr, unchanged. Every playing office (archived included)
+// for every signed-in viewer, whatever their office scope. The server render hands the client the same
+// offices + geo arrays the old page got from /api/state; GeoClient then polls GET /api/geo/state every 4 s.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -10,16 +13,14 @@ export const maxDuration = 60;
 export const metadata = { title: 'GeoGuessr' };
 
 export default async function GeoGuessrPage() {
-  const viewer = await requirePageViewer();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconGlobe size={24} /> GeoGuessr</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>GeoGuessr scores, charts and the 5K Club, exactly as before.</p>
-      </div>
-    </div>
-  );
+  await requirePageViewer();
+  let data;
+  try {
+    data = await loadGeo();
+  } catch (e) {
+    throw tagUpdating(e);
+  }
+  // .geo-route only scopes the shell's phone and disabled-button rules away from GeoGuessr (app/styles/shell.css),
+  // so it looks exactly as it did; GeoClient and geo-ui.js are unchanged.
+  return <div className="geo-route"><GeoClient initial={data} /></div>;
 }

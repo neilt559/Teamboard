@@ -1,70 +1,124 @@
-import { NextResponse } from 'next/server';
-import { sql, ensureSchema } from '@/lib/db';
-import { sessionUser, COOKIE } from '@/lib/auth';
+import { handle, HttpError, str, bad, forbidden, notFound, parseId } from '@/lib/http';
+import { guardedPatch, norm } from '@/lib/patch';
+import { deleteWithSnapshot } from '@/lib/audit';
+import { isAdmin } from '@/lib/policy';
 import { CATEGORIES, STATUSES } from '@/lib/suggestions';
+import { suggestionMeta, activeUserCount, canChangeStatus, loadSuggestion } from '@/lib/queries/suggestions';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-async function load(req, id) {
-  const me = await sessionUser(req.cookies.get(COOKIE)?.value);
-  const r = await sql`SELECT id, user_id FROM suggestions WHERE id = ${id}`;
-  return { me, s: r.rows[0] };
-}
+// Suggestion edits (design §8.2; inventory §1.15; rules 27-28; §13 #13).
+//   title, details, category, anonymous: the author only (403 for anyone else), now in ONE statement.
+//     title and details are base-compared (lib/patch.js): the edit form sends the values it opened with.
+//   status: anyone while there are fewer than 50 active users, then culture organizers and admins only;
+//     records status_changed_by / status_changed_at.
+//   hidden: admins only (moderation; hidden suggestions disappear for everyone else).
+// The response never carries the author's user_id (an anonymous post stays anonymous to everyone).
 
-// Anyone can move a suggestion's status along; only its author can change
-// the wording, category or anonymity.
-export async function PATCH(req, { params }) {
-  try {
-    await ensureSchema();
-    const { id } = await params;
-    const { me, s } = await load(req, id);
-    if (!me) return NextResponse.json({ error: 'Please sign in' }, { status: 401 });
-    if (!s) return NextResponse.json({ error: 'Suggestion not found' }, { status: 404 });
-    const b = await req.json();
-    const mine = String(s.user_id) === String(me.id);
-    const authorOnly = ['title', 'details', 'category', 'anonymous'].filter((k) => k in b);
-    if (authorOnly.length && !mine) {
-      return NextResponse.json({ error: 'Only the person who posted this can edit it.' }, { status: 403 });
+const AUTHOR_KEYS = ['title', 'details', 'category', 'anonymous'];
+const has = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
+const isoAt = (ms) => new Date(ms).toISOString();
+
+const COLUMNS = {
+  title: { type: 'text', text: true, norm: norm.line(160) },
+  details: { type: 'text', text: true, norm: (v) => str(v, 5000) },     // trimmed, as today
+  category: { type: 'text' },
+  anonymous: { type: 'boolean' },
+  status: { type: 'text' },
+  status_changed_by: { type: 'bigint' },
+  status_changed_at: { type: 'timestamptz' },
+  hidden_at: { type: 'timestamptz' },
+  hidden_by: { type: 'bigint' },
+  updated_at: { type: 'timestamptz' },
+};
+// What a PATCH reads back: never user_id.
+const RETURNING = ['title', 'details', 'category', 'status', 'anonymous', 'created_at', 'updated_at', 'hidden_at'];
+const PUBLIC = ['id', ...RETURNING];
+const publicRow = (r) => {
+  if (!r) return r;
+  const out = {};
+  for (const k of PUBLIC) if (k in r) out[k] = r[k] instanceof Date ? r[k].toISOString() : r[k];
+  if ('id' in out) out.id = String(out.id);
+  out.hidden = r.hidden_at != null;
+  delete out.hidden_at;
+  return out;
+};
+
+export const PATCH = handle(async ({ viewer, params, body, now }) => {
+  const id = parseId(params.id);
+  const b = await body();
+  const admin = isAdmin(viewer);
+  const s = await suggestionMeta(id);
+  if (!s || (s.hidden && !admin)) throw notFound('Suggestion not found');
+  const mine = s.user_id != null && s.user_id === String(viewer.id);
+  const authorKeys = AUTHOR_KEYS.filter((k) => has(b, k));
+  if (authorKeys.length && !mine) throw forbidden('Only the person who posted this can edit it.');
+
+  // Validate everything before writing anything (today a bad title after a status change half-applied).
+  const patch = {};
+  if (has(b, 'status')) {
+    if (!STATUSES.some((x) => x.key === b.status)) throw bad('Unknown status');
+    if (!canChangeStatus(viewer, await activeUserCount())) {
+      throw forbidden('Only culture organizers and admins can change the status.');
     }
-    if ('status' in b) {
-      if (!STATUSES.some((x) => x.key === b.status)) return NextResponse.json({ error: 'Unknown status' }, { status: 400 });
-      await sql`UPDATE suggestions SET status = ${b.status}, updated_at = now() WHERE id = ${id}`;
-    }
-    if ('title' in b) {
-      const title = String(b.title || '').trim().slice(0, 160);
-      if (!title) return NextResponse.json({ error: 'A suggestion needs a title.' }, { status: 400 });
-      await sql`UPDATE suggestions SET title = ${title}, updated_at = now() WHERE id = ${id}`;
-    }
-    if ('details' in b) {
-      await sql`UPDATE suggestions SET details = ${String(b.details || '').trim().slice(0, 5000)}, updated_at = now() WHERE id = ${id}`;
-    }
-    if ('category' in b && CATEGORIES.some((c) => c.key === b.category)) {
-      await sql`UPDATE suggestions SET category = ${b.category}, updated_at = now() WHERE id = ${id}`;
-    }
-    if ('anonymous' in b) {
-      await sql`UPDATE suggestions SET anonymous = ${!!b.anonymous}, updated_at = now() WHERE id = ${id}`;
-    }
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    patch.status = b.status;
+    patch.status_changed_by = String(viewer.id);
+    patch.status_changed_at = isoAt(now);
   }
-}
-
-// Only the author can delete their own suggestion.
-export async function DELETE(req, { params }) {
-  try {
-    await ensureSchema();
-    const { id } = await params;
-    const { me, s } = await load(req, id);
-    if (!me) return NextResponse.json({ error: 'Please sign in' }, { status: 401 });
-    if (!s) return NextResponse.json({ ok: true });
-    if (String(s.user_id) !== String(me.id)) {
-      return NextResponse.json({ error: 'Only the person who posted this can delete it.' }, { status: 403 });
-    }
-    await sql`DELETE FROM suggestions WHERE id = ${id}`;
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  if (has(b, 'title')) {
+    const title = str(b.title, 160);
+    if (!title) throw bad('A suggestion needs a title.');
+    patch.title = title;
   }
-}
+  if (has(b, 'details')) patch.details = b.details == null ? '' : b.details;
+  if (has(b, 'category') && CATEGORIES.some((c) => c.key === b.category)) patch.category = b.category;  // else ignored, as today
+  if (has(b, 'anonymous')) patch.anonymous = !!b.anonymous;
+  if (has(b, 'hidden')) {
+    if (!admin) throw forbidden('Only admins can hide suggestions.');
+    patch.hidden_at = b.hidden ? isoAt(now) : null;
+    patch.hidden_by = b.hidden ? String(viewer.id) : null;
+  }
+  if (Object.keys(patch).length) patch.updated_at = isoAt(now);
+
+  const base = {};
+  if (b.base && typeof b.base === 'object') {
+    for (const k of ['title', 'details']) if (has(patch, k) && has(b.base, k)) base[k] = b.base[k];
+  }
+
+  // Race-safe scope: author fields only while it is still the author's row; non-admins only while not hidden.
+  const scope = [];
+  const scopeParams = [];
+  if (authorKeys.length) { scopeParams.push(String(viewer.id)); scope.push(`user_id = $${scopeParams.length}::bigint`); }
+  if (!admin) scope.push('hidden_at IS NULL');
+
+  let row;
+  try {
+    ({ row } = await guardedPatch({
+      table: 'suggestions', id, body: { ...patch, base }, columns: COLUMNS, actorId: viewer.id,
+      scopeSql: scope.join(' AND '), scopeParams, now, returning: RETURNING,
+      notFound: new HttpError(404, 'gone', { message: 'This was deleted by someone else.' }),
+    }));
+  } catch (e) {
+    if (e instanceof HttpError && e.status === 409 && e.extra?.current) e.extra.current = publicRow(e.extra.current);
+    throw e;
+  }
+  const full = await loadSuggestion(viewer, id);
+  return { ok: true, row: full || publicRow(row) };
+}, { legacyWrite: true });
+
+// Only the author can delete their own suggestion (as today). Votes and replies go with it (cascade);
+// a JSON snapshot of the suggestion and its replies goes to audit_log in the same statement.
+export const DELETE = handle(async ({ viewer, params }) => {
+  const id = parseId(params.id);
+  const r = await deleteWithSnapshot({
+    table: 'suggestions', id, actorId: viewer.id, action: 'suggestion.delete',
+    scopeSql: 'user_id = $1::bigint', scopeParams: [String(viewer.id)],
+    children: { replies: { table: 'suggestion_replies', fk: 'suggestion_id' } },
+  });
+  if (!r.deleted && r.existed) throw forbidden('Only the person who posted this can delete it.');
+  return { ok: true };
+}, { legacyWrite: true });

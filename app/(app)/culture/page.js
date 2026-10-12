@@ -1,7 +1,13 @@
 import { requirePageViewer } from '@/lib/viewer';
+import { nowFromRequestContext } from '@/lib/clock';
+import { loadCultureHub } from '@/lib/queries/brackets';
 import { IconTrophy } from '@/app/icons';
+import { BracketCard } from '../_widgets/BracketWidget';
+import GeoWidget from '../_widgets/GeoWidget';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M2 (C2) (design §2.1, §15).
+// /culture: the Culture hub (design §2.1, §10). Release 1 cards: the bracket and GeoGuessr. Release 3 adds the
+// monthly challenge, upcoming events, past challenges and the organizer "nothing scheduled" warning; until
+// then those are left out rather than shown as placeholders. Cards stack on phones.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -11,14 +17,16 @@ export const metadata = { title: 'Culture' };
 
 export default async function CulturePage() {
   const viewer = await requirePageViewer();
+  const hub = await loadCultureHub(viewer, nowFromRequestContext());
   return (
-    <div className="coming-soon">
+    <div className="culture-hub">
       <div className="proj-head">
         <h1 className="wi-h"><IconTrophy size={24} /> Culture</h1>
       </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>Brackets, GeoGuessr, the monthly challenge and culture events.</p>
+      <p className="cu-intro">The fun side of TeamBoard: vote in the bracket and post your office’s daily GeoGuessr score.</p>
+      <div className="home-grid cu-cards">
+        <BracketCard summary={hub.bracket} />
+        <GeoWidget />
       </div>
     </div>
   );
