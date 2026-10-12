@@ -226,6 +226,7 @@ function AddMembers({ team, office, memberIds, onAdd, onClose }) {
   const outside = picked.filter((u) => office && String(u.office_id ?? '') !== String(office.id));
 
   const submit = async () => {
+    if (!picked.length) { setErr('Click a name in the list to choose who to add.'); return; }
     setBusy(true);
     setErr(null);
     try {
@@ -246,7 +247,7 @@ function AddMembers({ team, office, memberIds, onAdd, onClose }) {
       actions={(
         <>
           <button type="button" className="btn btn-plain" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn btn-ink" disabled={!picked.length || busy} onClick={submit}>
+          <button type="button" className="btn btn-ink" disabled={busy} onClick={submit}>
             {busy ? 'Adding…' : picked.length ? `Add ${picked.length} ${picked.length === 1 ? 'person' : 'people'}` : 'Add'}
           </button>
         </>
@@ -278,9 +279,10 @@ function AddMembers({ team, office, memberIds, onAdd, onClose }) {
         autoFocus
         defaultOpen
         officeId={office?.id ?? null}
-        exclude={memberIds}
+        already={memberIds}
+        alreadyLabel="Already on this team"
         value={picked}
-        onChange={setPicked}
+        onChange={(v) => { setPicked(v); setErr(null); }}
         limit={50}
         placeholder={office ? `Search by name (${office.name} first)` : 'Search by name or username'}
         disabled={busy}

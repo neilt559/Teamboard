@@ -18,7 +18,10 @@ import DeptTag from './DeptTag';
 // members, yourself). noneLabel (single mode): an extra first choice that sets null ("Not listed yet").
 // defaultOpen: show the result list right away (the Members panel's Add people dialog) instead of on focus.
 // officeId: list people whose home office it is first (the team roster's Add member); anyone can still be picked.
-// Keyboard: arrows move, Enter picks, Escape closes; rows are 44 px tall on phones.
+// already / alreadyLabel: ids still listed (after everyone else) but greyed out and not pickable, e.g. people
+// already on the project, so a search for them explains itself instead of showing nothing.
+// Keyboard: arrows move, Enter picks, Escape closes; rows are 44 px tall on phones. Nothing is highlighted until
+// you type or use the arrows, so a highlighted row is never mistaken for a picked one.
 
 const norm = (s) => String(s ?? '').toLowerCase();
 const nameOf = (u) => (u ? u.name || u.display_name || u.username || '' : '');
@@ -40,7 +43,7 @@ export function filterUsers(list, q, exclude = []) {
 export default function UserPicker({
   value = null, onChange, multiple = false, projectId = null, officeId = null, exclude = [], options = null,
   placeholder = 'Search by name', noneLabel = '', autoFocus = false, defaultOpen = false, disabled = false, label = 'Search people',
-  limit = 20, className = '',
+  limit = 20, className = '', already = [], alreadyLabel = 'Already added',
 }) {
   const id = useId();
   const listId = `${id}-list`;
@@ -99,10 +102,17 @@ export default function UserPicker({
     };
   }, [open]);
 
-  const choices = [...(!multiple && noneLabel ? [{ none: true }] : []), ...rows];
-  useEffect(() => { setActive(0); }, [q, rows.length]);
+  const alreadyKey = (already || []).map(String).join(',');
+  const alreadySet = useMemo(() => new Set(alreadyKey ? alreadyKey.split(',') : []), [alreadyKey]);
+  const isAlready = (u) => !u.none && alreadySet.has(String(u.id));
+  // People you can pick first, then the greyed-out ones.
+  const sorted = alreadySet.size ? [...rows.filter((u) => !isAlready(u)), ...rows.filter(isAlready)] : rows;
+  const choices = [...(!multiple && noneLabel ? [{ none: true }] : []), ...sorted];
+  const firstPickable = choices.findIndex((u) => !isAlready(u));
+  useEffect(() => { setActive(q.trim() ? firstPickable : -1); }, [q, rows.length, firstPickable]);
 
   const pick = (u) => {
+    if (isAlready(u)) return;
     if (multiple) {
       if (u.none) return;
       onChange([...selected, u]);
@@ -123,7 +133,7 @@ export default function UserPicker({
     if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((a) => Math.min(a + 1, Math.max(0, choices.length - 1))); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
     else if (e.key === 'Enter') {
-      if (open && choices[active]) { e.preventDefault(); pick(choices[active]); }
+      if (open && active >= 0 && choices[active]) { e.preventDefault(); pick(choices[active]); }
     } else if (e.key === 'Escape') {
       if (open) { e.stopPropagation(); setOpen(false); }
     } else if (e.key === 'Backspace' && multiple && !q && selected.length) {
@@ -168,7 +178,7 @@ export default function UserPicker({
             aria-expanded={open}
             aria-controls={listId}
             aria-autocomplete="list"
-            aria-activedescendant={open && choices[active] ? optId(active) : undefined}
+            aria-activedescendant={open && active >= 0 && choices[active] ? optId(active) : undefined}
             placeholder={placeholder}
             value={q}
             autoFocus={autoFocus}
@@ -190,8 +200,9 @@ export default function UserPicker({
               id={optId(i)}
               role="option"
               aria-selected={i === active}
-              className={`up-opt${i === active ? ' on' : ''}${u.none ? ' none' : ''}`}
-              onMouseEnter={() => setActive(i)}
+              aria-disabled={isAlready(u) || undefined}
+              className={`up-opt${i === active ? ' on' : ''}${u.none ? ' none' : ''}${isAlready(u) ? ' already' : ''}`}
+              onMouseEnter={() => { if (!isAlready(u)) setActive(i); }}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(u)}
             >
@@ -203,7 +214,9 @@ export default function UserPicker({
                     <span className="up-opt-meta">
                       {u.department && <DeptTag dept={u.department} />}
                       {[u.position, u.office, u.team].filter(Boolean).join(' · ')}
-                      {u.is_member && <span className="up-member">On this project</span>}
+                      {isAlready(u)
+                        ? <span className="up-member">{alreadyLabel}</span>
+                        : u.is_member && <span className="up-member">On this project</span>}
                     </span>
                   </span>
                 </>
