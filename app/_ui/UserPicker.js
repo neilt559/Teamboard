@@ -90,17 +90,15 @@ export default function UserPicker({
     return () => clearTimeout(t);
   }, [q, open, options, projectId, officeId, limit, hidden]);
 
-  // Close when focus or a click leaves the picker.
+  // Close when a click lands outside the picker. On 'click' (after the press is released), never on mousedown:
+  // collapsing the list on mousedown moved the dialog's buttons out from under the pointer, so the click on
+  // "Add" never happened. A defaultOpen picker (the list inside the Add dialogs) stays open.
   useEffect(() => {
-    if (!open) return undefined;
-    const down = (e) => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', down);
-    document.addEventListener('touchstart', down, { passive: true });
-    return () => {
-      document.removeEventListener('mousedown', down);
-      document.removeEventListener('touchstart', down);
-    };
-  }, [open]);
+    if (!open || defaultOpen) return undefined;
+    const away = (e) => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('click', away);
+    return () => document.removeEventListener('click', away);
+  }, [open, defaultOpen]);
 
   const alreadyKey = (already || []).map(String).join(',');
   const alreadySet = useMemo(() => new Set(alreadyKey ? alreadyKey.split(',') : []), [alreadyKey]);

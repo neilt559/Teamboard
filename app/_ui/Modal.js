@@ -10,6 +10,9 @@ export default function Modal({ title, icon = null, onClose, className = '', rol
   const box = useRef(null);
   const close = useRef(onClose);
   close.current = onClose;
+  // Close on the backdrop only when the press STARTED there too. A press that starts on a button inside the
+  // dialog and is released over the backdrop (because the dialog shrank under the pointer) is not a backdrop click.
+  const downOnOverlay = useRef(false);
 
   useEffect(() => {
     const before = document.activeElement;
@@ -24,7 +27,15 @@ export default function Modal({ title, icon = null, onClose, className = '', rol
   }, []);
 
   return (
-    <div className="modal-overlay" onClick={closeOnOverlay && onClose ? onClose : undefined}>
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        const fromOverlay = downOnOverlay.current && e.target === e.currentTarget;
+        downOnOverlay.current = false;
+        if (fromOverlay && closeOnOverlay && close.current) close.current();
+      }}
+    >
       <div
         ref={box}
         className={`modal${className ? ` ${className}` : ''}`}
