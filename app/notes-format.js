@@ -1,5 +1,6 @@
 'use client';
-import { useState, useRef, useLayoutEffect } from 'react';
+import { useEffect, useState, useRef, useLayoutEffect } from 'react';
+import { parseNotes } from './notes-parse';
 
 // Simple line-based formatting for meeting notes, saved as plain text:
 //   %t Title     → title (extra bold, dashed rule above and below)
@@ -9,22 +10,10 @@ import { useState, useRef, useLayoutEffect } from 'react';
 // The editor below shows that formatting live while you type (no separate
 // preview); the codes only exist in the saved text.
 
+// The parser lives in a plain module (notes-parse.js) so Server Components (the A11 owner report) can call it too.
 const INDENT = '  '; // one bullet level
 const MAX_LEVEL = 4;
-
-export function parseNotes(text) {
-  return String(text || '').split('\n').map((line) => {
-    let m;
-    if ((m = /^\s*%t\s?(.*)$/i.exec(line))) return { type: 'title', text: m[1] };
-    if ((m = /^\s*%h\s?(.*)$/i.exec(line))) return { type: 'header', text: m[1] };
-    if ((m = /^([ \t]*)-\s+(.*)$/.exec(line))) {
-      const width = m[1].replace(/\t/g, INDENT).length;
-      return { type: 'bullet', text: m[2], level: Math.min(MAX_LEVEL, Math.floor(width / INDENT.length)) };
-    }
-    if (!line.trim()) return { type: 'gap' };
-    return { type: 'text', text: line };
-  });
-}
+export { parseNotes };
 
 // Class names shared by the read-only view and the editor, so a line looks
 // exactly the same while you're writing it as after it's posted.
@@ -235,6 +224,61 @@ export function NotesEditor({ value, onChange, placeholder }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// The live-formatted editor for shared text (the project's Status Report, design-amendments A11: Neil rejected a
+// plain textarea with %t / %h codes). It keeps SyncedField's rules (app/synced.js): other people's changes show as
+// they arrive, except while you are in the editor; it saves when the focus leaves the editor (moving between its
+// lines does not count) and only when you changed the text since you came in; onSave(text, base) gets the value
+// the editor held when you came in, and may return false (snap back) or a promise of the stored value.
+export function SyncedNotesEditor({ value, onSave, placeholder, ...rest }) {
+  const latest = value == null ? '' : String(value);
+  const [text, setText] = useState(latest);
+  const [gen, setGen] = useState(0);              // a new editor when someone else's text replaces yours
+  const focused = useRef(false);
+  const atFocus = useRef(latest);
+  const known = useRef(latest);
+  const textNow = useRef(latest);
+  textNow.current = text;
+  const show = (t) => { if (t !== textNow.current) { setText(t); setGen((g) => g + 1); } };
+
+  useEffect(() => {
+    known.current = latest;
+    if (!focused.current) show(latest);
+  }, [latest]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const adopt = (stored) => {
+    if (stored === false) { if (!focused.current) show(known.current); return; }
+    if (stored == null || typeof stored === 'boolean') return;
+    known.current = String(stored);
+    if (!focused.current) show(known.current);
+  };
+
+  return (
+    <div
+      {...rest}
+      className={`notes-synced${rest.className ? ` ${rest.className}` : ''}`}
+      onFocus={() => {
+        if (focused.current) return;
+        focused.current = true;
+        atFocus.current = textNow.current;
+      }}
+      onBlur={(e) => {
+        if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;   // another line of the editor
+        focused.current = false;
+        const t = textNow.current;
+        if (t !== atFocus.current) {
+          const r = onSave(t, atFocus.current);
+          if (r === false) show(known.current);
+          else if (r && typeof r.then === 'function') r.then(adopt, () => {});
+        } else if (t !== known.current) {
+          show(known.current);                    // someone else changed it while you were in here
+        }
+      }}
+    >
+      <NotesEditor key={gen} value={text} onChange={(t) => { textNow.current = t; setText(t); }} placeholder={placeholder} />
     </div>
   );
 }

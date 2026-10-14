@@ -74,3 +74,51 @@ export function ScheduleButtons({ value, onPick, disabled = false }) {
     </div>
   );
 }
+
+// ---- A11 project header strip pieces (design-amendments A11, direction B) ----
+
+// The schedule as one choice of three, a real radio group (Behind / On track / Ahead): click, or arrow keys / Home /
+// End move the choice (and save it), with a roving tabindex; hover text says what a click does; a marked Behind turns
+// brick (CSS). '' = not set: nothing is marked and the first option takes the focus. disabled = read-only (archived).
+const RADIO_ORDER = ['behind', 'on_track', 'ahead'];
+export function ScheduleRadios({ value, onPick, disabled = false, labelledBy }) {
+  const opts = RADIO_ORDER.map((k) => SCHEDULE_STATUSES.find((s) => s.key === k));
+  const at = opts.findIndex((s) => s.key === value);
+  const pick = (i, el) => {
+    const s = opts[(i + opts.length) % opts.length];
+    if (disabled) return;
+    if (s.key !== value) onPick(s.key);
+    const btns = el?.parentElement?.querySelectorAll('[role="radio"]');
+    btns?.[(i + opts.length) % opts.length]?.focus();
+  };
+  const onKey = (i, e) => {
+    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (d) { e.preventDefault(); pick(i + d, e.currentTarget); return; }
+    if (e.key === 'Home') { e.preventDefault(); pick(0, e.currentTarget); }
+    if (e.key === 'End') { e.preventDefault(); pick(opts.length - 1, e.currentTarget); }
+  };
+  return (
+    <div className="ps-radios" role="radiogroup" aria-labelledby={labelledBy} aria-disabled={disabled || undefined}>
+      {opts.map((s, i) => {
+        const on = s.key === value;
+        return (
+          <button
+            key={s.key}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            tabIndex={on || (at < 0 && i === 0) ? 0 : -1}
+            className={`ps-opt k-${s.key}`}
+            disabled={disabled && !on}
+            aria-disabled={disabled || undefined}
+            title={disabled ? `Schedule: ${value ? scheduleOf(value).label : 'not set'}` : on ? `The schedule is ${s.label}` : `Mark the schedule ${s.label}`}
+            onClick={(e) => { if (!on) pick(i, e.currentTarget); }}
+            onKeyDown={(e) => onKey(i, e)}
+          >
+            <span className="ps-dot" aria-hidden="true" />{s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}

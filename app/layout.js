@@ -1,4 +1,6 @@
 import './globals.css';
+// A11: Barlow + Barlow Condensed for the owner report and the project header strip (self-hosted).
+import './styles/fonts.css';
 // One stylesheet per area (design §15 M0). shell.css styles the signed-in frame; the others belong to the
 // agents that build those pages and start empty.
 import './styles/shell.css';
@@ -14,6 +16,9 @@ import './styles/geo.css';
 // A6 (design-amendments A6.4-A6.7): project structure on the board, and the weekly owner reports (print CSS).
 import './styles/projects-a6.css';
 import './styles/reports.css';
+// A11: the owner report drawn as a plan sheet (and its print CSS), and the project header strip.
+import './styles/report-sheet.css';
+import './styles/project-strip.css';
 
 export const metadata = {
   title: { default: 'TeamBoard', template: '%s · TeamBoard' },

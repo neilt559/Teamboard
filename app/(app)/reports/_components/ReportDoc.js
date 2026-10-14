@@ -1,8 +1,10 @@
 import Link from 'next/link';
-import { FormattedNotes } from '@/app/notes-format';
 import { IconAlert } from '@/app/icons';
-import { ScheduleBadge, StageStepper } from '@/app/_ui/project-status';
-import { fmtHhmm, fmtSubmittalValue, fmtYmd, submittalLabel } from '@/app/_ui/project-format';
+import { parseNotes } from '@/app/notes-parse';
+import { fmtDay, fmtDayYear, fmtHhmm, fmtIssued, fmtShort } from '@/app/_ui/project-format';
+import logo from '@/public/brand/cage-logo-horizontal.png';
+import { CLOUD_PAD_X, CLOUD_PAD_Y, CLOUD_STROKE, cloudBox, cloudPath } from './cloud';
+import { sheetName, sheetWeekTitle } from './report-model';
 
 // Screen only (inside .rp-screen-only: never printed, never copied): which projects' Status Reports are left out
 // because their text predates the reports and nobody has reviewed it for owners yet (status_report_pending).
@@ -27,105 +29,287 @@ export function PendingReviewNotice({ projects, packet = false }) {
   );
 }
 
-// One project's status report (design-amendments A6.6), print-optimized (Letter; reports.css). Rendered on the
-// server from a lib/queries/reports.js report object ONLY: { title, project_number, owner_company, jurisdiction,
-// steps, current_stage_label, schedule_status, status_report, submittals, meetings }. Nothing else is
-// report-safe: no tasks, subtasks, task notes, members, project info rows, minutes or who edited what.
-// A plain module (no 'use client'): the single report and the owner packet both render it.
+// One project's owner report drawn as a sheet from a CAGE plan set (design-amendments A11, direction B "Sheet 1 of
+// 2", Neil's changes): a bordered Letter sheet; the masthead with the schedule's check row; the stage stationing line;
+// two columns (the week's Status Report beside the ONE "Attention Items" list and the meetings ahead); the submittal &
+// permit log; and the title block along the bottom edge (logo + offices, project + number, owner, jurisdiction, issued,
+// prepared by, sheet n of N). No abbreviations block and no legend.
+// Rendered on the server from a lib/queries/reports.js report object ONLY, so nothing internal can reach it: never
+// tasks, subtasks, task notes, members, project info rows, minutes or who edited what.
+// The server draws ONE sheet at full size. The fit pass (SheetFit.js + sheet-fit.js) then copies it into the empty
+// .rs-out next to it, steps spacing and type down (data-fit 0..4, floor 8.5 pt body / 7.5 pt small) and only if it
+// still doesn't fit continues onto sheet 2 with the title block repeated. The title block is its own row of the sheet,
+// so content can never print over it.
 
-export function ReportBrand({ reportDate, kind = 'Project Status Report' }) {
+const OFFICES = [['Lisle IL', 'Chicago IL'], ['Chandler AZ', 'Asheville NC'], ['Charlotte NC', 'Lakewood CO'], ['Venice FL', 'cagecivil.com']];
+const nb = (s) => String(s ?? '').replace(/ /g, ' ');
+
+// The Status Report as the sheet's prose: paragraphs, and each header with the bullets under it as one block (blocks
+// are what the fit pass may carry over to sheet 2, so a header never ends a sheet without its bullets).
+function proseBlocks(text) {
+  const out = [];
+  let group = null;
+  let list = null;
+  const flush = () => { group = null; list = null; };
+  for (const b of parseNotes(text)) {
+    if (b.type === 'gap') { if (!group) list = null; continue; }
+    if (b.type === 'title' || b.type === 'header') {
+      flush();
+      group = { kind: 'group', head: b.text, items: [] };
+      out.push(group);
+      continue;
+    }
+    if (b.type === 'bullet') {
+      if (group) { group.items.push(b); continue; }
+      if (!list) { list = { kind: 'list', items: [] }; out.push(list); }
+      list.items.push(b);
+      continue;
+    }
+    flush();
+    out.push({ kind: 'p', text: b.text });
+  }
+  return out;
+}
+
+function Bullets({ items }) {
   return (
-    <header className="rp-head">
-      <div className="rp-brand">
-        <span className="rp-mark" aria-hidden="true" />
-        <div>
-          <div className="rp-co">CAGE Civil Engineering</div>
-          <div className="rp-kind">{kind}</div>
-        </div>
-      </div>
-      <div className="rp-date">
-        <span>Report date</span>
-        <b>{fmtYmd(reportDate, { long: true })}</b>
-      </div>
-    </header>
+    <ul>
+      {items.map((b, i) => <li key={i} className={b.level ? `lv${Math.min(b.level, 3)}` : undefined}>{b.text}</li>)}
+    </ul>
   );
 }
 
-export default function ReportDoc({ project: p, reportDate, brand = true }) {
+function Prose({ text }) {
+  const blocks = proseBlocks(text);
+  if (!blocks.length) return <div className="rs-prose"><p className="rs-blk rs-none">No status report this week.</p></div>;
   return (
-    <article className="rp-doc" data-report-project={p.id}>
-      {brand && <ReportBrand reportDate={reportDate} />}
-      <h1 className="rp-title">{p.title || 'Untitled project'}</h1>
-      <dl className="rp-facts">
-        <div><dt>Project no.</dt><dd>{p.project_number || '—'}</dd></div>
-        <div><dt>Owner</dt><dd>{p.owner_company || '—'}</dd></div>
-        <div><dt>Jurisdiction</dt><dd>{p.jurisdiction || '—'}</dd></div>
-        <div><dt>Schedule</dt><dd><ScheduleBadge status={p.schedule_status} /></dd></div>
-      </dl>
+    <div className="rs-prose">
+      {blocks.map((b, i) => {
+        if (b.kind === 'p') return <p key={i} className="rs-blk">{b.text}</p>;
+        if (b.kind === 'list') return <div key={i} className="rs-blk rs-grp"><Bullets items={b.items} /></div>;
+        return (
+          <div key={i} className="rs-blk rs-grp">
+            <h3>{b.head}</h3>
+            {b.items.length > 0 && <Bullets items={b.items} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-      <section className="rp-sec rp-stage">
-        <h2>Project stage{p.current_stage_label ? <span className="rp-sec-sub">: {p.current_stage_label}</span> : null}</h2>
-        {p.steps?.length ? <StageStepper steps={p.steps} full /> : <p className="rp-none">No stages set.</p>}
+const BOX = (
+  <svg className="rs-box" viewBox="0 0 12 12" aria-hidden="true"><rect x=".5" y=".5" width="11" height="11" /><path d="M3 3l6 6M9 3l-6 6" /></svg>
+);
+const SCHED = [['behind', 'Behind'], ['on_track', 'On track'], ['ahead', 'Ahead']];
+
+function Schedule({ status }) {
+  return (
+    <div className="rs-sched" role="group" aria-label="Schedule">
+      <p className="rs-sched-k">Schedule</p>
+      <div className="rs-checks">
+        {SCHED.map(([k, label]) => (
+          <span key={k} className={`rs-check${status === k ? ' on' : ''}${k === 'behind' ? ' behind' : ''}`}>
+            {BOX}{label}{status === k ? <span className="rs-vh"> (marked)</span> : null}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Stages({ steps }) {
+  if (!steps?.length) {
+    return (
+      <section className="rs-stages" aria-label="Project stages">
+        <p className="rs-stages-k">Stage <b>not set</b></p>
       </section>
+    );
+  }
+  const at = steps.findIndex((s) => s.state === 'current');
+  return (
+    <section className="rs-stages" aria-label="Project stages">
+      <p className="rs-stages-k">Stage <b>{at >= 0 ? `${at + 1} of ${steps.length}` : 'not set'}</b></p>
+      <ol className="rs-line" style={{ '--n': steps.length }}>
+        {steps.map((s, i) => (
+          <li key={s.key} className={`rs-seg${s.state === 'done' ? ' done' : s.state === 'current' ? ' now' : ''}`} aria-current={s.state === 'current' ? 'step' : undefined}>
+            {s.state === 'current' && (
+              <span className="rs-here" aria-hidden="true"><svg viewBox="0 0 7 6"><path d="M0 0h7L3.5 6z" fill="currentColor" /></svg>Now</span>
+            )}
+            <span className="rs-seg-name">
+              {s.label}
+              <span className="rs-vh">{s.state === 'done' ? ' (complete)' : s.state === 'current' ? ' (current stage)' : ''}</span>
+            </span>
+            {i === steps.length - 1 && <span className="rs-end" />}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
 
-      <section className="rp-sec rp-status">
-        <h2>Status Report</h2>
-        <FormattedNotes text={p.status_report} empty="No status report this week." linkify />
-      </section>
+function Cloud({ item, who }) {
+  const { W, H } = cloudBox(item, who);
+  return (
+    <svg className="rs-cloud" aria-hidden="true" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+      style={{ inset: `-${CLOUD_PAD_Y}px -${CLOUD_PAD_X}px` }}>
+      <path d={cloudPath(W, H)} fill="none" stroke={CLOUD_STROKE} strokeWidth="1.3" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
 
-      <section className="rp-sec rp-subs">
-        <h2>Submittals</h2>
-        {p.submittals?.length ? (
-          <table className="rp-table">
-            <thead>
-              <tr><th scope="col">To</th><th scope="col">Submittal</th><th scope="col">Status</th><th scope="col">Dates</th></tr>
-            </thead>
-            <tbody>
-              {p.submittals.map((s) => (
-                <tr key={s.id}>
-                  <td data-label="To">{s.agency || '—'}</td>
-                  <td data-label="Submittal" className="rp-strong">{s.title || '—'}</td>
-                  <td data-label="Status"><span className="sub-chip" style={{ '--sc': s.status_color }}>{s.status_label}</span></td>
-                  <td data-label="Dates">
-                    {s.dates.length ? (
-                      <ul className="rp-dates">
-                        {s.dates.map((d) => (
-                          <li key={d.key} className={d.key === 'expected_response' ? 'rp-expected' : undefined}>
-                            <span>{submittalLabel(d)}:</span> {fmtSubmittalValue(d) || <span className="muted">not set</span>}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : '—'}
-                  </td>
+function Attention({ items, reportDate }) {
+  const late = items.filter((a) => a.late).length;
+  return (
+    <section className="rs-items" aria-label="Attention Items">
+      <div className="rs-vt"><h2>Attention Items</h2><p>{`${items.length} open${late ? `, ${late} late` : ''}`}</p></div>
+      <ol className="rs-list">
+        {items.map((a) => {
+          const due = a.need_by ? `need by ${fmtShort(a.need_by, reportDate)}` : 'no date set';
+          const lateText = a.late ? `${a.days_late} ${a.days_late === 1 ? 'day' : 'days'} late` : '';
+          return (
+            <li key={a.id} className={`rs-item${a.late ? ' late' : ''}`}>
+              <span className="rs-item-what">{a.item}</span>
+              <span className="rs-item-who">
+                {a.from_party ? <>{a.from_party}<i>·</i></> : null}
+                <span className="rs-nb">{nb(due)}</span>
+                {lateText && <><i>·</i><span className="rs-late-note">{lateText}</span></>}
+              </span>
+              {a.late && <Cloud item={a.item} who={`${a.from_party} · ${due} · ${lateText}`} />}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function Meetings({ meetings, reportDate }) {
+  return (
+    <section className="rs-meet" aria-label="Meetings ahead">
+      <div className="rs-vt"><h2>Meetings ahead</h2>{meetings.length > 0 && <p>{`Next ${meetings.length}`}</p>}</div>
+      {meetings.length ? (
+        <ul className="rs-mtgs">
+          {meetings.map((m) => (
+            <li key={m.id} className="rs-mtg">
+              <p className="rs-mtg-when">{fmtDay(m.meeting_date, reportDate)}{m.meeting_time ? <span>{nb(fmtHhmm(m.meeting_time))}</span> : null}</p>
+              <p className="rs-mtg-what">{m.title}{m.location ? <span className="rs-mtg-where">{m.location}</span> : null}</p>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="rs-none rs-pad">No meetings scheduled.</p>}
+    </section>
+  );
+}
+
+function statusDetail(s, reportDate) {
+  const d = s.detail;
+  if (!d) return '';
+  if (s.closed) return d.date ? fmtShort(d.date, reportDate) : '';
+  const bits = [];
+  if (d.date) bits.push(`${d.label} ${fmtShort(d.date, reportDate)}`);
+  if (d.days) bits.push(`${d.days}-day review`);
+  return bits.join(', ');
+}
+
+function Log({ subs, reportDate }) {
+  const open = subs.filter((s) => !s.closed).length;
+  return (
+    <section className="rs-log" aria-label="Submittal and permit log">
+      <div className="rs-vt"><h2>Submittal &amp; permit log</h2>{subs.length > 0 && <p>{`${open} open, by next date${subs.length > open ? '; closed last' : ''}`}</p>}</div>
+      {subs.length ? (
+        <table>
+          <colgroup><col style={{ width: '33%' }} /><col style={{ width: '17.5%' }} /><col style={{ width: '16.5%' }} /><col style={{ width: '11%' }} /><col style={{ width: '22%' }} /></colgroup>
+          <thead><tr><th scope="col">Agency and submittal</th><th scope="col">Status</th><th scope="col">Next date</th><th scope="col">Ball in court</th><th scope="col">Notes</th></tr></thead>
+          <tbody>
+            {subs.map((s) => {
+              const detail = statusDetail(s, reportDate);
+              return (
+                <tr key={s.id} className={s.closed ? 'closed' : undefined}>
+                  <td className="ag"><b>{s.agency || 'Agency not set'}</b>{s.title ? <span>{s.title}</span> : null}</td>
+                  <td className="st"><b>{s.status_label}</b>{detail ? <span>{nb(detail)}</span> : null}</td>
+                  {s.next
+                    ? <td className="next"><b>{fmtShort(s.next, reportDate)}</b><span>{s.next_label}</span></td>
+                    : <td className="next rs-empty"><span className="rs-dash">{s.closed ? '–' : 'not set'}</span></td>}
+                  {s.ball ? <td className="bic">{s.ball}</td> : <td className="bic rs-empty"><span className="rs-dash">–</span></td>}
+                  <td className={`note${s.note ? '' : ' rs-empty'}`}>{s.note}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : <p className="rp-none">No submittals.</p>}
-      </section>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : <p className="rs-none rs-pad">No submittals.</p>}
+    </section>
+  );
+}
 
-      <section className="rp-sec rp-meets">
-        <h2>Upcoming meetings</h2>
-        {p.meetings?.length ? (
-          <table className="rp-table">
-            <thead>
-              <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">What / with whom</th><th scope="col">Where</th></tr>
-            </thead>
-            <tbody>
-              {p.meetings.map((m) => (
-                <tr key={m.id}>
-                  <td data-label="Date" className="rp-nowrap">{fmtYmd(m.meeting_date, { weekday: true })}</td>
-                  <td data-label="Time" className="rp-nowrap">{fmtHhmm(m.meeting_time) || '—'}</td>
-                  <td data-label="What / with whom" className="rp-strong">{m.title}</td>
-                  <td data-label="Where">{m.location || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : <p className="rp-none">No upcoming meetings.</p>}
-      </section>
+export function TitleBlock({ p, reportDate, by }) {
+  return (
+    <footer className="rs-tb">
+      <div className="rs-tb-firm">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logo.src} width={logo.width} height={logo.height} alt="CAGE Civil Engineering" />
+        <p>{OFFICES.map(([a, b], i) => <span key={i}>{nb(a)} · {nb(b)}</span>)}</p>
+      </div>
+      <div className="rs-tb-proj"><span className="rs-k">Project</span>
+        <p className="rs-name"><span className="rs-name-t">{sheetName(p)}</span>{p.project_number ? <span className="rs-no">Project No. <b>{p.project_number}</b></span> : null}</p>
+      </div>
+      <div className="rs-tb-row">
+        <div><span className="rs-k">Owner</span><p className="rs-v">{p.owner_company || '–'}</p></div>
+        <div><span className="rs-k">Jurisdiction</span><p className="rs-v">{p.jurisdiction || '–'}</p></div>
+        <div><span className="rs-k">Issued</span><p className="rs-v">{fmtIssued(reportDate)}</p></div>
+      </div>
+      <div className="rs-tb-by"><span className="rs-k">Prepared by</span>
+        <p className="rs-v">{by?.name || ''}{by?.position ? <span>{by.position}</span> : null}{by?.email ? <span>{by.email}</span> : null}</p>
+      </div>
+      <div className="rs-tb-sheet"><span className="rs-k">Sheet</span><p className="rs-tb-title">Status report</p>
+        <p className="rs-n"><span className="rs-num">1</span><span className="rs-of">of 1</span></p>
+      </div>
+    </footer>
+  );
+}
 
-      <footer className="rp-foot">CAGE Civil Engineering · {p.title} · {fmtYmd(reportDate)}</footer>
-    </article>
+export default function ReportSheet({ project: p, reportDate, preparedBy }) {
+  const items = p.attention || [];
+  const meetings = p.meetings || [];
+  return (
+    <div className="rs-proj" data-report-project={p.id}>
+      <div className="rs-src">
+        <div className="rs-pack" data-fit="0">
+          <section className="rs-sheet" aria-label="Sheet 1 of 1">
+            <div className="rs-frame">
+              <div className="rs-field">
+                <header className="rs-mast">
+                  <div>
+                    <h1 className="rs-h1">Project status report</h1>
+                    <p className="rs-meta"><b>{sheetName(p)}</b><i>·</i>{fmtDayYear(reportDate)}</p>
+                  </div>
+                  <Schedule status={p.schedule_status} />
+                </header>
+                <div className="rs-sp rs-sp-a" />
+                <Stages steps={p.steps} />
+                <div className="rs-sp rs-sp-b" />
+                <div className="rs-cols">
+                  <div className="rs-col rs-col-l">
+                    <section className="rs-notes" aria-label="Status report">
+                      <div className="rs-vt"><h2>{sheetWeekTitle(p)}</h2></div>
+                      <Prose text={p.status_body ?? p.status_report} />
+                    </section>
+                  </div>
+                  <div className="rs-col rs-col-r">
+                    {items.length > 0 && <Attention items={items} reportDate={reportDate} />}
+                    <Meetings meetings={meetings} reportDate={reportDate} />
+                  </div>
+                </div>
+                <div className="rs-sp rs-sp-c" />
+                <Log subs={p.submittals || []} reportDate={reportDate} />
+              </div>
+              <TitleBlock p={p} reportDate={reportDate} by={preparedBy} />
+            </div>
+          </section>
+        </div>
+      </div>
+      <div className="rs-out" />
+    </div>
   );
 }

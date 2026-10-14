@@ -11,17 +11,18 @@ import { fmtYmd } from '@/app/_ui/project-format';
 // the status keeps the other dates (the server stores them all); only the matching ones show. Anyone who can see
 // the project edits them, like tasks. Archive (with a confirm) instead of delete; "Show archived" lists them with
 // Restore. One markup for both layouts: a table-like grid on desktop, cards on phones (CSS). They feed the weekly
-// owner report; the internal note never does.
+// owner report, the note too: A11 made it the "Notes" column of the report's submittal & permit log (short notes).
 
 // A date input that saves only the date you end up with, once: when you leave the box, or after you stop typing
 // for a moment (a date picked from the calendar saves that way too). Typing over a date segment by segment passes
 // through in-between dates (11/15 -> 01/15 -> 10/15 -> 10/02 -> 10/21) and a year typed digit by digit through
 // 0002, 0020, 0202; none of those reach the server (2026-10-14 review: they did, and a slow early write left
 // the wrong date stored and in the owner report). A half-typed date (the browser reports badInput) is never
-// saved as "no date"; leaving the box puts the stored date back.
+// saved as "no date"; leaving the box puts the stored date back. required (A8's received date): an emptied box is
+// never saved either; it snaps back to the stored date. Exported for the Attention Items section.
 const plausible = (x) => x === '' || /^(19|20|21)[0-9]{2}-[0-9]{2}-[0-9]{2}$/.test(x);
 const PAUSE_MS = 900;
-function DateField({ value, onSave, disabled, ...rest }) {
+export function DateField({ value, onSave, disabled, required = false, ...rest }) {
   const stored = value || '';
   const [v, setV] = useState(stored);
   const focused = useRef(false);
@@ -34,7 +35,7 @@ function DateField({ value, onSave, disabled, ...rest }) {
   const commit = (x, el) => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     const half = x === '' && !!el?.validity?.badInput;
-    if (half || !plausible(x)) return false;
+    if (half || !plausible(x) || (required && x === '')) return false;
     if (x !== storedNow.current) onSave(x || null);
     return true;
   };
@@ -44,6 +45,7 @@ function DateField({ value, onSave, disabled, ...rest }) {
       className="date-input"
       value={v}
       disabled={disabled}
+      required={required}
       onFocus={() => { focused.current = true; }}
       onBlur={(e) => {
         focused.current = false;
@@ -128,7 +130,7 @@ function Dates({ s, ro, onPatch }) {
 
 function SubmittalRow({ s, ro, actions, conflictUI, autoFocus }) {
   const st = submittalStatusOf(s.status);
-  const notices = [conflictUI(`submittal:${s.id}:agency`), conflictUI(`submittal:${s.id}:title`)].filter(Boolean);
+  const notices = [conflictUI(`submittal:${s.id}:agency`), conflictUI(`submittal:${s.id}:title`), conflictUI(`submittal:${s.id}:note`)].filter(Boolean);
   const onPatch = (patch) => actions.patchSubmittal(s.id, patch);
   return (
     <li className="sub-row" data-id={s.id} data-status={st.key}>
@@ -178,6 +180,21 @@ function SubmittalRow({ s, ro, actions, conflictUI, autoFocus }) {
       <div className="sub-cell sub-dcell">
         <Dates s={s} ro={ro} onPatch={onPatch} />
       </div>
+      <div className="sub-cell sub-note">
+        <span className="sub-lbl">Notes <i>· in the owner report</i></span>
+        {ro ? <span className="sub-ro sub-ro-note">{s.note || <span className="muted">—</span>}</span> : (
+          <SyncedField
+            className="sub-input sub-input-note"
+            value={s.note}
+            placeholder="Short note for the owner"
+            aria-label={`Notes for ${s.title || s.agency || 'this submittal'} (shown in the owner report)`}
+            title="Shown in the owner report's Notes column"
+            maxLength={300}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            onSave={(v, base) => actions.saveSubmittalText(s.id, 'note', v, base)}
+          />
+        )}
+      </div>
       <div className="sub-cell sub-act">
         {!ro && (
           <button type="button" className="row-icon sub-archive" title="Archive this submittal" aria-label={`Archive submittal ${s.title || s.agency || ''}`.trim()} onClick={() => actions.archiveSubmittal(s)}>
@@ -216,6 +233,7 @@ export default function Submittals({ submittals, ctx }) {
             <div className="sub-cell">Submittal</div>
             <div className="sub-cell">Status</div>
             <div className="sub-cell">Dates</div>
+            <div className="sub-cell" title="Shown in the owner report">Notes</div>
             <div className="sub-cell" />
           </div>
           <ul className="sub-list" aria-label="Submittals">

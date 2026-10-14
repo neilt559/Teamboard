@@ -273,3 +273,74 @@ h2.sec-h { margin: 0; }
 @media (hover: none) {
   .sub-archive, .um-archive { opacity: 1; }
 }
+
+/* ---------- A8 Attention Items ---------- */
+/* Overdue = red (need-by before today, Central), Due soon = amber (today or within 7 days). Each flag also says it
+   in words ("Overdue", "Due soon"), so it never relies on color alone. */
+.at-late-count { margin-left: 4px; padding: 1px 8px; border-radius: 10px; background: #fbeceb; color: #a33a2c; font-size: 11.5px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+.at-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.at-row { display: flex; align-items: center; gap: 14px; padding: 9px 10px; border-bottom: 1px solid var(--line); border-left: 3px solid transparent; }
+.at-list > .at-row:last-child { border-bottom: none; }
+.at-row:hover { background: #fcfcfa; }
+.at-row.overdue { border-left-color: #c4483e; background: #fff8f7; }
+.at-row.soon { border-left-color: #d99a1e; background: #fffbf1; }
+.at-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.at-item { font-size: 14px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.at-from { font-size: 12.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.at-from b { font-weight: 600; color: var(--ink); }
+.at-when { flex: 0 0 170px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.at-due { display: inline-flex; flex-direction: column; gap: 1px; font-size: 13px; color: var(--ink); }
+.at-due.none { font-size: 12.5px; color: var(--muted); }
+.at-due-k { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.at-due-v { font-weight: 600; font-variant-numeric: tabular-nums; }
+.at-due.overdue { color: #a33a2c; }
+.at-due.overdue .at-due-k { color: #a33a2c; }
+.at-due.soon .at-due-k, .at-due.soon .at-due-v { color: #8a5a00; }
+.at-act { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+.at-recv { border-color: var(--lime-dark); }
+.at-archive { opacity: .55; }
+.at-row:hover .at-archive, .at-archive:focus-visible { opacity: 1; }
+.at-editing { display: block; padding: 8px; border-left-color: transparent; background: none; }
+.at-form-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 170px; gap: 10px; }
+.at-recv-wrap { margin-top: 10px; }
+.at-recv-toggle {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: none; background: none; border-radius: 6px;
+  font: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-2); cursor: pointer;
+}
+.at-recv-toggle:hover { background: #f4f4f2; color: var(--ink); }
+.at-recv-toggle:focus-visible { outline: 2px solid var(--lime-dark); outline-offset: 1px; }
+.at-recv-toggle .icon { transform: rotate(-90deg); transition: transform .15s; }
+.at-recv-toggle .icon.open { transform: none; }
+.at-list-received { margin-top: 6px; }
+.at-received { background: #fafafa; }
+.at-received .at-item { color: var(--ink-2); font-weight: 500; }
+.at-rdate .date-input { padding: 5px 7px; font-size: 13px; max-width: 160px; }
+
+@media (max-width: 1100px) {
+  .at-form-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .at-f-item { grid-column: 1 / -1; }
+}
+
+/* phones: each item is a card */
+@media (max-width: 720px) {
+  .at-list { border: none; overflow: visible; display: flex; flex-direction: column; gap: 10px; }
+  .at-row { flex-wrap: wrap; gap: 8px 10px; padding: 10px 10px 12px; border: 1px solid var(--line); border-left-width: 4px; border-radius: 12px; background: var(--panel); }
+  .at-list > .at-row:last-child { border-bottom: 1px solid var(--line); }
+  .at-row.overdue { border-left-color: #c4483e; }
+  .at-row.soon { border-left-color: #d99a1e; }
+  .at-main { flex: 1 1 100%; }
+  .at-when { flex: 1 1 auto; }
+  .at-act { flex: 1 1 100%; flex-wrap: wrap; }
+  .at-act .btn { flex: 1 1 auto; min-height: 44px; justify-content: center; }
+  .at-archive { opacity: 1; min-width: 44px; height: 44px; }
+  .at-rdate .date-input { width: 100%; max-width: none; min-height: 44px; }
+  .at-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .at-f-item { grid-column: auto; }
+  .at-form .field { min-height: 44px; }
+  .at-recv-toggle { min-height: 44px; }
+  .at-row input, .at-form input { scroll-margin-bottom: calc(58px + env(safe-area-inset-bottom) + 16px); }
+}
+
+@media (hover: none) {
+  .at-archive { opacity: 1; }
+}

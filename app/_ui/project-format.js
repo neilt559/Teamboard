@@ -42,3 +42,45 @@ export function fmtSubmittalValue(d) {
 
 // Its label in a report: the value already says "days", so the review period drops the "(days)".
 export const submittalLabel = (d) => (d?.key === 'review_days' ? 'Review period' : d?.label || '');
+
+// ---- the owner report's ONE date style (design-amendments A11): "Oct 22", "Tue Oct 20"; no commas, no zero
+// padding. The year is added only when it differs from the report's (ref) year: "Dec 3, 2025". Numeric only in the
+// title block's Issued cell: "10/14/2026".
+const parts = (ymd) => {
+  const m = YMD.exec(String(ymd ?? ''));
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return Number.isNaN(d.getTime()) ? null : { d, y: Number(m[1]), mo: Number(m[2]), day: Number(m[3]) };
+};
+const yearOf = (ymd) => parts(ymd)?.y;
+const MON = (d) => fmt({ month: 'short' }).format(d);
+const WDAY = (d) => fmt({ weekday: 'short' }).format(d);
+
+// 'YYYY-MM-DD' -> 'Oct 22' ('Oct 22, 2025' when ref is in another year). '' / unreadable -> ''.
+export function fmtShort(ymd, ref = '') {
+  const p = parts(ymd);
+  if (!p) return '';
+  const y = ref && yearOf(ref) !== p.y ? `, ${p.y}` : '';
+  return `${MON(p.d)} ${p.day}${y}`;
+}
+// 'YYYY-MM-DD' -> 'Tue Oct 20' (with the year when ref is in another year).
+export function fmtDay(ymd, ref = '') {
+  const p = parts(ymd);
+  if (!p) return '';
+  return `${WDAY(p.d)} ${fmtShort(ymd, ref)}`;
+}
+// 'YYYY-MM-DD' -> 'Wed Oct 14, 2026' (the report's date line).
+export function fmtDayYear(ymd) {
+  const p = parts(ymd);
+  return p ? `${WDAY(p.d)} ${MON(p.d)} ${p.day}, ${p.y}` : '';
+}
+// 'YYYY-MM-DD' -> '10/14/2026' (the title block's Issued cell only).
+export function fmtIssued(ymd) {
+  const p = parts(ymd);
+  return p ? `${p.mo}/${p.day}/${p.y}` : '';
+}
+// 'YYYY-MM-DD' -> 'October 12' ("Week of October 12").
+export function fmtMonthDay(ymd) {
+  const p = parts(ymd);
+  return p ? `${fmt({ month: 'long' }).format(p.d)} ${p.day}` : '';
+}

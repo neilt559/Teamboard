@@ -2,8 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconAlert, IconArchive, IconCheck, IconNote, IconRestore } from '@/app/icons';
-import { SyncedTextarea } from '@/app/synced';
-import { FormattedNotes } from '@/app/notes-format';
+import { FormattedNotes, SyncedNotesEditor } from '@/app/notes-format';
 import { api, ConflictError, settleWrites, trackWrite } from '@/app/_ui/api';
 import useServerState, { mergeById } from '@/app/_ui/useServerState';
 import { RefreshPill } from '@/app/_ui/useRefresh';
@@ -18,6 +17,7 @@ import ProjectInfo from './ProjectInfo';
 import MembersPanel from './MembersPanel';
 import Submittals from './Submittals';
 import UpcomingMeetings from './UpcomingMeetings';
+import AttentionItems from './AttentionItems';
 import ProjectDetailsDialog from './ProjectDetailsDialog';
 import useBoardSync from './useBoardSync';
 import { projectTitle, parseStages } from '@/lib/projects';
@@ -29,10 +29,11 @@ import { projectTitle, parseStages } from '@/lib/projects';
 // A6 (design-amendments A6.5): the header's schedule status, stage stepper, Project details and Generate report;
 // the notes are the "Status Report" (it goes to the owner in the weekly report); Submittals and Upcoming meetings
 // sections. Every A6 write bumps the project's rev like any other write (wrote()).
+// A8 (design-amendments A8.3): the Attention Items section between Submittals and Upcoming meetings.
 
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 const nPeople = (n) => `${n} ${n === 1 ? 'person' : 'people'}`;
-const LISTS = { task: 'tasks', info: 'info', meeting: 'meetings', series: 'series', submittal: 'submittals', upcoming: 'upcoming_meetings' };
+const LISTS = { task: 'tasks', info: 'info', meeting: 'meetings', series: 'series', submittal: 'submittals', upcoming: 'upcoming_meetings', attention: 'attention_items' };
 const URLS = {
   task: (id) => `/api/tasks/${id}`,
   info: (id) => `/api/info/${id}`,
@@ -41,6 +42,7 @@ const URLS = {
   project: (id) => `/api/projects/${id}`,
   submittal: (id, pid) => `/api/projects/${pid}/submittals/${id}`,
   upcoming: (id, pid) => `/api/projects/${pid}/upcoming-meetings/${id}`,
+  attention: (id, pid) => `/api/projects/${pid}/attention-items/${id}`,
 };
 // A project row from the API (PATCH answers carry stages as an array; a 409's current row carries the stored
 // JSON text): stages always become an array here.
@@ -489,6 +491,46 @@ export default function ProjectBoard({ initial }) {
     }))) return;
     await patchItem('upcoming', m.id, { archived: true });
   }, [ask, patchItem]);
+  // ---------------------------------------------------------------- A8: attention items
+  const createAttention = useCallback(async (f) => {
+    touch();
+    const r = await api(`/api/projects/${pid}/attention-items`, {
+      method: 'POST',
+      body: { item: f.item.trim(), from_party: f.from_party.trim(), need_by: f.need_by || '' },
+    });
+    wrote();
+    if (r?.row?.id != null) appendLocal('attention', r.row);
+    refreshNow();
+  }, [touch, pid, wrote, appendLocal, refreshNow]);
+  const saveAttention = useCallback(async (a, f, bases) => {
+    const body = attentionBody(f, bases);
+    if (!Object.keys(body).some((k) => k !== 'base')) return;
+    touch();
+    try {
+      const r = await api(URLS.attention(a.id, pid), { method: 'PATCH', body });
+      wrote();
+      if (r?.row) mergeLocal('attention', a.id, r.row);
+    } catch (e) {
+      if (e instanceof ConflictError && e.current) mergeLocal('attention', a.id, e.current);
+      else handleGone('attention', a.id, e);
+      throw e;
+    }
+  }, [touch, pid, wrote, mergeLocal, handleGone]);
+  // Received stamps today on the server (Central); the row moves to the Received list at once.
+  const receiveAttention = useCallback((a) => {
+    mergeLocal('attention', a.id, { received_date: d.today || null });
+    return patchItem('attention', a.id, { status: 'received' });
+  }, [mergeLocal, patchItem, d.today]);
+  const reopenAttention = useCallback((a) => patchItem('attention', a.id, { status: 'open' }), [patchItem]);
+  const archiveAttention = useCallback(async (a) => {
+    if (!(await ask({
+      title: `Archive “${a.item}”?`,
+      lines: [a.status === 'received' ? 'It leaves the Received list. “Show archived” brings it back.' : 'It leaves this list and the weekly report. “Show archived” brings it back.'],
+      confirmLabel: 'Archive',
+    }))) return;
+    await patchItem('attention', a.id, { archived: true });
+  }, [ask, patchItem]);
+
   const setDraftFlag = useCallback((key, v) => setA6Dirty((x) => (!!x[key] === !!v ? x : { ...x, [key]: !!v })), []);
 
   // ---------------------------------------------------------------- derived
@@ -522,6 +564,8 @@ export default function ProjectBoard({ initial }) {
     saveSubmittalText: (id, field, v, base) => saveText('submittal', id, field, v, base),
     createUpcoming, saveUpcoming, archiveUpcoming,
     patchUpcoming: (id, patch) => patchItem('upcoming', id, patch),
+    createAttention, saveAttention, receiveAttention, reopenAttention, archiveAttention,
+    patchAttention: (id, patch) => patchItem('attention', id, patch),
     setDraftDirty: setDraftFlag,
   };
   const ctx = {
@@ -574,10 +618,11 @@ export default function ProjectBoard({ initial }) {
         actions={actions}
         conflictUI={conflictUI}
         ask={ask}
+        today={d.today}
       />
 
       <div className="notes-panel status-report-panel" id="status-report">
-        <label className="notes-label" htmlFor={`pnotes-${pid}`}><IconNote size={14} /> Status Report <span>· goes to the owner in the weekly report</span></label>
+        <h2 className="notes-label" id={`pnotes-h-${pid}`}><IconNote size={14} /> Status Report <span>· goes to the owner in the weekly report</span></h2>
         {reviewPending && (
           <div className="sr-review" role="note">
             <IconAlert size={15} />
@@ -596,17 +641,19 @@ export default function ProjectBoard({ initial }) {
         {ro ? (
           <div className="notes-area notes-ro"><FormattedNotes text={p.notes} empty="No status report." /></div>
         ) : (
-          <SyncedTextarea
+          <SyncedNotesEditor
             key={pid}
             id={`pnotes-${pid}`}
-            className="notes-area"
+            role="group"
+            aria-labelledby={`pnotes-h-${pid}`}
+            className="sr-editor"
             value={p.notes || ''}
             placeholder="Where the project stands this week: progress, what’s next, what you’re waiting on…"
             onSave={(v, base) => actions.saveProjectText('notes', v, base)}
           />
         )}
         {conflictUI(`project:${pid}:notes`)}
-        {!ro && <p className="sr-hint">In the report, a line that starts with <code>%t</code> is a title, <code>%h</code> a header, and a dash (<code>-</code>) a bullet.</p>}
+        {!ro && <p className="sr-hint">A title on the first line (for example “Week of October 12”) heads the notes in the owner report.</p>}
       </div>
 
       <TaskTable tasks={active} subsByParent={subsByParent} ctx={ctx} />
@@ -616,6 +663,7 @@ export default function ProjectBoard({ initial }) {
       )}
 
       <Submittals submittals={d.submittals || []} ctx={ctx} />
+      <AttentionItems items={d.attention_items || []} today={d.today} fromOptions={d.attention_from || []} ctx={ctx} />
       <UpcomingMeetings meetings={d.upcoming_meetings || []} today={d.today} ctx={ctx} />
 
       <ProjectMeetings
@@ -662,6 +710,18 @@ function upcomingBody(f, bases) {
   if (f.meeting_date !== bases.meeting_date) body.meeting_date = f.meeting_date;
   if ((f.meeting_time || '') !== (bases.meeting_time || '')) body.meeting_time = f.meeting_time || '';
   for (const k of ['title', 'location']) {
+    if (f[k].trim() !== String(bases[k] ?? '').trim()) { body[k] = f[k].trim(); base[k] = bases[k] ?? ''; }
+  }
+  if (Object.keys(base).length) body.base = base;
+  return body;
+}
+
+// Only the fields of an attention item that changed since the editor opened; text with its base (design §7.4).
+function attentionBody(f, bases) {
+  const body = {};
+  const base = {};
+  if ((f.need_by || '') !== (bases.need_by || '')) body.need_by = f.need_by || null;
+  for (const k of ['item', 'from_party']) {
     if (f[k].trim() !== String(bases[k] ?? '').trim()) { body[k] = f[k].trim(); base[k] = bases[k] ?? ''; }
   }
   if (Object.keys(base).length) body.base = base;

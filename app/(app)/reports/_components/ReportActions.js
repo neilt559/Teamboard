@@ -8,7 +8,8 @@ import { reportEmail } from './report-email';
 // (ClipboardItem with text/html + text/plain, so it pastes formatted into Outlook or Gmail; falls back to plain
 // text, then to a hidden textarea + execCommand) with a "Copied" confirmation, and Save as PDF (window.print():
 // the print CSS hides the app and lays the report out on Letter pages; pick "Save as PDF" as the printer).
-// reports = the lib/queries/reports.js report objects the page renders (the email is built from them only).
+// reports = the lib/queries/reports.js report objects the page renders (the email is built from them only);
+// preparedBy = the title block's "Prepared by" (the viewer: name, position, email).
 async function copyReport(html, text) {
   try {
     if (typeof window !== 'undefined' && window.ClipboardItem && navigator.clipboard?.write) {
@@ -41,13 +42,13 @@ async function copyReport(html, text) {
   return null;
 }
 
-export default function ReportActions({ reports, reportDate, owner = '', backHref, backLabel = 'Back' }) {
+export default function ReportActions({ reports, reportDate, owner = '', preparedBy = null, backHref, backLabel = 'Back' }) {
   const [state, setState] = useState(null);          // null | 'rich' | 'plain' | 'fail'
   const timer = useRef(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const copy = async () => {
-    const { html, text } = reportEmail(reports, { reportDate, owner });
+    const { html, text } = reportEmail(reports, { reportDate, owner, preparedBy });
     const r = await copyReport(html, text);
     setState(r || 'fail');
     if (timer.current) clearTimeout(timer.current);
