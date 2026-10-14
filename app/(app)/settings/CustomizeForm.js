@@ -11,17 +11,19 @@ import { projectTitle } from '@/lib/projects';
 // /api/prefs). Each control saves on its own, right away, and the page refreshes so the shell picks it up
 // (density, the sidebar's followed offices and pins). Follows and pins never grant access.
 
+// The stored keys stay 'threads' (saved preferences keep working); since design-amendments A10 they mean the
+// Suggestions/Announcements boards.
 const LANDING = [
   ['home', 'Home'], ['my-work', 'My work'], ['projects', 'Projects'], ['tasks', 'All tasks'],
-  ['threads', 'Threads'], ['culture', 'Culture'],
+  ['threads', 'Suggestions/Announcements'], ['culture', 'Culture'],
 ];
 const WIDGET_LABELS = {
   my_tasks: 'My tasks', pinned_projects: 'Pinned projects', my_projects: 'My projects', announcements: 'Announcements',
-  threads: 'Threads (your spaces)', challenge: 'This month’s challenge', events: 'Upcoming events', bracket: 'Bracket',
-  geo: 'GeoGuessr', admin_queue: 'Approval queue (admins)',
+  threads: 'Suggestions/Announcements (your boards)', challenge: 'This month’s challenge', events: 'Upcoming events',
+  bracket: 'Bracket', geo: 'GeoGuessr', admin_queue: 'Approval queue (admins)',
 };
 // The challenge/events arrive in Release 3. Until then their Home cards render nothing, so they aren't offered
-// here (the agents shipping them remove the key from this list). Threads and announcements shipped in Release 2.
+// here (the agents shipping them remove the key from this list).
 const NOT_YET = new Set(['challenge', 'events']);
 const NOT_YET_LANDING = new Set([]);
 

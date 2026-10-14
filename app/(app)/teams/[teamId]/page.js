@@ -2,16 +2,14 @@ import { notFound } from 'next/navigation';
 import { requirePageViewer, publicViewer, tagUpdating } from '@/lib/viewer';
 import { loadTeam } from '@/lib/queries/teams';
 import { canManageTeamsIn } from '@/lib/access';
-import { loadSpace } from '@/lib/queries/spaces';
 import { loadProjectFieldOptions } from '@/lib/queries/project';
 import { canCreateProjectIn } from '@/lib/policy';
-import ThreadPreview from '../../threads/_components/ThreadPreview';
 import TeamOverview from './TeamOverview';
 
-// Team overview (design §2.1): team names and the viewer's visible projects are for everyone; the team's thread
-// space (design-amendments A5) for its roster, Director and up (L4) and admins (tb_can_read_space): for them the
-// header links to "<Team> space" and the page shows its preview. An archived team (or a team in an archived
-// office) is a 404 except for the people who could restore it, who see it with a banner.
+// Team overview (design §2.1): team names and the viewer's visible projects are for everyone. Teams have no thread
+// space any more (design-amendments A10: posts live on the CAGE and office Suggestions/Announcements boards). An
+// archived team (or a team in an archived office) is a 404 except for the people who could restore it, who see it
+// with a banner.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -49,22 +47,12 @@ export default async function TeamPage({ params }) {
   const data = await load(viewer, params.teamId);
   if (!data) notFound();
   const pv = publicViewer(viewer);
-  let space = null;
   // The New project dialog's owner / jurisdiction suggestions (A6.4), only for people who may add one here.
   let createOptions = null;
   try {
-    space = await loadSpace(viewer, `team:${data.team.id}`);
     if (canCreateProjectIn(viewer, data.team) && !data.team.archived) createOptions = await loadProjectFieldOptions(viewer);
   } catch (e) {
     throw tagUpdating(e);
   }
-  return (
-    <TeamOverview
-      viewer={pv}
-      data={data}
-      spaceLink={space ? { href: space.href, name: space.name, unread: space.unread } : null}
-      createOptions={createOptions}
-      threadSlot={space ? <ThreadPreview scope="team" teamId={data.team.id} viewer={viewer} /> : null}
-    />
-  );
+  return <TeamOverview viewer={pv} data={data} createOptions={createOptions} />;
 }

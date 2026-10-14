@@ -79,9 +79,9 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
 }, { legacyWrite: true });
 
 // DELETE (admins; the UI asks twice). Refused while the office has GeoGuessr history (scores or 5Ks), with
-// today's text; refused while people still have it as their home office; refused while the office's thread space
-// or any of its teams' spaces has posts or suggestions (design-amendments A5.3: nothing is ever deleted, archive
-// it instead; the RESTRICT keys on space_posts and suggestions back this up). GeoGuessr history is checked first,
+// today's text; refused while people still have it as their home office; refused while the office's board (or an
+// old thread space of it or its teams) has posts (design-amendments A5.3, A10: nothing is ever deleted, archive it
+// instead; the RESTRICT keys on space_posts and suggestions back this up). GeoGuessr history is checked first,
 // so an office that has both (Charlotte: scores and the moved suggestions) keeps today's answer (rule 3, geo
 // parity). The whole office tree is snapshotted to audit_log in the same statement as the delete. A missing office
 // is { ok: true }.
@@ -108,7 +108,7 @@ export const DELETE = handle(async ({ viewer, params }) => {
       throw new HttpError(409, `${u.people} ${u.people === 1 ? 'person has' : 'people have'} “${u.name}” as their home office, `
         + 'so it can’t be deleted. Archive it instead.');
     }
-    throw new HttpError(409, 'Other records still use this office (GeoGuessr scores, threads or events), so it can’t be deleted. Archive it instead.');
+    throw new HttpError(409, 'Other records still use this office (GeoGuessr scores, posts or events), so it can’t be deleted. Archive it instead.');
   }
   if (!r.deleted && r.existed && (r.scores > 0 || r.fivek > 0)) {
     throw new HttpError(409, GEO_HISTORY);

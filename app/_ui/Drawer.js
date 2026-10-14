@@ -7,9 +7,9 @@ import { Badge } from './Header';
 import { logout } from './api';
 
 // Phone slide-in menu (<= 720 px, design §2.2): backdrop, and never wider than min(86vw, 360px) whatever the
-// saved desktop sidebar width. Holds the office tree plus All tasks, People, Settings, Admin and Log out (Threads,
-// with its unread badge, is in the bottom bar; suggestions live in the thread spaces since Release 2). Closes on
-// the backdrop, Escape, or any link.
+// saved desktop sidebar width. Holds the office tree plus All tasks, People, Settings, Admin and Log out ("Posts",
+// the Suggestions/Announcements boards, is in the bottom bar with its unread badge). Closes on the backdrop,
+// Escape, or any link.
 const under = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
 function Item({ href, Icon, label, pathname, onClose, children }) {

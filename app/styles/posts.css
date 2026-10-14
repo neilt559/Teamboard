@@ -1,0 +1,48 @@
+/* Suggestions/Announcements outside the board pages (design-amendments A10.4): the Home "Announcements" and
+   "Suggestions/Announcements" cards, the office page's board preview and its header link. The board pages have
+   their own sheet (app/(app)/suggestions/suggestions.css). Imported from app/layout.js. Builds on globals.css
+   (.btn, .section-head), shell.css (.tab-badge) and home.css (.widget, .wl-*). Neil's look: gray #5B5859 (--ink)
+   and lime #CBCE00 (--lime); SVG icons only. Phones (<= 720 px): 44 px tap targets. */
+
+/* ---------- newest posts (Home cards, the office preview) ---------- */
+.sp-latest { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.sp-latest > li + li { border-top: 1px dashed var(--line); }
+.sp-latest-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 8px; border-radius: 8px; color: var(--text); text-decoration: none; min-width: 0; }
+.sp-latest-row:hover { background: #f8f9e8; }
+.sp-latest-row .hs { flex: 0 0 auto; margin-top: 1px; }
+.sp-latest-anon { background: #b3b1b2 !important; font-size: 13px; }
+.sp-latest-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.sp-latest-top { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: 12px; color: var(--muted); }
+.sp-latest-space { font-weight: 800; color: var(--ink); font-size: 12px; }
+.sp-latest-who { font-weight: 600; color: var(--ink-2); }
+.sp-latest-title { font-size: 13.5px; font-weight: 700; color: var(--ink); line-height: 1.35; overflow-wrap: anywhere; }
+.sp-latest-text { font-size: 13px; color: var(--text); line-height: 1.45; overflow-wrap: anywhere; }
+.sp-latest-meta { font-size: 12px; color: var(--muted); }
+.sp-latest-widget .sp-latest-row { padding: 8px 6px; }
+.sp-kind { font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; border-radius: 999px; padding: 1px 7px; background: #f1f1f2; color: var(--ink-2); }
+.sp-kind.ann { background: #eef0c2; color: var(--ink); }
+
+/* the office page: the board preview, and the header link */
+.sp-preview { margin-top: 16px; }
+.sp-preview .section-title .icon { color: var(--lime-dark); }
+.sp-preview-empty { margin: 4px 0; }
+.sp-space-link .icon { color: var(--lime-dark); }
+.sp-space-link .tab-badge { margin-left: 2px; }
+
+/* the Home "Suggestions/Announcements" card */
+.sp-widget .widget-title .tab-badge { margin-left: 2px; }
+.sp-wrow-icon { display: inline-grid; place-items: center; width: 26px; height: 26px; flex: 0 0 auto; border-radius: 7px; background: #f6f7e4; color: var(--lime-dark); }
+.sp-wrow.has-unread .wl-name { font-weight: 800; }
+.sp-row-go { flex: 0 0 auto; color: #c4c4c4; }
+.sp-unread {
+  display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; font-size: 11.5px; font-weight: 800; color: var(--on-lime);
+  background: var(--lime); border-radius: 999px; padding: 1px 8px 1px 6px; line-height: 18px;
+}
+.sp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--on-lime); display: inline-block; }
+.sp-wlatest { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.sp-wlatest-h { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+
+/* ---------- phones ---------- */
+@media (max-width: 720px) {
+  .sp-latest-row { min-height: 44px; }
+}

@@ -6,7 +6,7 @@ import './styles/fonts.css';
 import './styles/shell.css';
 import './styles/home.css';
 import './styles/board.css';
-import './styles/threads.css';
+import './styles/posts.css';
 import './styles/culture.css';
 import './styles/calendar.css';
 import './styles/admin.css';

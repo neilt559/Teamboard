@@ -13,24 +13,88 @@
 .sg-banner { max-width: 900px; }
 .sg-banner .spacer { flex: 1 1 auto; }
 
+/* ---------- Suggestions/Announcements boards (design-amendments A10) ---------- */
+.sgb-head { margin-bottom: 10px; max-width: 900px; }
+.sgb-head h1 { min-width: 0; }
+.sgb-h1 { min-width: 0; overflow-wrap: anywhere; }
+
+/* board switcher: CAGE | my offices | (L4, admins) the other offices */
+.sgb-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 4px; max-width: 900px; }
+.sgb-switch-item { display: inline-flex; align-items: center; gap: 6px; }
+.sgb-switch-sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+.sgb-pill {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: #fff; color: var(--ink-2); font-size: 13px; font-weight: 600; text-decoration: none;
+}
+.sgb-pill:hover { border-color: var(--ink-2); color: var(--ink); }
+.sgb-pill:focus-visible { outline: 2px solid var(--lime-dark); outline-offset: 2px; }
+.sgb-pill.on { border-color: var(--ink); background: var(--ink); color: #fff; box-shadow: inset 0 -3px 0 var(--lime); }
+.sgb-pill .tab-badge { margin-left: 2px; }
+.sgb-tag { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.sgb-pill.on .sgb-tag { color: rgba(255, 255, 255, .8); }
+.sgb-intro { margin: 10px 0 14px; max-width: 900px; }
+.sgb-archived { max-width: 900px; margin-bottom: 14px; }
+
+/* composer: post type, then that type's fields */
+.sgb-kind { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: #f6f6f4; gap: 3px; margin-top: 2px; }
+.sgb-kind-opt {
+  display: inline-flex; align-items: center; gap: 6px; border: none; background: transparent; color: var(--ink-2);
+  border-radius: 7px; padding: 7px 14px; font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+}
+.sgb-kind-opt:hover { color: var(--ink); background: #ececec; }
+.sgb-kind-opt.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .12), inset 0 -2px 0 var(--lime); }
+.sgb-kind-opt:focus-visible { outline: 2px solid var(--lime-dark); outline-offset: 1px; }
+.sgb-editor .notes-ed-box { min-height: 110px; }
+.sgb-hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.sgb-editing { max-width: 900px; }
+
+/* filters: All / Announcements / Suggestions + search + sort; the Suggestions view adds category and status */
+.sgb-tools { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin-bottom: 10px; max-width: 900px; }
+.sgb-types .sg-chip { padding: 7px 14px; font-size: 13.5px; }
+.sgb-subtools { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; max-width: 900px; }
+.sgb-subtools .sg-filter { margin-bottom: 0; flex: 1 1 420px; }
+
+/* an announcement: the megaphone sits where a suggestion's +1 button is; the last two weeks' are lime-edged */
+.sgb-ann-mark {
+  flex: 0 0 auto; align-self: flex-start; width: 48px; min-height: 54px; display: grid; place-items: center;
+  border-radius: 10px; background: #f4f5e6; color: var(--ink);
+}
+.sgb-ann.recent { border-left: 4px solid var(--lime); }
+.sgb-ann.recent .sgb-ann-mark { background: var(--lime); color: var(--on-lime); }
+.sgb-badge {
+  font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink);
+  background: #eef0c2; border-radius: 999px; padding: 3px 9px;
+}
+.sgb-ann-body { margin: 4px 0 2px; font-size: 13.5px; color: var(--text); line-height: 1.5; word-break: break-word; }
+.sgb-ann-body .fmt { padding: 0; }
+.sgb-ann-body.clamp { max-height: 15em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.sgb-new {
+  display: inline-block; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--on-lime); background: var(--lime); border-radius: 999px; padding: 2px 7px; line-height: 1.3;
+}
+.sg-reply-toggle .sgb-new { margin-left: 2px; }
+
+/* a post opened from a link (#post-<id>, the Home cards) */
+.sg-card:target { outline: 2px solid var(--lime-dark); outline-offset: 2px; scroll-margin-top: 80px; }
+
 /* phones: 44 px tap targets (design §2.2) */
 @media (max-width: 720px) {
   .sg-card { gap: 10px; padding: 12px; }
   .sg-icon-btn { min-width: 44px; min-height: 44px; }
   .sg-reply-toggle { min-height: 44px; padding: 6px 12px; }
   select.sg-status { min-height: 44px; padding: 4px 12px; }
-  .sg-filter .sg-chip, .sg-form .sg-chip { min-height: 44px; }
+  .sg-filter .sg-chip, .sg-form .sg-chip, .sgb-types .sg-chip { min-height: 44px; }
   .sg-search { max-width: none; flex-basis: 100%; }
-  .sg-search input { padding: 10px 0; }
-  .sg-select { min-height: 44px; flex: 1 1 0; }
+  .sg-search input { padding: 10px 0; font-size: 16px; }
+  .sg-select { min-height: 44px; flex: 1 1 0; font-size: 16px; }
   .sg-reply-compose { flex-wrap: wrap; }
   .sg-reply-compose .btn { min-height: 44px; }
   .sg-form .modal-actions .btn { min-height: 44px; }
+  .sgb-pill { min-height: 44px; padding: 6px 14px; }
+  .sgb-switch-sep { display: none; }
+  .sgb-kind { display: flex; }
+  .sgb-kind-opt { flex: 1 1 0; justify-content: center; min-height: 44px; }
+  .sgb-ann-mark { width: 40px; min-height: 44px; }
+  .sgb-head .btn { min-height: 44px; }
+  .sgb-head h1 { font-size: 21px; }
 }
-
-/* Release 2: the box inside a thread space's Suggestions tab (design-amendments A5.6). The space page has the
-   heading, so the intro and "+ New suggestion" share one row. */
-.sg-embedded { max-width: none; }
-.sg-embed-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 12px; }
-.sg-embed-head .sg-intro { flex: 1 1 280px; margin: 0; }
-.sg-embed-head .btn { flex: 0 0 auto; }

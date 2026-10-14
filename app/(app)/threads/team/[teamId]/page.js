@@ -1,23 +1,26 @@
-import { notFound } from 'next/navigation';
-import { requirePageViewer } from '@/lib/viewer';
-import SpaceScreen, { spaceMetadata } from '../../_components/SpaceScreen';
+import { redirect } from 'next/navigation';
+import { requirePageViewer, tagUpdating } from '@/lib/viewer';
+import { teamBoardKey } from '@/lib/queries/suggestions';
+import { boardHref } from '@/lib/suggestions';
 
-// /threads/team/[teamId]: one team's space (design-amendments A5.6). Readable by the team's roster, Director and
-// up (L4) and admins; everyone else gets the same 404 as a missing team.
+// /threads/team/[teamId]: team spaces are gone (design-amendments A10.1); an old link goes to the team's office
+// board (a team without an office, or a missing team: the CAGE board). The board page decides who reads it.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const maxDuration = 60;
 
-const validId = (v) => /^[0-9]{1,18}$/.test(String(v ?? ''));
+const validId = (v) => /^[1-9][0-9]{0,17}$/.test(String(v ?? ''));
 
-export async function generateMetadata({ params }) {
-  if (!validId(params.teamId)) return { title: 'Threads' };
-  return spaceMetadata(`team:${params.teamId}`);
-}
-
-export default async function TeamSpacePage({ params, searchParams }) {
-  const viewer = await requirePageViewer();
-  if (!validId(params.teamId)) notFound();
-  return <SpaceScreen viewer={viewer} spaceKey={`team:${params.teamId}`} searchParams={searchParams} />;
+export default async function TeamSpacePage({ params }) {
+  await requirePageViewer();
+  let key = null;
+  if (validId(params.teamId)) {
+    try {
+      key = await teamBoardKey(params.teamId);
+    } catch (e) {
+      throw tagUpdating(e);
+    }
+  }
+  redirect(boardHref(key || 'company'));
 }

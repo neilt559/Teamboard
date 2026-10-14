@@ -1,8 +1,8 @@
-import { handle, notFound, parseId, HttpError } from '@/lib/http';
+import { handle, bad, notFound, parseId } from '@/lib/http';
 import { query } from '@/lib/db';
 import { isAdmin } from '@/lib/policy';
 import { suggestionMeta } from '@/lib/queries/suggestions';
-import { writableSql, ARCHIVED_MESSAGE } from '@/lib/queries/spaces';
+import { writableSql, archivedError } from '@/lib/queries/spaces';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -13,8 +13,8 @@ export const maxDuration = 60;
 // +1 ({ on: true }) or take back your +1 ({ on: false }). One per person (PK (suggestion_id, user_id), rule 24);
 // the voter always comes from the session (rule 23). Authors may +1 their own idea. A missing (or hidden)
 // suggestion is now a 404 instead of a foreign-key 500 (design §8.2). Voter lists are never returned.
-// Release 2 (design-amendments A5): only in a thread space the viewer can read (404 otherwise, the same as
-// missing), and not in an archived office or team space (409, admins excepted); both re-checked in the statement.
+// Only on a board the viewer can read (404 otherwise, the same as missing), and not on an archived office's
+// board (409, admins excepted); both re-checked in the statement. Announcements take no +1s (A10.2): 400.
 export const POST = handle(async ({ viewer, params, body }) => {
   const id = parseId(params.id);
   const b = await body();
@@ -23,8 +23,10 @@ export const POST = handle(async ({ viewer, params, body }) => {
   const admin = isAdmin(viewer);
   const meta = await suggestionMeta(viewer, id);
   if (!meta || (meta.hidden && !admin)) throw notFound('Suggestion not found');
-  if (!meta.writable) throw new HttpError(409, ARCHIVED_MESSAGE, { code: 'archived' });
+  if (meta.kind === 'announcement') throw bad('Announcements don’t take +1s.');
+  if (!meta.writable) throw archivedError();
   const target = `SELECT s.id FROM suggestions s WHERE s.id = $1::bigint AND (s.hidden_at IS NULL OR $3::boolean)
+                    AND s.kind = 'suggestion'
                     AND tb_can_read_space($2::bigint, s.scope, s.office_id, s.team_id)
                     AND ${writableSql('$2::bigint', 's.scope', 's.office_id', 's.team_id')}`;
   const r = on

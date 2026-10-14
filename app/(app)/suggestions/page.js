@@ -1,16 +1,19 @@
-import { redirect } from 'next/navigation';
 import { requirePageViewer } from '@/lib/viewer';
+import BoardScreen, { boardMetadata } from './BoardScreen';
 
-// /suggestions: Release 2 moved the suggestion box into the thread spaces (design-amendments A5.6): every space
-// (CAGE, each office, each team) has a Suggestions tab, and the four existing suggestions now live in the Charlotte
-// office space. The old address goes to the space list. SuggestionsClient and suggestions-ui.js (this folder)
-// render the Suggestions tab (app/(app)/threads/_components/SpaceScreen.js).
+// /suggestions: the CAGE Suggestions/Announcements board, everyone's (design-amendments A10.1). Every office has
+// its own at /suggestions/office/[officeId]; the switcher at the top moves between them. Every /threads address
+// redirects here (or to the office's board).
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const maxDuration = 60;
 
+export async function generateMetadata() {
+  return boardMetadata('company');
+}
+
 export default async function SuggestionsPage() {
-  await requirePageViewer();
-  redirect('/threads');
+  const viewer = await requirePageViewer();
+  return <BoardScreen viewer={viewer} boardKey="company" />;
 }

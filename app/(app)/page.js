@@ -12,7 +12,7 @@ import MyProjectsWidget from './_widgets/MyProjectsWidget';
 import AdminQueueWidget from './_widgets/AdminQueueWidget';
 import WhatsNewWidget from './_widgets/WhatsNewWidget';
 import AnnouncementsWidget from './_widgets/AnnouncementsWidget';
-import ThreadsWidget from './_widgets/ThreadsWidget';
+import PostsWidget from './_widgets/PostsWidget';
 import ChallengeWidget from './_widgets/ChallengeWidget';
 import EventsWidget from './_widgets/EventsWidget';
 import BracketWidget from './_widgets/BracketWidget';
@@ -35,7 +35,7 @@ const WIDGETS = {
   pinned_projects: PinnedWidget,
   my_projects: MyProjectsWidget,
   announcements: AnnouncementsWidget,
-  threads: ThreadsWidget,
+  threads: PostsWidget,                          // the stored key; the Suggestions/Announcements card (A10.4)
   challenge: ChallengeWidget,
   events: EventsWidget,
   bracket: BracketWidget,

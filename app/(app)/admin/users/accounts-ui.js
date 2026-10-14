@@ -134,7 +134,7 @@ function AccountEditor({ u, me, lists, accounts, onPatch, onAfter, ask }) {
     const ok = await ask({
       title: `Remove ${o.name} from ${u.name}’s offices?`,
       lines: [
-        `They stop seeing ${o.name}’s projects (except ones they’re a member of) and its meeting minutes and threads.`,
+        `They stop seeing ${o.name}’s projects (except ones they’re a member of), its meeting minutes and its suggestions and announcements.`,
         same(teams.find((t) => same(t.id, u.team_id))?.office_id, o.id) ? `Their team (${u.team}) is in ${o.name}, so it is cleared too.` : '',
       ],
       confirmLabel: 'Remove office',

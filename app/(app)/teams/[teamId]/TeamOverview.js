@@ -17,7 +17,6 @@ import MoreMenu from '../../offices/_ui/MoreMenu';
 import ErrorBanner from '../../offices/_ui/ErrorBanner';
 import AddTaskModal from './AddTaskModal';
 import TeamRoster from './TeamRoster';
-import SpaceLink from '../../threads/_components/SpaceLink';
 import CreateProjectDialog from '@/app/_ui/CreateProjectDialog';
 import { projectTitle } from '@/lib/projects';
 
@@ -31,11 +30,10 @@ function Owner({ person }) {
 }
 
 // The Team overview (inventory §1.10, design §2.1/§2.3): the team's visible projects as cards with their notes,
-// open task lists, "Mark done" and "+ Add task", plus the team's roster (A4: it drives project membership) and
-// (Release 2) its thread.
+// open task lists, "Mark done" and "+ Add task", plus the team's roster (A4: it drives project membership).
 // Moving the team to another office needs team rights in both offices; project add / rename / archive /
 // delete follow lib/policy.js exactly as the API does.
-export default function TeamOverview({ viewer, data, threadSlot = null, spaceLink = null, createOptions = null }) {
+export default function TeamOverview({ viewer, data, createOptions = null }) {
   const router = useRouter();
   useRefreshOnFocus(30_000);
   const [state, setState] = useServerState(data);
@@ -227,7 +225,6 @@ export default function TeamOverview({ viewer, data, threadSlot = null, spaceLin
           />
         )}
         <div className="spacer" />
-        {spaceLink && <SpaceLink link={spaceLink} />}
         {canAddProject && !team.archived && <button type="button" className="btn btn-lime" onClick={() => setDialog({ kind: 'project' })}>+ Add Project</button>}
       </div>
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
@@ -333,7 +330,6 @@ export default function TeamOverview({ viewer, data, threadSlot = null, spaceLin
         refresh={() => router.refresh()}
         pmOnlyEditor={!admin && !canManageTeam}
       />
-      {threadSlot}
 
       {addingTaskFor && (
         <AddTaskModal people={people} projectName={addingProject ? projectTitle(addingProject) : ''} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />

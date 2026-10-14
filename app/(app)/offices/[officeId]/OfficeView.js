@@ -16,15 +16,16 @@ import MoreMenu from '../_ui/MoreMenu';
 import ErrorBanner from '../_ui/ErrorBanner';
 import PersonRow from '../_ui/PersonRow';
 import OfficeMeetings from './OfficeMeetings';
-import SpaceLink from '../../threads/_components/SpaceLink';
+import BoardLink from '../../suggestions/BoardLink';
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
 // One office (design §2.1, inventory §1.10 OfficeView): breadcrumb, header, teams grid (visible project names
-// only), people, and the office-internal part (meetings, office thread) for people who may see it. Team
-// management (add, rename, reorder within this office, archive, restore, delete) moved here from the old
-// sidebar's prompt()/confirm() controls, with the same wording and double confirms (§2.3, rule 18).
-export default function OfficeView({ viewer, data, now, threadSlot = null, spaceLink = null }) {
+// only), people, and the office-internal part (meetings, the office's Suggestions/Announcements board preview) for
+// people who may see it. Team management (add, rename, reorder within this office, archive, restore, delete) moved
+// here from the old sidebar's prompt()/confirm() controls, with the same wording and double confirms (§2.3,
+// rule 18). boardLink / boardSlot come from the page, only for viewers who can read the office's board (A10.4).
+export default function OfficeView({ viewer, data, now, boardSlot = null, boardLink = null }) {
   const router = useRouter();
   useRefreshOnFocus(30_000);
   const [state, setState] = useServerState(data);
@@ -129,7 +130,7 @@ export default function OfficeView({ viewer, data, now, threadSlot = null, space
         <LocalTime tz={office.tz} now={now} className="progress-label local-time" />
         {mine && <span className="ofc-badge ofc-badge-mine">Your office</span>}
         {!mine && followed && <span className="ofc-badge ofc-badge-follow">Following</span>}
-        {spaceLink && <><div className="spacer" /><SpaceLink link={spaceLink} /></>}
+        {boardLink && <><div className="spacer" /><BoardLink link={boardLink} /></>}
       </div>
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
@@ -197,14 +198,14 @@ export default function OfficeView({ viewer, data, now, threadSlot = null, space
       {state.internal ? (
         <>
           <OfficeMeetings key={office.id} officeId={office.id} meetings={state.meetings} />
-          {threadSlot}
+          {boardSlot}
         </>
       ) : (
         <div className="office-section office-block office-locked">
           <IconLock size={18} />
           <div>
             <b>{`${office.name} office members only`}</b>
-            <p>Meeting minutes and the office’s thread space are for people in this office.</p>
+            <p>Meeting minutes and the office’s suggestions and announcements are for people in this office.</p>
           </div>
         </div>
       )}

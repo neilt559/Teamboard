@@ -3,9 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  IconHome, IconCheck, IconFolder, IconList, IconChat, IconTrophy, IconUsers, IconMenu,
+  IconHome, IconCheck, IconFolder, IconList, IconMegaphone, IconTrophy, IconUsers, IconMenu,
   IconSettings, IconKey, IconShield, IconLogOut, IconCaret,
 } from '../icons';
+import { BOARD_LABEL, BOARD_SHORT } from '@/lib/suggestions';
 import { Headshot } from './Headshot';
 import { logout } from './api';
 import { openAdminEntrance } from './ClaimAdmin';
@@ -13,14 +14,15 @@ import { openAdminEntrance } from './ClaimAdmin';
 // The sticky 56 px header (design §2.2). Desktop: brand, tabs, user menu. Phone (<= 720 px): hamburger,
 // brand, avatar; the tabs move to the bottom bar and the drawer.
 
-// Every main section. `match` decides the active tab; offices and teams live under Projects. Release 2: the
-// suggestion box lives in each thread space (/suggestions redirects to /threads), so it has no tab of its own.
+// Every main section. `match` decides the active tab; offices and teams live under Projects. `short` is the
+// bottom bar's label where the full one doesn't fit. Design-amendments A10: the Suggestions/Announcements boards
+// replace the thread spaces (every /threads address redirects to them).
 export const TABS = [
   { key: 'home', href: '/', label: 'Home', Icon: IconHome, match: (p) => p === '/' },
   { key: 'my-work', href: '/my-work', label: 'My work', Icon: IconCheck },
   { key: 'projects', href: '/projects', label: 'Projects', Icon: IconFolder, also: ['/offices', '/teams', '/reports'] },
   { key: 'tasks', href: '/tasks', label: 'All tasks', Icon: IconList },
-  { key: 'threads', href: '/threads', label: 'Threads', Icon: IconChat, also: ['/suggestions'] },
+  { key: 'posts', href: '/suggestions', label: BOARD_LABEL, short: BOARD_SHORT, Icon: IconMegaphone, also: ['/threads'] },
   { key: 'culture', href: '/culture', label: 'Culture', Icon: IconTrophy },
   { key: 'people', href: '/people', label: 'People', Icon: IconUsers },
 ];
@@ -33,10 +35,10 @@ export function tabFor(pathname) {
   return null;
 }
 
-// Threads unread total from loadNav (design-amendments A5.5: nav.threads_unread, unread posts across every space
-// the viewer can read; the older nav.unread shapes are still accepted).
+// Suggestions/Announcements unread total from loadNav (design-amendments A10.4: nav.posts_unread, unread posts
+// across every board the viewer can read; the older nav.unread shapes are still accepted).
 export function unreadCount(nav) {
-  const t = Number(nav?.threads_unread);
+  const t = Number(nav?.posts_unread);
   if (Number.isFinite(t) && t > 0) return t;
   const u = nav?.unread;
   if (typeof u === 'number') return u;
@@ -197,7 +199,7 @@ export default function Header({ viewer, nav, pathname, drawerOpen, onMenu }) {
             aria-current={active === key ? 'page' : undefined}
           >
             <Icon size={16} /> {label}
-            {key === 'threads' && <Badge n={unread} label="unread" />}
+            {key === 'posts' && <Badge n={unread} label="unread" />}
           </Link>
         ))}
       </nav>
