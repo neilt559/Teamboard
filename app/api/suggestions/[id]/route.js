@@ -4,6 +4,7 @@ import { deleteWithSnapshot } from '@/lib/audit';
 import { isAdmin } from '@/lib/policy';
 import { CATEGORIES, STATUSES } from '@/lib/suggestions';
 import { suggestionMeta, activeUserCount, canChangeStatus, loadSuggestion } from '@/lib/queries/suggestions';
+import { writableSql, ARCHIVED_MESSAGE } from '@/lib/queries/spaces';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -18,6 +19,9 @@ export const maxDuration = 60;
 //     records status_changed_by / status_changed_at.
 //   hidden: admins only (moderation; hidden suggestions disappear for everyone else).
 // The response never carries the author's user_id (an anonymous post stays anonymous to everyone).
+// Release 2 (design-amendments A5): a suggestion in a thread space the viewer can't read is the same 404 as a
+// missing one (tb_can_read_space, checked first and again in the UPDATE itself); in an archived office or team
+// space nothing changes except by an admin (409).
 
 const AUTHOR_KEYS = ['title', 'details', 'category', 'anonymous'];
 const has = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
@@ -52,11 +56,12 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
   const id = parseId(params.id);
   const b = await body();
   const admin = isAdmin(viewer);
-  const s = await suggestionMeta(id);
+  const s = await suggestionMeta(viewer, id);
   if (!s || (s.hidden && !admin)) throw notFound('Suggestion not found');
   const mine = s.user_id != null && s.user_id === String(viewer.id);
   const authorKeys = AUTHOR_KEYS.filter((k) => has(b, k));
   if (authorKeys.length && !mine) throw forbidden('Only the person who posted this can edit it.');
+  if (!s.writable) throw new HttpError(409, ARCHIVED_MESSAGE, { code: 'archived' });
 
   // Validate everything before writing anything (today a bad title after a status change half-applied).
   const patch = {};
@@ -89,10 +94,14 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
     for (const k of ['title', 'details']) if (has(patch, k) && has(b.base, k)) base[k] = b.base[k];
   }
 
-  // Race-safe scope: author fields only while it is still the author's row; non-admins only while not hidden.
-  const scope = [];
-  const scopeParams = [];
-  if (authorKeys.length) { scopeParams.push(String(viewer.id)); scope.push(`user_id = $${scopeParams.length}::bigint`); }
+  // Race-safe scope: still readable and writable for the viewer; author fields only while it is still the author's
+  // row; non-admins only while not hidden.
+  const scopeParams = [String(viewer.id)];
+  const scope = [
+    'tb_can_read_space($1::bigint, suggestions.scope, suggestions.office_id, suggestions.team_id)',
+    writableSql('$1::bigint', 'suggestions.scope', 'suggestions.office_id', 'suggestions.team_id'),
+  ];
+  if (authorKeys.length) scope.push('user_id = $1::bigint');
   if (!admin) scope.push('hidden_at IS NULL');
 
   let row;
@@ -112,13 +121,27 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
 
 // Only the author can delete their own suggestion (as today). Votes and replies go with it (cascade);
 // a JSON snapshot of the suggestion and its replies goes to audit_log in the same statement.
+// Missing, or in a space the viewer can't read -> { ok: true } (no existence leak); someone else's -> 403;
+// archived space -> 409.
 export const DELETE = handle(async ({ viewer, params }) => {
   const id = parseId(params.id);
+  const s = await suggestionMeta(viewer, id);
+  if (!s) return { ok: true };
+  if (s.user_id !== String(viewer.id)) throw forbidden('Only the person who posted this can delete it.');
+  if (!s.writable) throw new HttpError(409, ARCHIVED_MESSAGE, { code: 'archived' });
   const r = await deleteWithSnapshot({
     table: 'suggestions', id, actorId: viewer.id, action: 'suggestion.delete',
-    scopeSql: 'user_id = $1::bigint', scopeParams: [String(viewer.id)],
+    scopeSql: `suggestions.user_id = $1::bigint
+      AND tb_can_read_space($1::bigint, suggestions.scope, suggestions.office_id, suggestions.team_id)
+      AND ${writableSql('$1::bigint', 'suggestions.scope', 'suggestions.office_id', 'suggestions.team_id')}`,
+    scopeParams: [String(viewer.id)],
     children: { replies: { table: 'suggestion_replies', fk: 'suggestion_id' } },
   });
-  if (!r.deleted && r.existed) throw forbidden('Only the person who posted this can delete it.');
+  if (!r.deleted && r.existed) {
+    // Changed meanwhile: answer from what it is now.
+    const now = await suggestionMeta(viewer, id);
+    if (now && now.user_id !== String(viewer.id)) throw forbidden('Only the person who posted this can delete it.');
+    if (now && !now.writable) throw new HttpError(409, ARCHIVED_MESSAGE, { code: 'archived' });
+  }
   return { ok: true };
 }, { legacyWrite: true });

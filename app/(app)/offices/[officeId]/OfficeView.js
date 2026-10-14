@@ -15,6 +15,7 @@ import MoreMenu from '../_ui/MoreMenu';
 import ErrorBanner from '../_ui/ErrorBanner';
 import PersonRow from '../_ui/PersonRow';
 import OfficeMeetings from './OfficeMeetings';
+import SpaceLink from '../../threads/_components/SpaceLink';
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
@@ -22,7 +23,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 // only), people, and the office-internal part (meetings, office thread) for people who may see it. Team
 // management (add, rename, reorder within this office, archive, restore, delete) moved here from the old
 // sidebar's prompt()/confirm() controls, with the same wording and double confirms (§2.3, rule 18).
-export default function OfficeView({ viewer, data, now, threadSlot = null }) {
+export default function OfficeView({ viewer, data, now, threadSlot = null, spaceLink = null }) {
   const router = useRouter();
   useRefreshOnFocus(30_000);
   const [state, setState] = useServerState(data);
@@ -127,6 +128,7 @@ export default function OfficeView({ viewer, data, now, threadSlot = null }) {
         <LocalTime tz={office.tz} now={now} className="progress-label local-time" />
         {mine && <span className="ofc-badge ofc-badge-mine">Your office</span>}
         {!mine && followed && <span className="ofc-badge ofc-badge-follow">Following</span>}
+        {spaceLink && <><div className="spacer" /><SpaceLink link={spaceLink} /></>}
       </div>
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
@@ -201,7 +203,7 @@ export default function OfficeView({ viewer, data, now, threadSlot = null }) {
           <IconLock size={18} />
           <div>
             <b>{`${office.name} office members only`}</b>
-            <p>Meeting minutes and the office thread are for people in this office.</p>
+            <p>Meeting minutes and the office’s thread space are for people in this office.</p>
           </div>
         </div>
       )}

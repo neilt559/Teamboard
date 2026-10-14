@@ -17,6 +17,7 @@ import MoreMenu from '../../offices/_ui/MoreMenu';
 import ErrorBanner from '../../offices/_ui/ErrorBanner';
 import AddTaskModal from './AddTaskModal';
 import TeamRoster from './TeamRoster';
+import SpaceLink from '../../threads/_components/SpaceLink';
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const same = (a, b) => a != null && b != null && String(a) === String(b);
@@ -32,7 +33,7 @@ function Owner({ person }) {
 // (Release 2) its thread.
 // Moving the team to another office needs team rights in both offices; project add / rename / archive /
 // delete follow lib/policy.js exactly as the API does.
-export default function TeamOverview({ viewer, data, threadSlot = null }) {
+export default function TeamOverview({ viewer, data, threadSlot = null, spaceLink = null }) {
   const router = useRouter();
   useRefreshOnFocus(30_000);
   const [state, setState] = useServerState(data);
@@ -230,6 +231,7 @@ export default function TeamOverview({ viewer, data, threadSlot = null }) {
           />
         )}
         <div className="spacer" />
+        {spaceLink && <SpaceLink link={spaceLink} />}
         {canAddProject && !team.archived && <button type="button" className="btn btn-lime" onClick={() => setDialog({ kind: 'project' })}>+ Add Project</button>}
       </div>
       <ErrorBanner error={error} onDismiss={() => setError(null)} />

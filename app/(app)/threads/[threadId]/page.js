@@ -1,27 +1,14 @@
-import { requirePageViewer } from '@/lib/viewer';
 import { notFound } from 'next/navigation';
-import { IconChat } from '@/app/icons';
+import { requirePageViewer } from '@/lib/viewer';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M3 (T1) (design §2.1, §15).
+// Release 2 has no thread pages: a space holds announcements, suggestions and chat (design-amendments A5 replaces
+// design §9). This M0 placeholder route stays so an old /threads/<id> link is a plain 404.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const maxDuration = 60;
 
-export const metadata = { title: 'Thread' };
-
-export default async function ThreadPage({ params }) {
-  const viewer = await requirePageViewer();
-  if (!/^[0-9]{1,18}$/.test(String(params.threadId))) notFound();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconChat size={24} /> Thread</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>One conversation and its replies.</p>
-      </div>
-    </div>
-  );
+export default async function ThreadPage() {
+  await requirePageViewer();
+  notFound();
 }

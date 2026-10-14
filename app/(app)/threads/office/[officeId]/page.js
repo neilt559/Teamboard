@@ -1,27 +1,23 @@
-import { requirePageViewer } from '@/lib/viewer';
 import { notFound } from 'next/navigation';
-import { IconChat } from '@/app/icons';
+import { requirePageViewer } from '@/lib/viewer';
+import SpaceScreen, { spaceMetadata } from '../../_components/SpaceScreen';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M3 (T1) (design §2.1, §15).
+// /threads/office/[officeId]: one office's space (design-amendments A5.6). Readable by the office's home and
+// extra-office members, Director and up (L4) and admins; everyone else gets the same 404 as a missing office.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const maxDuration = 60;
 
-export const metadata = { title: 'Office threads' };
+const validId = (v) => /^[0-9]{1,18}$/.test(String(v ?? ''));
 
-export default async function OfficeThreadsPage({ params }) {
+export async function generateMetadata({ params }) {
+  if (!validId(params.officeId)) return { title: 'Threads' };
+  return spaceMetadata(`office:${params.officeId}`);
+}
+
+export default async function OfficeSpacePage({ params, searchParams }) {
   const viewer = await requirePageViewer();
-  if (!/^[0-9]{1,18}$/.test(String(params.officeId))) notFound();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconChat size={24} /> Office threads</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>Conversations for one office.</p>
-      </div>
-    </div>
-  );
+  if (!validId(params.officeId)) notFound();
+  return <SpaceScreen viewer={viewer} spaceKey={`office:${params.officeId}`} searchParams={searchParams} />;
 }

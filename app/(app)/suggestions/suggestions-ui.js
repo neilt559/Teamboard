@@ -299,9 +299,12 @@ function ReplyThread({ replies, tz, isAdmin, ask, onReply, onDeleteReply, onHide
   );
 }
 
+// embedded (Release 2, a thread space's Suggestions tab): no page heading, the intro line and "+ New suggestion"
+// share one row. intro replaces the default intro text; canPost false hides "+ New suggestion" (archived space).
 export default function SuggestionsView({
   suggestions, replies = [], tz, canStatus = true, statusOpen = true, isAdmin = false,
   onAdd, onPatch, onEdit, onDelete, onVote, onReply, onDeleteReply, onHide, onHideReply, onRefresh,
+  embedded = false, intro = null, canPost = true,
 }) {
   const [composing, setComposing] = useState(false);
   const [cat, setCat] = useState('all');
@@ -327,11 +330,20 @@ export default function SuggestionsView({
 
   return (
     <>
-      <div className="proj-head">
-        <h1 className="wi-h"><IconBulb size={24} /> Suggestions</h1>
-        {!composing && <button type="button" className="btn btn-lime btn-sm" onClick={() => setComposing(true)}>+ New suggestion</button>}
-      </div>
-      <p className="sg-intro">Ideas to make the office better. Anyone can post one, +1 the ideas they like, and follow what happens with them.</p>
+      {embedded ? (
+        <div className="sg-embed-head">
+          <p className="sg-intro">{intro || 'Ideas to make the office better. Anyone can post one, +1 the ideas they like, and follow what happens with them.'}</p>
+          {canPost && !composing && <button type="button" className="btn btn-lime btn-sm" onClick={() => setComposing(true)}>+ New suggestion</button>}
+        </div>
+      ) : (
+        <>
+          <div className="proj-head">
+            <h1 className="wi-h"><IconBulb size={24} /> Suggestions</h1>
+            {canPost && !composing && <button type="button" className="btn btn-lime btn-sm" onClick={() => setComposing(true)}>+ New suggestion</button>}
+          </div>
+          <p className="sg-intro">{intro || 'Ideas to make the office better. Anyone can post one, +1 the ideas they like, and follow what happens with them.'}</p>
+        </>
+      )}
 
       {composing && (
         <SuggestionForm
@@ -371,7 +383,7 @@ export default function SuggestionsView({
       </div>
 
       {rows.length === 0 ? (
-        <div className="sg-empty">{suggestions.length ? 'No suggestions match these filters.' : 'No suggestions yet — be the first to post one!'}</div>
+        <div className="sg-empty">{suggestions.length ? 'No suggestions match these filters.' : canPost ? 'No suggestions yet — be the first to post one!' : 'No suggestions here.'}</div>
       ) : (
         <div className="sg-list">
           {rows.map((s) => (

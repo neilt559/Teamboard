@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { TABS, tabFor, unreadCount, Badge } from './Header';
 
 // Phone tab bar (<= 720 px, design §2.2): fixed, 58 px plus the safe-area inset. Active item = lime underline.
-// All tasks, Suggestions and People are in the drawer.
+// All tasks and People are in the drawer. Threads carries the unread badge (nav.threads_unread).
 const KEYS = ['home', 'my-work', 'projects', 'threads', 'culture'];
 const ITEMS = KEYS.map((k) => TABS.find((t) => t.key === k));
 

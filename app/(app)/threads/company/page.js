@@ -1,25 +1,15 @@
+import { redirect } from 'next/navigation';
 import { requirePageViewer } from '@/lib/viewer';
-import { IconChat } from '@/app/icons';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M3 (T1) (design §2.1, §15).
+// The M0 placeholder URL for the company channel. The CAGE space lives at /threads/cage (design-amendments A5.6).
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const maxDuration = 60;
 
-export const metadata = { title: 'Company threads' };
-
-export default async function CompanyThreadsPage() {
-  const viewer = await requirePageViewer();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconChat size={24} /> Company threads</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>Company-wide conversations.</p>
-      </div>
-    </div>
-  );
+export default async function CompanyThreadsPage({ searchParams }) {
+  await requirePageViewer();
+  const tab = ['announcements', 'suggestions', 'chat'].includes(searchParams?.tab) && searchParams.tab !== 'announcements'
+    ? `?tab=${searchParams.tab}` : '';
+  redirect(`/threads/cage${tab}`);
 }

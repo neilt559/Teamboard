@@ -11,7 +11,11 @@ import SuggestionsView from './suggestions-ui';
 // the same endpoints with the new client (X-TB-Client: 2). Optimistic where they were optimistic (status,
 // +1, deletes); creates and replies wait for the server, then the page refreshes (design §7.5: after your
 // own write, router.refresh(); refresh on focus).
-export default function SuggestionsClient({ initial, tz }) {
+// Release 2 (design-amendments A5): the box lives in each thread space's Suggestions tab. space = the space key
+// ('company', 'office:<id>', 'team:<id>'); a new suggestion is posted into it. embedded drops the page heading
+// (the space page has its own), intro replaces the intro line, canPost false hides "+ New suggestion"
+// (an archived space is read-only).
+export default function SuggestionsClient({ initial, tz, space = null, embedded = false, intro = null, canPost = true }) {
   const router = useRouter();
   const [data, setData] = useServerState(initial);
   const [error, setError] = useState(null);
@@ -35,7 +39,7 @@ export default function SuggestionsClient({ initial, tz }) {
 
   async function addSuggestion(p) {
     try {
-      const row = await api('/api/suggestions', { method: 'POST', body: p });
+      const row = await api('/api/suggestions', { method: 'POST', body: space ? { ...p, space } : p });
       if (row && row.id != null && row.title != null) {
         setData((d) => ({ ...d, suggestions: [row, ...d.suggestions.filter((s) => String(s.id) !== String(row.id))] }));
       }
@@ -131,7 +135,7 @@ export default function SuggestionsClient({ initial, tz }) {
   }
 
   return (
-    <div className="sg-page">
+    <div className={`sg-page${embedded ? ' sg-embedded' : ''}`}>
       {error && (
         <div className="banner sg-banner" role="alert">
           <IconAlert size={16} />
@@ -157,6 +161,9 @@ export default function SuggestionsClient({ initial, tz }) {
         onHide={hideSuggestion}
         onHideReply={hideReply}
         onRefresh={refresh}
+        embedded={embedded}
+        intro={intro}
+        canPost={canPost}
       />
     </div>
   );

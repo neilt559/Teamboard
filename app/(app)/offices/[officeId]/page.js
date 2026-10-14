@@ -3,12 +3,15 @@ import { requirePageViewer, publicViewer, tagUpdating } from '@/lib/viewer';
 import { loadOffice } from '@/lib/queries/offices';
 import { canManageTeamsIn } from '@/lib/access';
 import { nowFromRequestContext } from '@/lib/clock';
+import { loadSpace } from '@/lib/queries/spaces';
 import ThreadPreview from '../../threads/_components/ThreadPreview';
 import OfficeView from './OfficeView';
 
 // One office (design §2.1): public part for everyone (teams with visible project names, people); the
-// office-internal part (meetings, office thread) for home and extra-office members at any level, PMs and up
-// (L3+) and admins (tb_can_see_office, amendment A1); others see "<Office> office members only".
+// office-internal part (meetings) for home and extra-office members at any level, PMs and up (L3+) and admins
+// (tb_can_see_office, amendment A1); others see "<Office> office members only". The office's thread space
+// (design-amendments A5) is stricter: its members, Director and up (L4) and admins (tb_can_read_space); for them
+// the header links to "<Office> space" and the page shows its preview.
 // An archived office is a 404, except for admins, who get a Restore banner.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -44,12 +47,19 @@ export default async function OfficePage({ params }) {
   // Archived teams are listed (with Restore) only for people who manage teams here; nobody else gets them.
   const data = canManageTeamsIn(viewer, loaded.office.id) ? loaded : { ...loaded, archived_teams: [] };
   const pv = publicViewer(viewer);
+  let space = null;
+  try {
+    space = await loadSpace(viewer, `office:${data.office.id}`);
+  } catch (e) {
+    throw tagUpdating(e);
+  }
   return (
     <OfficeView
       viewer={pv}
       data={data}
       now={nowFromRequestContext()}
-      threadSlot={data.internal ? <ThreadPreview scope="office" officeId={data.office.id} viewer={pv} /> : null}
+      spaceLink={space ? { href: space.href, name: space.name, unread: space.unread } : null}
+      threadSlot={space ? <ThreadPreview scope="office" officeId={data.office.id} viewer={viewer} /> : null}
     />
   );
 }

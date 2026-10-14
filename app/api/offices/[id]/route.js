@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { guardedPatch, norm } from '@/lib/patch';
 import { validTimeZone } from '@/app/(app)/admin/_parts/timezones';
 import { deleteOffice, officeUsage } from '@/lib/queries/admin';
+import { spaceUsage, SPACE_DELETE_REFUSED } from '@/lib/queries/spaces';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -77,16 +78,22 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
 }, { legacyWrite: true });
 
 // DELETE (admins; the UI asks twice). Refused while the office has GeoGuessr history (scores or 5Ks), with
-// today's text; refused while people still have it as their home office. The whole office tree is
+// today's text; refused while people still have it as their home office; refused while the office's thread space
+// or any of its teams' spaces has posts or suggestions (design-amendments A5.3: nothing is ever deleted, archive
+// it instead; the RESTRICT keys on space_posts and suggestions back this up). The whole office tree is
 // snapshotted to audit_log in the same statement as the delete. A missing office is { ok: true }.
 export const DELETE = handle(async ({ viewer, params }) => {
   const oid = parseId(params.id);
+  const threads = await spaceUsage({ officeId: oid });
+  if (threads.posts || threads.suggestions) throw new HttpError(409, SPACE_DELETE_REFUSED.office, { code: 'has_threads' });
   let r;
   try {
     r = await deleteOffice({ adminId: viewer.id, officeId: oid });
   } catch (e) {
-    // RESTRICT foreign keys (users.office_id, geo_scores) raise 23001; NO ACTION ones raise 23503.
+    // RESTRICT foreign keys (users.office_id, geo_scores, space_posts, suggestions) raise 23001; NO ACTION ones 23503.
     if (e?.code !== '23503' && e?.code !== '23001') throw e;
+    const t = await spaceUsage({ officeId: oid });               // a post that arrived meanwhile
+    if (t.posts || t.suggestions) throw new HttpError(409, SPACE_DELETE_REFUSED.office, { code: 'has_threads' });
     const u = await officeUsage(oid);
     if (u?.people) {
       throw new HttpError(409, `${u.people} ${u.people === 1 ? 'person has' : 'people have'} “${u.name}” as their home office, `

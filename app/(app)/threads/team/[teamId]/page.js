@@ -1,27 +1,23 @@
-import { requirePageViewer } from '@/lib/viewer';
 import { notFound } from 'next/navigation';
-import { IconChat } from '@/app/icons';
+import { requirePageViewer } from '@/lib/viewer';
+import SpaceScreen, { spaceMetadata } from '../../_components/SpaceScreen';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M3 (T1) (design §2.1, §15).
+// /threads/team/[teamId]: one team's space (design-amendments A5.6). Readable by the team's roster, Director and
+// up (L4) and admins; everyone else gets the same 404 as a missing team.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const maxDuration = 60;
 
-export const metadata = { title: 'Team threads' };
+const validId = (v) => /^[0-9]{1,18}$/.test(String(v ?? ''));
 
-export default async function TeamThreadsPage({ params }) {
+export async function generateMetadata({ params }) {
+  if (!validId(params.teamId)) return { title: 'Threads' };
+  return spaceMetadata(`team:${params.teamId}`);
+}
+
+export default async function TeamSpacePage({ params, searchParams }) {
   const viewer = await requirePageViewer();
-  if (!/^[0-9]{1,18}$/.test(String(params.teamId))) notFound();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconChat size={24} /> Team threads</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>Conversations for one team.</p>
-      </div>
-    </div>
-  );
+  if (!validId(params.teamId)) notFound();
+  return <SpaceScreen viewer={viewer} spaceKey={`team:${params.teamId}`} searchParams={searchParams} />;
 }

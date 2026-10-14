@@ -2,6 +2,7 @@ import { handle, HttpError, parseId, str, bad, forbidden, gone } from '@/lib/htt
 import { query } from '@/lib/db';
 import { guardedPatch, norm } from '@/lib/patch';
 import { canManageTeamsIn } from '@/lib/access';
+import { spaceUsage, SPACE_DELETE_REFUSED } from '@/lib/queries/spaces';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -101,10 +102,13 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
 // DELETE /api/teams/:id: admins only (two confirms in the UI). One statement deletes the team (its projects
 // and everything in them cascade, its roster too; members' team is cleared by the FK) and writes a JSON snapshot of all of
 // it to audit_log, so the delete can never happen without its record (§13 #12). Already gone -> { ok: true }.
+// Release 2 (design-amendments A5.3): refused with 409 while the team's thread space has posts or suggestions
+// (nothing is ever deleted; archive it instead). The RESTRICT keys on space_posts.team_id and suggestions.team_id
+// back this up: a post that arrives meanwhile rolls the whole statement back, snapshot included.
 export const DELETE = handle(async ({ viewer, params }) => {
   const id = parseId(params.id);
-  // A reference that refuses the delete (threads.team_id is ON DELETE RESTRICT from Release 2) rolls the whole
-  // statement back, snapshot included, and answers 409.
+  const threads = await spaceUsage({ teamId: id });
+  if (threads.posts || threads.suggestions) throw new HttpError(409, SPACE_DELETE_REFUSED.team, { code: 'has_threads' });
   const r = await query(
     `WITH s AS (SELECT * FROM teams WHERE id = $1::bigint),
      pr AS (SELECT p.* FROM projects p WHERE p.team_id IN (SELECT id FROM s)),
@@ -129,9 +133,12 @@ export const DELETE = handle(async ({ viewer, params }) => {
      a AS (INSERT INTO audit_log (actor_id, action, entity, entity_id, detail)
            SELECT $2::bigint, 'team.delete', 'teams', d.id::text, snap.detail FROM d CROSS JOIN snap)
      SELECT (SELECT count(*) FROM d)::int AS deleted`,
-    [id, String(viewer.id)]).catch((e) => {
-    if (e?.code === '23503') throw new HttpError(409, 'This team still has threads or other records that need it. Archive it instead.');
-    throw e;
+    [id, String(viewer.id)]).catch(async (e) => {
+    // RESTRICT keys raise 23001 (restrict_violation), NO ACTION ones 23503.
+    if (e?.code !== '23503' && e?.code !== '23001') throw e;
+    const t = await spaceUsage({ teamId: id });
+    if (t.posts || t.suggestions) throw new HttpError(409, SPACE_DELETE_REFUSED.team, { code: 'has_threads' });
+    throw new HttpError(409, 'This team still has threads or other records that need it. Archive it instead.');
   });
   return { ok: true, deleted: Number(r.rows[0]?.deleted || 0) };
 }, { auth: 'admin', legacyWrite: true });

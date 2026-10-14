@@ -1,14 +1,15 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { IconList, IconBulb, IconUsers, IconSettings, IconShield, IconLogOut } from '../icons';
+import { IconList, IconUsers, IconSettings, IconShield, IconLogOut } from '../icons';
 import { NavTree } from './Sidebar';
 import { Badge } from './Header';
 import { logout } from './api';
 
 // Phone slide-in menu (<= 720 px, design §2.2): backdrop, and never wider than min(86vw, 360px) whatever the
-// saved desktop sidebar width. Holds the office tree plus All tasks, Suggestions, People, Settings, Admin and
-// Log out. Closes on the backdrop, Escape, or any link.
+// saved desktop sidebar width. Holds the office tree plus All tasks, People, Settings, Admin and Log out (Threads,
+// with its unread badge, is in the bottom bar; suggestions live in the thread spaces since Release 2). Closes on
+// the backdrop, Escape, or any link.
 const under = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
 function Item({ href, Icon, label, pathname, onClose, children }) {
@@ -45,7 +46,6 @@ export default function Drawer({ open, onClose, viewer, nav, pathname }) {
       <nav className="drawer-panel" id="tb-drawer" aria-label="Menu" ref={panel}>
         <div className="drawer-links">
           <Item href="/tasks" Icon={IconList} label="All tasks" pathname={pathname} onClose={onClose} />
-          <Item href="/suggestions" Icon={IconBulb} label="Suggestions" pathname={pathname} onClose={onClose} />
           <Item href="/people" Icon={IconUsers} label="People" pathname={pathname} onClose={onClose} />
         </div>
         <NavTree nav={nav} pathname={pathname} onNavigate={onClose} />

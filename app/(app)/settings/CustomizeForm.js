@@ -16,13 +16,13 @@ const LANDING = [
 ];
 const WIDGET_LABELS = {
   my_tasks: 'My tasks', pinned_projects: 'Pinned projects', my_projects: 'My projects', announcements: 'Announcements',
-  threads: 'Unread threads', challenge: 'This month’s challenge', events: 'Upcoming events', bracket: 'Bracket',
+  threads: 'Threads (your spaces)', challenge: 'This month’s challenge', events: 'Upcoming events', bracket: 'Bracket',
   geo: 'GeoGuessr', admin_queue: 'Approval queue (admins)',
 };
-// Threads arrive in Release 2 and the challenge/events in Release 3. Until then their Home cards render
-// nothing, so they aren't offered here (the agents shipping them remove the key from this list).
-const NOT_YET = new Set(['announcements', 'threads', 'challenge', 'events']);
-const NOT_YET_LANDING = new Set(['threads']);
+// The challenge/events arrive in Release 3. Until then their Home cards render nothing, so they aren't offered
+// here (the agents shipping them remove the key from this list). Threads and announcements shipped in Release 2.
+const NOT_YET = new Set(['challenge', 'events']);
+const NOT_YET_LANDING = new Set([]);
 
 function Saved({ on }) {
   return on ? <span className="pf-ok wi" role="status"><IconCheck size={14} /> Saved</span> : null;
