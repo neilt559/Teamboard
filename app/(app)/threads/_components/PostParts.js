@@ -78,9 +78,12 @@ export function useAutoGrow(ref, value, max = 200) {
   }, [ref, value, max]);
 }
 
-// Inline plain-text editor for a reply or a chat message. Enter saves (Shift+Enter: new line), Escape cancels.
+// Inline plain-text editor for a reply or a chat message; Escape cancels. It saves the way its composer sends, so
+// the two boxes of one thread agree: chat (enterSaves, the default) saves on Enter (Shift+Enter: new line), like
+// the chat composer; a reply (enterSaves={false}) keeps Enter for new lines and saves on Ctrl+Enter (Cmd+Enter on
+// a Mac) or the Save button, like the reply box. The hint under the box says which.
 // onSave(text, base) resolves true, or throws ConflictError (shown under the box with Keep mine / Use theirs).
-export function InlineEdit({ post, onSave, onCancel, label = 'Edit message' }) {
+export function InlineEdit({ post, onSave, onCancel, label = 'Edit message', enterSaves = true }) {
   const [text, setText] = useState(post.body || '');
   const [base, setBase] = useState(post.body || '');
   const [busy, setBusy] = useState(false);
@@ -116,8 +119,9 @@ export function InlineEdit({ post, onSave, onCancel, label = 'Edit message' }) {
         maxLength={MAX_BODY + 500}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-          else if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); save(); }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
+          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+          if (e.ctrlKey || e.metaKey || (enterSaves && !e.shiftKey)) { e.preventDefault(); save(); }
         }}
       />
       <ConflictNotice
@@ -129,7 +133,7 @@ export function InlineEdit({ post, onSave, onCancel, label = 'Edit message' }) {
       />
       {err && <div className="sp-err" role="alert">{err}</div>}
       <div className="sp-edit-actions">
-        <span className="sp-hint">Enter to save · Esc to cancel</span>
+        <span className="sp-hint">{enterSaves ? 'Enter to save' : 'Ctrl+Enter to save'} · Esc to cancel</span>
         <button type="button" className="btn btn-plain btn-sm" onClick={() => onCancel()} disabled={busy}>Cancel</button>
         <button type="button" className="btn btn-ink btn-sm" onClick={() => save()} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
       </div>

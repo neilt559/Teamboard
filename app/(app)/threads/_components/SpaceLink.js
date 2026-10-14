@@ -12,7 +12,7 @@ export default function SpaceLink({ link }) {
   return (
     <Link href={link.href} prefetch={false} className="btn btn-plain btn-sm wi sp-space-link">
       <IconChat size={15} /> {`${link.name} space`}
-      {n > 0 && <span className="tab-badge" aria-label={`${n} unread`}>{n > 99 ? '99+' : n}</span>}
+      {n > 0 && <span className="tab-badge" aria-label={`${n} unread in ${link.name}`}>{n > 99 ? '99+' : n}</span>}
     </Link>
   );
 }

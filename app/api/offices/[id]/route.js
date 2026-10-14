@@ -14,6 +14,7 @@ export const maxDuration = 60;
 const has = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
 const RET = 'id, name, position, archived, geo_on, tz';
 const shape = (row) => ({ ...row, id: String(row.id), position: Number(row.position) });
+const GEO_HISTORY = 'This office has GeoGuessr history, so it can’t be deleted. Archive it instead.';
 
 // PATCH (design §8.2)
 //   { geo_on: true } alone -> joins GeoGuessr: one-way, anyone, exactly as today (GeoGuessr's "Add").
@@ -80,12 +81,20 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
 // DELETE (admins; the UI asks twice). Refused while the office has GeoGuessr history (scores or 5Ks), with
 // today's text; refused while people still have it as their home office; refused while the office's thread space
 // or any of its teams' spaces has posts or suggestions (design-amendments A5.3: nothing is ever deleted, archive
-// it instead; the RESTRICT keys on space_posts and suggestions back this up). The whole office tree is
-// snapshotted to audit_log in the same statement as the delete. A missing office is { ok: true }.
+// it instead; the RESTRICT keys on space_posts and suggestions back this up). GeoGuessr history is checked first,
+// so an office that has both (Charlotte: scores and the moved suggestions) keeps today's answer (rule 3, geo
+// parity). The whole office tree is snapshotted to audit_log in the same statement as the delete. A missing office
+// is { ok: true }.
 export const DELETE = handle(async ({ viewer, params }) => {
   const oid = parseId(params.id);
   const threads = await spaceUsage({ officeId: oid });
-  if (threads.posts || threads.suggestions) throw new HttpError(409, SPACE_DELETE_REFUSED.office, { code: 'has_threads' });
+  if (threads.posts || threads.suggestions) {
+    const g = await query(
+      `SELECT (o.fivek > 0 OR EXISTS (SELECT 1 FROM geo_scores gs WHERE gs.office_id = o.id)) AS geo
+       FROM offices o WHERE o.id = $1::bigint`, [oid]);
+    if (g.rows[0]?.geo) throw new HttpError(409, GEO_HISTORY);
+    throw new HttpError(409, SPACE_DELETE_REFUSED.office, { code: 'has_threads' });
+  }
   let r;
   try {
     r = await deleteOffice({ adminId: viewer.id, officeId: oid });
@@ -102,7 +111,7 @@ export const DELETE = handle(async ({ viewer, params }) => {
     throw new HttpError(409, 'Other records still use this office (GeoGuessr scores, threads or events), so it can’t be deleted. Archive it instead.');
   }
   if (!r.deleted && r.existed && (r.scores > 0 || r.fivek > 0)) {
-    throw new HttpError(409, 'This office has GeoGuessr history, so it can’t be deleted. Archive it instead.');
+    throw new HttpError(409, GEO_HISTORY);
   }
   return { ok: true };
 }, { auth: 'admin', legacyWrite: true });

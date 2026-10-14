@@ -1,4 +1,4 @@
-import { handle, str, bad, HttpError, notFound } from '@/lib/http';
+import { handle, str, bad, HttpError, notFound, noNul } from '@/lib/http';
 import { query } from '@/lib/db';
 import { CATEGORIES } from '@/lib/suggestions';
 import { loadSuggestion, loadSuggestions, suggestionTarget } from '@/lib/queries/suggestions';
@@ -28,9 +28,9 @@ export const GET = handle(async ({ req, viewer }) => {
 // statement. Response keeps today's { id } and adds the shaped suggestion.
 export const POST = handle(async ({ viewer, body }) => {
   const b = await body();
-  const title = str(b.title, 160);
+  const title = noNul(str(b.title, 160));                         // a NUL can't be stored: 400, not 500
   if (!title) throw bad('Give your suggestion a title.');
-  const details = str(b.details, 5000);
+  const details = noNul(str(b.details, 5000));
   const category = CATEGORIES.some((c) => c.key === b.category) ? b.category : 'other';
   const target = await suggestionTarget(viewer, b.space);
   if (!target) throw notFound('Space not found');

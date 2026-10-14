@@ -51,7 +51,7 @@ export default async function ThreadsWidget({ viewer, now: givenNow }) {
                   <span className="wl-meta">{meta}{s.archived ? ' · archived' : ''}</span>
                 </span>
                 {n > 0
-                  ? <span className="sp-unread" aria-label={`${n} unread`}><span className="sp-dot" aria-hidden="true" />{n > 99 ? '99+' : n}</span>
+                  ? <span className="sp-unread" aria-label={`${n} unread in ${s.name}`}><span className="sp-dot" aria-hidden="true" />{n > 99 ? '99+' : n}</span>
                   : <IconChevronRight size={15} className="sp-row-go" />}
               </Link>
             </li>

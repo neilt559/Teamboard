@@ -1,4 +1,4 @@
-import { handle, HttpError, str, bad, forbidden, notFound, parseId } from '@/lib/http';
+import { handle, HttpError, str, bad, forbidden, notFound, parseId, noNul } from '@/lib/http';
 import { guardedPatch, norm } from '@/lib/patch';
 import { deleteWithSnapshot } from '@/lib/audit';
 import { isAdmin } from '@/lib/policy';
@@ -75,11 +75,11 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
     patch.status_changed_at = isoAt(now);
   }
   if (has(b, 'title')) {
-    const title = str(b.title, 160);
+    const title = noNul(str(b.title, 160));                       // a NUL can't be stored: 400, not 500
     if (!title) throw bad('A suggestion needs a title.');
     patch.title = title;
   }
-  if (has(b, 'details')) patch.details = b.details == null ? '' : b.details;
+  if (has(b, 'details')) patch.details = b.details == null ? '' : noNul(String(b.details));   // norm str()s it anyway
   if (has(b, 'category') && CATEGORIES.some((c) => c.key === b.category)) patch.category = b.category;  // else ignored, as today
   if (has(b, 'anonymous')) patch.anonymous = !!b.anonymous;
   if (has(b, 'hidden')) {

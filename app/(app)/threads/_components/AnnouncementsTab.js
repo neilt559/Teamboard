@@ -149,6 +149,7 @@ function Reply({ r, tz, now, isNew, editing, setEditing, act }) {
           <InlineEdit
             post={r}
             label="Edit your reply"
+            enterSaves={false}
             onSave={(body, base) => act.edit(r, body, base).then(() => setEditing(null))}
             onCancel={(reload) => { setEditing(null); if (reload) act.refresh(); }}
           />

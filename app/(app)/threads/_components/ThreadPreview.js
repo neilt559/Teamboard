@@ -43,7 +43,7 @@ export default async function ThreadPreview({ scope, officeId = null, teamId = n
         {sections.map(({ tab, label, Icon, n }) => (
           <Link key={tab} href={spaceUrl(sp, tab)} prefetch={false} className="sp-preview-tab wi">
             <Icon size={15} /> {label}
-            {Number(n) > 0 && <span className="tab-badge" aria-label={`${n} unread`}>{n > 99 ? '99+' : n}</span>}
+            {Number(n) > 0 && <span className="tab-badge" aria-label={`${n} unread in ${label}`}>{n > 99 ? '99+' : n}</span>}
           </Link>
         ))}
       </nav>

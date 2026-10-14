@@ -13,7 +13,7 @@ import { createPost, editPost, setPostFlag, deletePost, fetchPage, markRead, new
 
 // General chat (design-amendments A5.6): messages oldest to newest with day separators, the composer at the
 // bottom (Enter sends, Shift+Enter makes a new line). It asks for messages after the newest one every 10 s while
-// the tab is visible (with changed_since, so edits, deletes and hides by others show up too), has "Load earlier",
+// the tab is visible (with changed_since, so edits, deletes, hides and unhides by others show up too), has "Load earlier",
 // and lets people edit and delete their own messages. It stays at the bottom when new messages arrive unless
 // you've scrolled up; then "New messages" shows instead.
 // initial = GET /api/spaces/posts's latest page from the server ({ posts oldest first, has_more, server_time }).
@@ -173,13 +173,17 @@ export default function ChatTab({ space, initial, unread = 0, viewer, tz, server
     const have = new Set(msgs.map((m) => String(m.id)));
     const fromOthers = got.some((m) => !m.mine && !have.has(String(m.id)));
     const bottom = atBottom();
-    plan.current = got.length ? (bottom ? 'bottom' : fromOthers ? 'pill' : null) : null;
     const gone = new Set(changed.filter((m) => m.removed).map((m) => String(m.id)));
     const edits = changed.filter((m) => !m.removed);
+    // A changed message this chat doesn't show (a moderator unhid it) comes back, in id order, when it falls in the
+    // history loaded here; an older one arrives with "Load earlier" like the rest.
+    const lo = more && msgs.length ? num(msgs[0].id) : 0;
+    const back = edits.filter((m) => !have.has(String(m.id)) && num(m.id) >= lo);
+    plan.current = got.length ? (bottom ? 'bottom' : fromOthers ? 'pill' : null) : (back.length && bottom ? 'bottom' : null);
     setMsgs((cur) => {
       const known = new Set(cur.map((m) => String(m.id)));
       const kept = cur.filter((m) => !gone.has(String(m.id)));
-      return upsert(kept, [...edits.filter((m) => known.has(String(m.id))), ...got.filter((m) => !gone.has(String(m.id)))]);
+      return upsert(kept, [...edits.filter((m) => known.has(String(m.id))), ...back, ...got.filter((m) => !gone.has(String(m.id)))]);
     });
     if (fromOthers && bottom && document.visibilityState === 'visible') readSoon();
   }

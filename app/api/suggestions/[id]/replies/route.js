@@ -1,4 +1,4 @@
-import { handle, str, bad, notFound, parseId, HttpError } from '@/lib/http';
+import { handle, str, bad, notFound, parseId, HttpError, noNul } from '@/lib/http';
 import { query } from '@/lib/db';
 import { isAdmin } from '@/lib/policy';
 import { loadReply, suggestionMeta } from '@/lib/queries/suggestions';
@@ -18,7 +18,7 @@ export const maxDuration = 60;
 // archived office or team space is read-only (409, admins excepted).
 export const POST = handle(async ({ viewer, params, body }) => {
   const id = parseId(params.id);
-  const text = str((await body()).body, 5000);
+  const text = noNul(str((await body()).body, 5000));             // a NUL can't be stored: 400, not 500
   if (!text) throw bad('Write something first.');
   const uid = String(viewer.id);
   const admin = isAdmin(viewer);

@@ -9,7 +9,7 @@ import Crumbs from '@/app/_ui/Crumbs';
 export const SECTION_TABS = [
   { key: 'announcements', label: 'Announcements', short: 'Announcements', Icon: IconBell },
   { key: 'suggestions', label: 'Suggestions', short: 'Suggestions', Icon: IconBulb },
-  { key: 'chat', label: 'General chat', short: 'Chat', Icon: IconChat },
+  { key: 'chat', label: 'General chat', short: 'General chat', Icon: IconChat },   // the full name on phones too (A5.6)
 ];
 
 export function spaceUrl(s, tab = null) {
@@ -38,8 +38,8 @@ export function shownUnread(s, activeKey = null, activeSection = null) {
 }
 
 // Groups for the list (lib/queries/spaces.js listSpaces order): CAGE; your offices, each followed by its teams;
-// the other offices with theirs (L4 and admins); last, a roster team in an office you can't open (parent_key null),
-// under a plain label with its office's name.
+// the other offices with theirs (L4 and admins); last, a roster team in an office you can't open (its parent_key
+// office isn't in the list), under a plain label with its office's name.
 function groupSpaces(spaces) {
   const mineN = spaces.filter((s) => s.scope === 'office' && s.mine).length;
   const groups = {
@@ -58,8 +58,9 @@ function groupSpaces(spaces) {
       lastLabel = null;
       continue;
     }
-    const g = (s.parent_key && officeGroup.get(s.parent_key)) || groups.other;
-    if (!s.parent_key) {
+    const listed = !!s.parent_key && officeGroup.has(s.parent_key);
+    const g = (listed && officeGroup.get(s.parent_key)) || groups.other;
+    if (!listed) {
       const label = `label:${s.office_id || s.office_name || ''}`;
       if (lastLabel !== label) {
         g.rows.push({ label: true, key: `${label}:${s.key}`, name: s.office_name || 'Another office' });
@@ -97,7 +98,7 @@ export function SpaceList({ spaces, activeKey = null, activeSection = null, clas
                     <span className="sp-row-name">{s.name}</span>
                     {s.archived && <span className="sp-tag">Archived</span>}
                     {n > 0 && (
-                      <span className="sp-unread" aria-label={`${n} unread`}>
+                      <span className="sp-unread" aria-label={`${n} unread in ${s.name}`}>
                         <span className="sp-dot" aria-hidden="true" />{n > 99 ? '99+' : n}
                       </span>
                     )}
@@ -165,11 +166,13 @@ export function SpaceTabs({ space, unread, active }) {
             scroll={false}
             className={`sp-tab${on ? ' on' : ''}`}
             aria-current={on ? 'page' : undefined}
+            aria-label={n > 0 ? `${label}, ${n} unread` : label}
+            title={label}
             data-tab={key}
           >
             <Icon size={16} />
             <span className="sp-tab-label"><span className="sp-tab-long">{label}</span><span className="sp-tab-short">{short}</span></span>
-            {n > 0 && <span className="tab-badge" aria-label={`${n} unread`}>{n > 99 ? '99+' : n}</span>}
+            {n > 0 && <span className="tab-badge" aria-label={`${n} unread in ${label}`}>{n > 99 ? '99+' : n}</span>}
           </Link>
         );
       })}
