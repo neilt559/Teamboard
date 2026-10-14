@@ -1,10 +1,11 @@
 import { requirePageViewer, publicViewer, tagUpdating } from '@/lib/viewer';
-import { listVisibleProjects } from '@/lib/queries/projects-list';
+import { listVisibleProjects, loadCreateProjectOptions } from '@/lib/queries/projects-list';
 import ProjectsIndex from './ProjectsIndex';
 
 // /projects (design §2.1): every project the viewer can see, with search, the Office -> Team filter, the tabs
 // Mine / My offices / All I can see, pin toggles and "Show archived" (?archived=1, which the sidebar's
-// "Archived (N)" link opens).
+// "Archived (N)" link opens). A6: "+ New project" (the create dialog, for anyone who may create in some team) and
+// "Weekly reports" (/reports).
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -19,8 +20,10 @@ export default async function ProjectsPage({ searchParams }) {
   const viewer = await requirePageViewer();
   const archived = one(searchParams?.archived) === '1';
   let data;
+  let createOptions;
   try {
-    data = await listVisibleProjects(viewer, { archived });
+    // The New project dialog (A6.4): the teams this viewer may create in, and the owner / jurisdiction suggestions.
+    [data, createOptions] = await Promise.all([listVisibleProjects(viewer, { archived }), loadCreateProjectOptions(viewer)]);
   } catch (e) {
     throw tagUpdating(e);
   }
@@ -32,5 +35,5 @@ export default async function ProjectsPage({ searchParams }) {
     office: idOrAll(one(searchParams?.office)),
     team: idOrAll(one(searchParams?.team)),
   };
-  return <ProjectsIndex data={data} viewer={publicViewer(viewer)} initial={initial} archived={archived} />;
+  return <ProjectsIndex data={data} viewer={publicViewer(viewer)} initial={initial} archived={archived} createOptions={createOptions} />;
 }

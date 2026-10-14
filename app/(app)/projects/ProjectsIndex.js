@@ -2,13 +2,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { IconFolder, IconSearch, IconPin, IconChevronRight, IconArchive } from '@/app/icons';
+import { IconFolder, IconSearch, IconPin, IconChevronRight, IconArchive, IconFile } from '@/app/icons';
+import CreateProjectDialog from '@/app/_ui/CreateProjectDialog';
 import { byName } from '@/app/_ui/tasks';
 import { api } from '@/app/_ui/api';
 import { useRefreshOnFocus } from '@/app/_ui/useRefresh';
 import { withDefaults, MAX_PINNED } from '@/lib/prefs';
 import { ErrorBanner, FilterToggle } from '../tasks/task-list-ui';
 import '../tasks/lists.css';
+import { projectTitle } from '@/lib/projects';
 
 // /projects (design §2.1): every project the viewer can see, from lib/queries/projects-list.js (already
 // permission-filtered, so filtering here in the browser can't show anything new). Search, Office -> Team
@@ -47,7 +49,7 @@ function ProjectRow({ p, pinned, onPin, pinBusy }) {
         type="button"
         className={`lt-pin${pinned ? ' on' : ''}`}
         aria-pressed={pinned}
-        aria-label={pinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
+        aria-label={pinned ? `Unpin ${projectTitle(p)}` : `Pin ${projectTitle(p)}`}
         title={pinned ? 'Unpin from the sidebar' : 'Pin to the sidebar'}
         disabled={pinBusy}
         onClick={() => onPin(p)}
@@ -55,7 +57,7 @@ function ProjectRow({ p, pinned, onPin, pinBusy }) {
         <IconPin size={16} />
       </button>
       <div className="lt-prow-main">
-        <Link href={`/projects/${p.id}`} prefetch={false} className="lt-prow-name">{p.name || 'Untitled project'}</Link>
+        <Link href={`/projects/${p.id}`} prefetch={false} className="lt-prow-name">{projectTitle(p) || 'Untitled project'}</Link>
         <div className="lt-prow-where">
           {p.office_archived ? <span>{p.office_name}</span> : <Link href={`/offices/${p.office_id}`} prefetch={false}>{p.office_name}</Link>}
           <IconChevronRight size={11} />
@@ -77,7 +79,7 @@ function ProjectRow({ p, pinned, onPin, pinBusy }) {
   );
 }
 
-export default function ProjectsIndex({ data, viewer, initial, archived }) {
+export default function ProjectsIndex({ data, viewer, initial, archived, createOptions = null }) {
   const router = useRouter();
   useRefreshOnFocus(30_000);
   const all = data.projects || [];
@@ -181,7 +183,7 @@ export default function ProjectsIndex({ data, viewer, initial, archived }) {
   const matchesFilters = (p) => {
     if (officeNow !== 'all' && !same(p.office_id, officeNow)) return false;
     if (teamNow !== 'all' && !same(p.team_id, teamNow)) return false;
-    if (needle && !`${p.name} ${p.team_name} ${p.office_name}`.toLowerCase().includes(needle)) return false;
+    if (needle && !`${projectTitle(p)} ${p.owner_company || ''} ${p.team_name} ${p.office_name}`.toLowerCase().includes(needle)) return false;
     return true;
   };
   const matches = (p) => {
@@ -203,6 +205,8 @@ export default function ProjectsIndex({ data, viewer, initial, archived }) {
   };
 
   const tabInfo = TABS.find((t) => t.key === tabNow);
+  const [creating, setCreating] = useState(false);
+  const canCreate = (createOptions?.teams || []).length > 0;
 
   return (
     <div className="lt-page">
@@ -214,6 +218,8 @@ export default function ProjectsIndex({ data, viewer, initial, archived }) {
         </span>
         <span className="spacer" />
         <Link href="/tasks" prefetch={false} className="lt-head-link">All tasks <IconChevronRight size={14} /></Link>
+        <Link href="/reports" prefetch={false} className="btn btn-plain wi lt-reports-btn"><IconFile size={15} /> Weekly reports</Link>
+        {canCreate && <button type="button" className="btn btn-lime lt-new-btn" onClick={() => setCreating(true)}>+ New project</button>}
       </div>
 
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
@@ -319,6 +325,16 @@ export default function ProjectsIndex({ data, viewer, initial, archived }) {
             <p className="muted lt-none">No archived projects{filtering ? ' match' : ''}.</p>
           )}
         </section>
+      )}
+      {creating && (
+        <CreateProjectDialog
+          teams={createOptions.teams}
+          teamId={teamNow !== 'all' && createOptions.teams.some((t) => same(t.id, teamNow)) ? teamNow
+            : createOptions.teams.some((t) => same(t.id, viewer?.team_id)) ? viewer.team_id : null}
+          owners={createOptions.owners}
+          jurisdictions={createOptions.jurisdictions}
+          onClose={() => setCreating(false)}
+        />
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { IconPin } from '@/app/icons';
 import { api } from '@/app/_ui/api';
 import { withDefaults } from '@/lib/prefs';
+import { projectTitle } from '@/lib/projects';
 
 // Home dashboard widget 'pinned_projects' (design §2.1, §11): prefs.pinned_project_ids, re-filtered through
 // tb_visible_project_ids on read (loadDashboard), so a project you lost access to just drops out. Unpin
@@ -68,12 +69,12 @@ export default function PinnedWidget({ viewer, data }) {
             <li key={p.id} className="wl-item">
               <Link href={`/projects/${p.id}`} prefetch={false} className="wl-row">
                 <span className="wl-main">
-                  <span className="wl-name">{p.name}</span>
+                  <span className="wl-name">{projectTitle(p)}</span>
                   <span className="wl-meta">{p.office_name} › {p.team_name}{p.archived ? ' · archived' : ''}</span>
                 </span>
                 <span className="wl-count" title="Open tasks">{p.open_count}</span>
               </Link>
-              <button type="button" className="wl-action" aria-label={`Unpin ${p.name}`} title="Unpin" onClick={() => unpin(p)}>
+              <button type="button" className="wl-action" aria-label={`Unpin ${projectTitle(p)}`} title="Unpin" onClick={() => unpin(p)}>
                 <IconPin size={15} />
               </button>
             </li>

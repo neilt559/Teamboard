@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { IconFolder } from '@/app/icons';
+import { projectTitle } from '@/lib/projects';
 
 // Home dashboard widget 'my_projects' (design §2.1, §11): active projects I can see where I was added
 // (day-one "legacy" access to every old project doesn't count, or this would list all 48), that belong to my
@@ -27,7 +28,7 @@ export default function MyProjectsWidget({ data }) {
               <li key={p.id}>
                 <Link href={`/projects/${p.id}`} prefetch={false} className="wl-row">
                   <span className="wl-main">
-                    <span className="wl-name">{p.name}</span>
+                    <span className="wl-name">{projectTitle(p)}</span>
                     <span className="wl-meta">{p.office_name} › {p.team_name}</span>
                   </span>
                   <span className="wl-count" title="Open tasks">{p.open_count}</span>

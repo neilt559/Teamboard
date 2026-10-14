@@ -61,7 +61,7 @@ export default function MyTasksWidget({ data }) {
                     <span className="wl-main">
                       <span className="wl-name">{t.parent_id ? '↳ ' : ''}{t.title || (t.parent_id ? 'Untitled subtask' : 'Untitled task')}</span>
                       <span className="wl-meta">
-                        {t.project_name}{t.parent_id && t.parent_title ? ` · under “${t.parent_title}”` : ''}
+                        {t.project_title || t.project_name}{t.parent_id && t.parent_title ? ` · under “${t.parent_title}”` : ''}
                         {st && t.status !== 'not_started' ? <span className="wl-status" style={{ color: st.text }}> · {st.label}</span> : null}
                       </span>
                     </span>

@@ -9,6 +9,7 @@ import { useConfirm } from '@/app/_ui/ConfirmDialog';
 import { useRefreshOnFocus } from '@/app/_ui/useRefresh';
 import useServerState from '@/app/_ui/useServerState';
 import { canManageTeamsIn, isAdmin } from '@/lib/policy';
+import { projectTitle } from '@/lib/projects';
 import LocalTime from '../LocalTime';
 import NameDialog from '../_ui/NameDialog';
 import MoreMenu from '../_ui/MoreMenu';
@@ -147,7 +148,7 @@ export default function OfficeView({ viewer, data, now, threadSlot = null, space
                 <span className="home-card-main">
                   <Link href={`/teams/${t.id}`} prefetch={false} className="home-card-name ofc-card-link">{t.name}</Link>
                   <span className="home-card-stats">{plural(t.projects.length, 'project')} · {plural(t.open, 'open task')}</span>
-                  {t.projects.length > 0 && <span className="home-card-list">{t.projects.map((p) => p.name).join(' · ')}</span>}
+                  {t.projects.length > 0 && <span className="home-card-list">{t.projects.map((p) => projectTitle(p)).join(' · ')}</span>}
                 </span>
                 <span className="ofc-card-side">
                   <MoreMenu items={teamMenu(t, i)} label={`Actions for ${t.name}`} />

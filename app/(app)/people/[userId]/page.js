@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { requirePageViewer, tagUpdating } from '@/lib/viewer';
 import { loadPerson } from '@/lib/queries/people';
 import { isAdmin } from '@/lib/policy';
+import { projectTitle } from '@/lib/projects';
 import { IconBuilding, IconUsers, IconFolder, IconTag, IconSettings, IconShield } from '@/app/icons';
 import { Headshot } from '@/app/_ui/Headshot';
 import NameLabel from '@/app/_ui/NameLabel';
@@ -53,7 +54,7 @@ function PersonChip({ p, sub }) {
 function ProjectRow({ p }) {
   return (
     <li className="pp-proj">
-      <Link href={`/projects/${p.id}`} prefetch={false} className="pp-proj-name">{p.name}</Link>
+      <Link href={`/projects/${p.id}`} prefetch={false} className="pp-proj-name">{projectTitle(p)}</Link>
       <span className="pp-proj-where">{p.office.name} · {p.team.name}</span>
       {p.archived && <span className="acct-tag test">Archived</span>}
     </li>

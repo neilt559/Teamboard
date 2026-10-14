@@ -10,6 +10,7 @@ import { RefreshPill } from '@/app/_ui/useRefresh';
 import ConflictNotice from '@/app/_ui/ConflictNotice';
 import { useConfirm } from '@/app/_ui/ConfirmDialog';
 import Crumbs from '@/app/_ui/Crumbs';
+import { projectTitle } from '@/lib/projects';
 import { Avatar, OwnerSelect, StatusPill, StatusSelect, StoplightDots, fmtAdded, personById } from '@/app/_ui/tasks';
 import { ownerOptions } from '../../TaskRow';
 import { addedText, useMounted } from '../../ProjectBoard';
@@ -140,7 +141,7 @@ export default function TaskDetail({ initial }) {
     { label: 'Offices', href: '/offices' },
     p.office_id != null ? { label: p.office_name, href: `/offices/${p.office_id}` } : null,
     p.team_id != null ? { label: p.team_name, href: `/teams/${p.team_id}` } : null,
-    { label: p.name, href: `/projects/${pid}` },
+    { label: projectTitle(p), href: `/projects/${pid}` },
     parent ? { label: parent.title || 'Untitled task', href: `/projects/${pid}/tasks/${parent.id}` } : null,
     { label: t.title || (isSub ? 'Untitled subtask' : 'Untitled task') },
   ];
@@ -174,7 +175,7 @@ export default function TaskDetail({ initial }) {
           {isSub && parent ? (
             <span>Subtask of <Link href={`/projects/${pid}/tasks/${parent.id}`} prefetch={false}>{parent.title || 'Untitled task'}</Link></span>
           ) : (
-            <span>Task in <Link href={`/projects/${pid}`} prefetch={false}>{p.name}</Link></span>
+            <span>Task in <Link href={`/projects/${pid}`} prefetch={false}>{projectTitle(p)}</Link></span>
           )}
         </div>
         {ro ? (

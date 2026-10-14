@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { IconCaret, IconPin, IconArchive, IconChevronRight } from '../icons';
+import { projectTitle } from '@/lib/projects';
 
 // Left navigation (design §2.2): pinned projects, the "My offices" tree (home, extra and followed offices ->
 // active teams -> visible projects with open counts), "All projects", "Archived". Navigation only: adding,
@@ -60,10 +61,10 @@ function ProjectRow({ p, pathname, onNavigate, pin = false }) {
       className={`proj${under(pathname, href) ? ' active' : ''}${p.archived ? ' proj-archived' : ''}`}
       aria-current={pathname === href ? 'page' : undefined}
       onClick={onNavigate}
-      title={p.name}
+      title={projectTitle(p)}
     >
       {pin && <IconPin size={13} className="proj-pin" />}
-      <span className="name">{p.name}</span>
+      <span className="name">{projectTitle(p)}</span>
       {p.archived ? <span className="count">archived</span> : <span className="count">{p.open_count}</span>}
     </Link>
   );
@@ -150,6 +151,7 @@ export function NavTree({ nav, pathname, onNavigate }) {
       <div className="nav-section nav-more">
         <Link href="/projects" prefetch={false} className="side-link" onClick={onNavigate}>All projects <IconChevronRight size={14} /></Link>
         <Link href="/offices" prefetch={false} className="side-link" onClick={onNavigate}>All offices <IconChevronRight size={14} /></Link>
+        <Link href="/reports" prefetch={false} className="side-link" onClick={onNavigate}>Weekly reports <IconChevronRight size={14} /></Link>
         {nav?.archived_count > 0 && (
           <Link href="/projects?archived=1" prefetch={false} className="archived-toggle side-archived" onClick={onNavigate}>
             <IconArchive size={14} /> Archived ({nav.archived_count})

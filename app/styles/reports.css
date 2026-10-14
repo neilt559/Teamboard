@@ -1,0 +1,140 @@
+/* Weekly owner reports (design-amendments A6.6, A6.7): /projects/[id]/report, /reports and /reports/owner.
+   On screen the report is a sheet of paper on the gray page; in print (Save as PDF) the app's header, sidebar,
+   drawer, bottom bar and the report's own buttons disappear and each project starts on a new Letter page.
+   Imported from app/layout.js. Desktop >= 721 px; phone <= 720 px. */
+
+/* ---------- screen: the report page ---------- */
+.rp-page { max-width: 8.5in; margin: 0 auto; }
+.rp-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.rp-actions .btn .icon { color: inherit; }
+.rp-copy .icon { color: var(--lime-dark) !important; }
+.rp-actions-note { flex: 1 1 100%; margin: 0; font-size: 12px; color: var(--muted); text-align: right; min-height: 1.2em; }
+.rp-paper {
+  background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, .07);
+  padding: 0.55in 0.6in; margin-bottom: 18px; color: #222;
+}
+
+/* the document */
+.rp-doc { font-size: 13.5px; line-height: 1.5; }
+.rp-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 3px solid var(--lime); margin-bottom: 18px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.rp-brand { display: flex; align-items: center; gap: 12px; }
+.rp-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--lime); border: 8px solid var(--ink); box-sizing: border-box; flex: 0 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.rp-co { font-size: 19px; font-weight: 800; color: var(--ink); letter-spacing: .01em; line-height: 1.2; }
+.rp-kind { font-size: 12.5px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: .08em; }
+.rp-date { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.rp-date span { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.rp-date b { font-size: 13.5px; color: var(--ink); }
+.rp-title { margin: 0 0 10px; font-size: 24px; line-height: 1.25; color: var(--ink); overflow-wrap: anywhere; }
+.rp-facts { display: grid; grid-template-columns: repeat(4, minmax(0, auto)); justify-content: start; gap: 6px 28px; margin: 0 0 16px; }
+.rp-facts > div { min-width: 0; }
+.rp-facts dt { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.rp-facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.rp-sec { margin: 0 0 18px; break-inside: auto; }
+.rp-sec h2 {
+  margin: 0 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e3e3e5; font-size: 12.5px; font-weight: 800; color: var(--ink);
+  text-transform: uppercase; letter-spacing: .07em; break-after: avoid;
+}
+.rp-sec-sub { text-transform: none; letter-spacing: 0; font-weight: 700; color: var(--ink-2); }
+.rp-stage .stage-steps { flex-wrap: wrap; row-gap: 6px; }
+.rp-stage .stage-btn { min-height: 30px; font-size: 12.5px; }
+.rp-status .fmt { font-size: 13.5px; }
+.rp-none { margin: 0; color: var(--muted); font-style: italic; }
+.rp-table { width: 100%; min-width: 0; border-collapse: collapse; font-size: 13px; }
+.rp-table thead th {
+  background: none; padding: 6px 8px; border-bottom: 2px solid var(--lime); font-size: 10.5px; color: var(--ink-2); letter-spacing: .06em;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.rp-table tbody td { padding: 7px 8px; border-bottom: 1px solid #ececee; font-size: 13px; vertical-align: top; }
+.rp-table tbody tr:hover td { background: none; }
+.rp-table tr { break-inside: avoid; }
+.rp-strong { font-weight: 600; }
+.rp-nowrap { white-space: nowrap; }
+.rp-dates { list-style: none; margin: 0; padding: 0; }
+.rp-dates li { white-space: nowrap; }
+.rp-dates li > span { color: var(--ink-2); }
+.rp-dates .rp-expected { font-weight: 700; color: #0b6e99; }
+.rp-foot { margin-top: 22px; padding-top: 8px; border-top: 1px solid #ececee; font-size: 10.5px; color: var(--muted); }
+
+/* packet cover */
+.rp-cover-k { margin: 26px 0 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.rp-cover-owner { margin: 0; font-size: 30px; line-height: 1.2; color: var(--ink); overflow-wrap: anywhere; }
+.rp-cover-n { margin: 4px 0 18px; font-size: 14px; color: var(--ink-2); }
+.rp-toc { margin: 0; padding: 0; list-style: none; counter-reset: rptoc; border-top: 1px solid #ececee; }
+.rp-toc li { counter-increment: rptoc; display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid #ececee; break-inside: avoid; }
+.rp-toc li::before { content: counter(rptoc) '.'; font-weight: 800; color: var(--muted); min-width: 22px; }
+.rp-toc-title { flex: 1 1 auto; min-width: 0; font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+.rp-toc-meta { flex: 0 0 auto; font-size: 12.5px; color: var(--ink-2); }
+
+/* ---------- /reports index ---------- */
+.rp-index { max-width: 980px; }
+.rp-intro { margin: -6px 0 16px; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; max-width: 760px; }
+.rp-group { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.rp-group-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 8px; }
+.rp-group-head h2 { margin: 0; font-size: 17px; color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
+.rp-count { font-size: 12px; font-weight: 700; color: var(--muted); background: #f1f1f2; border-radius: 999px; padding: 2px 9px; }
+.rp-open-packet .icon { color: var(--on-lime); }
+.rp-plist { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.rp-prow { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.rp-prow:last-child { border-bottom: none; }
+.rp-prow-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rp-prow-title { font-size: 14px; font-weight: 700; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.rp-prow-title:hover { text-decoration: underline; text-decoration-color: var(--lime-dark); }
+.rp-prow-meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.rp-prow-btn { flex: 0 0 auto; }
+.rp-prow-flag { color: #8a6100; font-weight: 600; }
+/* screen only: Status Reports left out until someone reviews their pre-A6 text */
+.rp-pending { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 14px; padding: 10px 12px; border-radius: 8px; background: #fffbe6; border: 1px solid #ffe58f; color: #5c4600; font-size: 13px; line-height: 1.5; }
+.rp-pending .icon { flex: 0 0 auto; margin-top: 2px; color: #8a6100; }
+.rp-pending-list { margin: 4px 0 0; padding-left: 18px; }
+.rp-pending-list a { color: var(--ink); font-weight: 700; }
+.rp-noowner { border-style: dashed; background: #fffef8; }
+.rp-noowner-hint { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 10px; padding: 9px 11px; border-radius: 8px; background: #fffbe6; border: 1px solid #ffe58f; color: #7a5c00; font-size: 13px; line-height: 1.45; }
+.rp-noowner-hint .icon { flex: 0 0 auto; margin-top: 2px; }
+
+/* ---------- phones ---------- */
+@media (max-width: 720px) {
+  .rp-actions .btn { flex: 1 1 auto; justify-content: center; }
+  .rp-actions-note { text-align: left; }
+  .rp-paper { padding: 18px 14px; border-radius: 10px; }
+  .rp-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .rp-date { align-items: flex-start; text-align: left; }
+  .rp-title { font-size: 20px; }
+  .rp-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+  .rp-table thead { display: none; }
+  .rp-table, .rp-table tbody, .rp-table tr, .rp-table td { display: block; width: 100%; }
+  .rp-table tr { padding: 8px 0; border-bottom: 1px solid #ececee; }
+  .rp-table tbody td { border: none; padding: 2px 0; }
+  .rp-table tbody td::before { content: attr(data-label); display: block; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .rp-dates li { white-space: normal; }
+  .rp-cover-owner { font-size: 24px; }
+  .rp-toc li { flex-wrap: wrap; gap: 4px 10px; }
+  .rp-toc-title { flex-basis: calc(100% - 34px); }
+  .rp-group { padding: 12px 10px; }
+  .rp-group-head .spacer { display: none; }
+  .rp-open-packet { flex: 1 1 100%; justify-content: center; }
+  .rp-prow { flex-wrap: wrap; gap: 6px 10px; }
+  .rp-prow-main { flex-basis: 100%; }
+  .rp-prow-btn { margin-left: auto; }
+}
+
+/* ---------- print (Save as PDF) ---------- */
+/* Browsers print with "Background graphics" off by default, which drops anything drawn with a background: the
+   Status Report's hexagon bullets (.fmt-li::before), the stage stepper's connector lines (.stage-step::before), the
+   chips and the brand bar. Everything on the report paper keeps its colors in print. */
+.rp-paper, .rp-paper *, .rp-paper *::before, .rp-paper *::after { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+@page { size: letter; margin: 0.5in 0.55in; }
+@media print {
+  html, body { background: #fff !important; }
+  .app-shell .app-header, .app-shell .shell-side, .app-shell .bottom-nav, .app-shell .drawer, .skip-link, .shell-banner,
+  .refresh-pill, .rp-screen-only, .rp-actions { display: none !important; }
+  .app-shell .layout { display: block; min-height: 0; }
+  .app-shell .main { padding: 0 !important; }
+  .rp-page { max-width: none; margin: 0; }
+  .rp-paper { border: none; border-radius: 0; box-shadow: none; padding: 0; margin: 0; }
+  .rp-pagebreak { break-before: page; page-break-before: always; }
+  .rp-doc { font-size: 11.5pt; }
+  .rp-title { font-size: 19pt; }
+  .rp-table tbody td { font-size: 10.5pt; }
+  .rp-head, .rp-sec h2, .rp-toc li { break-inside: avoid; }
+  a { color: inherit; text-decoration: none; }
+}

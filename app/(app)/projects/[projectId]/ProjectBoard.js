@@ -1,9 +1,10 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconAlert, IconArchive, IconNote, IconRestore } from '@/app/icons';
+import { IconAlert, IconArchive, IconCheck, IconNote, IconRestore } from '@/app/icons';
 import { SyncedTextarea } from '@/app/synced';
-import { api, ConflictError } from '@/app/_ui/api';
+import { FormattedNotes } from '@/app/notes-format';
+import { api, ConflictError, settleWrites, trackWrite } from '@/app/_ui/api';
 import useServerState, { mergeById } from '@/app/_ui/useServerState';
 import { RefreshPill } from '@/app/_ui/useRefresh';
 import ConflictNotice from '@/app/_ui/ConflictNotice';
@@ -15,23 +16,35 @@ import TaskTable from './TaskTable';
 import ArchivedTasks from './ArchivedTasks';
 import ProjectInfo from './ProjectInfo';
 import MembersPanel from './MembersPanel';
+import Submittals from './Submittals';
+import UpcomingMeetings from './UpcomingMeetings';
+import ProjectDetailsDialog from './ProjectDetailsDialog';
 import useBoardSync from './useBoardSync';
+import { projectTitle, parseStages } from '@/lib/projects';
 
 // The project board (design §2.1, §2.3): header (rename, team move, archive, delete), progress, notes, the task
 // table with subtasks and task notes (cards that open the task page on phones), archived tasks, meetings and
 // series, additional info and the Members panel. Server-rendered data, optimistic edits, and a 20 s poll of the
 // project's rev counter instead of the old whole-database poll (§7.5).
+// A6 (design-amendments A6.5): the header's schedule status, stage stepper, Project details and Generate report;
+// the notes are the "Status Report" (it goes to the owner in the weekly report); Submittals and Upcoming meetings
+// sections. Every A6 write bumps the project's rev like any other write (wrote()).
 
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 const nPeople = (n) => `${n} ${n === 1 ? 'person' : 'people'}`;
-const LISTS = { task: 'tasks', info: 'info', meeting: 'meetings', series: 'series' };
+const LISTS = { task: 'tasks', info: 'info', meeting: 'meetings', series: 'series', submittal: 'submittals', upcoming: 'upcoming_meetings' };
 const URLS = {
   task: (id) => `/api/tasks/${id}`,
   info: (id) => `/api/info/${id}`,
   meeting: (id) => `/api/project-meetings/${id}`,
   series: (id) => `/api/meeting-series/${id}`,
   project: (id) => `/api/projects/${id}`,
+  submittal: (id, pid) => `/api/projects/${pid}/submittals/${id}`,
+  upcoming: (id, pid) => `/api/projects/${pid}/upcoming-meetings/${id}`,
 };
+// A project row from the API (PATCH answers carry stages as an array; a 409's current row carries the stored
+// JSON text): stages always become an array here.
+const projectPatch = (row) => (row && Object.prototype.hasOwnProperty.call(row, 'stages') ? { ...row, stages: parseStages(row.stages) } : row);
 const SS_ARCHIVED = 'tb_show_archived_tasks';
 
 export function useMounted() {
@@ -55,12 +68,15 @@ export default function ProjectBoard({ initial }) {
   const [showArchived, setShowArchived] = useState(false);
   const [focusId, setFocusId] = useState(null);
   const [draftDirty, setDraftDirty] = useState(false);
+  const [a6Dirty, setA6Dirty] = useState({});            // open upcoming-meeting drafts
+  const [details, setDetails] = useState(false);         // the Project details dialog
   const [confirmUI, ask] = useConfirm();
   const toastTimer = useRef(null);
 
   // 20 s rev poll that ignores our own writes, and refreshes that can't undo them (useBoardSync.js).
   const { stale, refresh, wrote, refreshNow } = useBoardSync({
-    projectId: pid, initialRev: initial.project.rev, initialArchived: initial.project.archived, dirty: draftDirty, props: initial,
+    projectId: pid, initialRev: initial.project.rev, initialArchived: initial.project.archived,
+    dirty: draftDirty || Object.values(a6Dirty).some(Boolean), props: initial,
   });
 
   // The archived section stays open or closed across projects for this tab (as before).
@@ -82,7 +98,7 @@ export default function ProjectBoard({ initial }) {
 
   // ---------------------------------------------------------------- local state helpers
   const mergeLocal = useCallback((kind, id, patch) => {
-    if (kind === 'project') { setD((x) => ({ ...x, project: { ...x.project, ...patch } })); return; }
+    if (kind === 'project') { setD((x) => ({ ...x, project: { ...x.project, ...projectPatch(patch) } })); return; }
     const key = LISTS[kind];
     setD((x) => ({ ...x, [key]: x[key].map((r) => (same(r.id, id) ? { ...r, ...patch } : r)) }));
   }, [setD]);
@@ -114,7 +130,7 @@ export default function ProjectBoard({ initial }) {
     clearConflict(key);
     mergeLocal(kind, id, { [field]: value });
     try {
-      const r = await api(URLS[kind](id), { method: 'PATCH', body: { [field]: value, base: { [field]: base } } });
+      const r = await api(URLS[kind](id, pid), { method: 'PATCH', body: { [field]: value, base: { [field]: base } } });
       wrote();
       if (r?.row) mergeLocal(kind, id, r.row);
       if (r?.added_members?.length) { showToast(addedText(r.added_members)); refreshNow(); }
@@ -129,7 +145,7 @@ export default function ProjectBoard({ initial }) {
       }
       throw e;
     }
-  }, [clearConflict, mergeLocal, showToast, refreshNow, fail, handleGone, wrote]);
+  }, [clearConflict, mergeLocal, showToast, refreshNow, fail, handleGone, wrote, pid]);
 
   const conflictUI = useCallback((key) => {
     const c = conflicts[key];
@@ -232,7 +248,7 @@ export default function ProjectBoard({ initial }) {
     const joins = Number(target.move_joins) || 0;
     const from = p.team_name || 'the current team';
     const ok = await ask({
-      title: `Move “${p.name}” to ${target.name}?`,
+      title: `Move “${projectTitle(p)}” to ${target.name}?`,
       lines: [
         leaves ? `${nPeople(leaves)} who got this project from ${from}’s roster ${leaves === 1 ? 'comes' : 'come'} off it.` : null,
         joins ? `${nPeople(joins)} on ${target.name}’s roster ${joins === 1 ? 'joins' : 'join'} it.` : null,
@@ -257,7 +273,7 @@ export default function ProjectBoard({ initial }) {
       refreshNow();
       return true;
     } catch (e) { fail(e); refreshNow(); return false; }
-  }, [d.teams, p.team_id, p.team_name, p.name, ask, touch, pid, wrote, mergeLocal, showToast, refreshNow, fail]);
+  }, [d.teams, p.team_id, p.team_name, p.name, p.project_number, ask, touch, pid, wrote, mergeLocal, showToast, refreshNow, fail]);
 
   const deleteProject = useCallback(async () => {
     try {
@@ -344,6 +360,137 @@ export default function ProjectBoard({ initial }) {
     } catch (e) { fail(e); refreshNow(); }
   }, [setD, pid, router, refreshNow, fail, wrote]);
 
+  // ---------------------------------------------------------------- A6: schedule, stage, details
+  // Optimistic: the button or stage changes at once; a failure puts the server's value back (refreshNow).
+  const setProjectField = useCallback((patch) => {
+    mergeLocal('project', pid, patch);
+    return patchProject(patch);
+  }, [mergeLocal, pid, patchProject]);
+  const setSchedule = useCallback((v) => setProjectField({ schedule_status: v }), [setProjectField]);
+  const setStage = useCallback((k) => setProjectField({ current_stage: k }), [setProjectField]);
+  // After Save (our write: the rev poll expects it) or "Discard mine" after a 409 (their row, nothing written).
+  const detailsSaved = useCallback((row, { wrote: ours = true } = {}) => {
+    if (row) { if (ours) wrote(); mergeLocal('project', pid, row); }
+    refreshNow();
+  }, [wrote, mergeLocal, pid, refreshNow]);
+
+  // ---------------------------------------------------------------- Status Report review (pre-A6 text)
+  // A pre-A6 project's notes were written as internal notes, so reports leave them out until someone reviews them
+  // (status_report_reviewed_at NULL). "Use in reports" saves whatever is being typed first, then sends the text it
+  // reviewed as the base: if someone changed it meanwhile the server answers 409 and nothing is released.
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const notesNow = useRef(p.notes || '');
+  notesNow.current = p.notes || '';
+  const reviewPending = p.status_report_reviewed_at == null && /\S/.test(p.notes || '');
+  const markReviewed = useCallback(async () => {
+    const el = document.activeElement;
+    if (el && el !== document.body && typeof el.blur === 'function') el.blur();
+    setReviewBusy(true);
+    try {
+      await new Promise((r) => setTimeout(r, 0));
+      const s = await settleWrites();
+      await new Promise((r) => setTimeout(r, 0));     // the saved text is rendered (notesNow)
+      if (!s.ok) {
+        if (s.timedOut) setError('Your changes are still saving. Try again in a moment.');
+        return;
+      }
+      touch();
+      const r = await api(URLS.project(pid), { method: 'PATCH', body: { status_report_reviewed: true, base: { notes: notesNow.current } } });
+      wrote();
+      if (r?.row) mergeLocal('project', pid, r.row);
+    } catch (e) {
+      if (e instanceof ConflictError) {
+        if (e.current) mergeLocal('project', pid, e.current);
+        setError('Someone changed the Status Report while you were reading it. Read it again, then click Use in reports.');
+      } else fail(e);
+    } finally {
+      setReviewBusy(false);
+    }
+  }, [touch, pid, wrote, mergeLocal, fail]);
+
+  // ---------------------------------------------------------------- A6: submittals and upcoming meetings
+  // Writes to one submittal or meeting go out one at a time, in the order they were made, so a slow earlier write
+  // can never land after a later one (2026-10-14 review: a date typed segment by segment stored an in-between
+  // value). Only the newest write's answer is merged, so an older answer never flickers the field back.
+  const itemQueues = useRef({});
+  const patchItem = useCallback((kind, id, patch) => {
+    mergeLocal(kind, id, patch);
+    const key = `${kind}:${id}`;
+    const q = itemQueues.current;
+    const run = async () => {
+      try {
+        const r = await api(URLS[kind](id, pid), { method: 'PATCH', body: patch });
+        wrote();
+        if (r?.row && q[key] === job) mergeLocal(kind, id, r.row);
+        return r?.row;
+      } catch (e) {
+        fail(e);
+        handleGone(kind, id, e);
+        refreshNow();
+        return null;
+      }
+    };
+    const job = trackWrite((q[key] || Promise.resolve()).then(run, run));
+    q[key] = job;
+    job.then(() => { if (q[key] === job) delete q[key]; });
+    return job;
+  }, [mergeLocal, pid, wrote, fail, handleGone, refreshNow]);
+
+  const addSubmittal = useCallback(async () => {
+    touch();
+    try {
+      const r = await api(`/api/projects/${pid}/submittals`, { method: 'POST', body: {} });
+      wrote();
+      if (r?.row?.id != null) { appendLocal('submittal', r.row); setFocusId(`submittal:${r.row.id}`); }
+      refreshNow();
+    } catch (e) { fail(e); }
+  }, [touch, pid, wrote, appendLocal, refreshNow, fail]);
+  const archiveSubmittal = useCallback(async (s) => {
+    const what = [s.agency, s.title].filter(Boolean).join(', ');
+    if (!(await ask({
+      title: what ? `Archive “${what}”?` : 'Archive this submittal?',
+      lines: ['It leaves this list and the weekly report. “Show archived” brings it back.'],
+      confirmLabel: 'Archive',
+    }))) return;
+    await patchItem('submittal', s.id, { archived: true });
+  }, [ask, patchItem]);
+
+  const createUpcoming = useCallback(async (f) => {
+    touch();
+    const r = await api(`/api/projects/${pid}/upcoming-meetings`, {
+      method: 'POST',
+      body: { meeting_date: f.meeting_date, meeting_time: f.meeting_time || '', title: f.title.trim(), location: f.location.trim() },
+    });
+    wrote();
+    if (r?.row?.id != null) {
+      setD((x) => ({ ...x, upcoming_meetings: sortUpcoming(mergeById(x.upcoming_meetings, r.row)) }));
+    }
+    refreshNow();
+  }, [touch, pid, wrote, setD, refreshNow]);
+  const saveUpcoming = useCallback(async (m, f, bases) => {
+    const body = upcomingBody(f, bases);
+    if (!Object.keys(body).some((k) => k !== 'base')) return;
+    touch();
+    try {
+      const r = await api(URLS.upcoming(m.id, pid), { method: 'PATCH', body });
+      wrote();
+      if (r?.row) setD((x) => ({ ...x, upcoming_meetings: sortUpcoming(mergeById(x.upcoming_meetings, r.row)) }));
+    } catch (e) {
+      if (e instanceof ConflictError && e.current) mergeLocal('upcoming', m.id, e.current);
+      else handleGone('upcoming', m.id, e);
+      throw e;
+    }
+  }, [touch, pid, wrote, setD, mergeLocal, handleGone]);
+  const archiveUpcoming = useCallback(async (m) => {
+    if (!(await ask({
+      title: `Archive “${m.title}”?`,
+      lines: ['It leaves this list and the weekly report. “Show archived” brings it back.'],
+      confirmLabel: 'Archive',
+    }))) return;
+    await patchItem('upcoming', m.id, { archived: true });
+  }, [ask, patchItem]);
+  const setDraftFlag = useCallback((key, v) => setA6Dirty((x) => (!!x[key] === !!v ? x : { ...x, [key]: !!v })), []);
+
   // ---------------------------------------------------------------- derived
   const { active, archived, subsByParent, doneCount, total } = useMemo(() => {
     const top = d.tasks.filter((t) => t.parent_id == null);
@@ -369,6 +516,13 @@ export default function ProjectBoard({ initial }) {
     saveInfoText: (id, field, v, base) => saveText('info', id, field, v, base),
     saveProjectText: (field, v, base) => saveText('project', pid, field, v, base),
     patchProject, moveProject, deleteProject, addInfo, deleteInfo, addMembers, removeMember,
+    setSchedule, setStage, openDetails: () => setDetails(true),
+    addSubmittal, archiveSubmittal,
+    patchSubmittal: (id, patch) => patchItem('submittal', id, patch),
+    saveSubmittalText: (id, field, v, base) => saveText('submittal', id, field, v, base),
+    createUpcoming, saveUpcoming, archiveUpcoming,
+    patchUpcoming: (id, patch) => patchItem('upcoming', id, patch),
+    setDraftDirty: setDraftFlag,
   };
   const ctx = {
     pid, people: d.people, ro, mounted, focusId, actions, conflictUI,
@@ -381,7 +535,7 @@ export default function ProjectBoard({ initial }) {
     { label: 'Offices', href: '/offices' },
     p.office_id != null ? { label: p.office_name, href: p.office_archived ? undefined : `/offices/${p.office_id}` } : null,
     p.team_id != null ? { label: p.team_name, href: p.team_archived || p.office_archived ? undefined : `/teams/${p.team_id}` } : null,
-    { label: p.name },
+    { label: projectTitle(p) },
   ];
 
   return (
@@ -422,21 +576,37 @@ export default function ProjectBoard({ initial }) {
         ask={ask}
       />
 
-      <div className="notes-panel">
-        <label className="notes-label" htmlFor={`pnotes-${pid}`}><IconNote size={14} /> Project notes <span>· visible to your whole team</span></label>
+      <div className="notes-panel status-report-panel" id="status-report">
+        <label className="notes-label" htmlFor={`pnotes-${pid}`}><IconNote size={14} /> Status Report <span>· goes to the owner in the weekly report</span></label>
+        {reviewPending && (
+          <div className="sr-review" role="note">
+            <IconAlert size={15} />
+            <div className="sr-review-text">
+              <b>Not in the owner reports yet.</b> This text was written as internal project notes before weekly reports
+              existed. Read it and take out anything internal (staff names, internal reviews, remarks), then click
+              <b> Use in reports</b>. Until then the report says “No status report this week.”
+            </div>
+            {!ro && (
+              <button type="button" className="btn btn-ink btn-sm wi sr-review-btn" onClick={markReviewed} disabled={reviewBusy}>
+                <IconCheck size={14} /> {reviewBusy ? 'Saving…' : 'Use in reports'}
+              </button>
+            )}
+          </div>
+        )}
         {ro ? (
-          <div className="notes-area notes-ro">{p.notes || <span className="muted">No notes.</span>}</div>
+          <div className="notes-area notes-ro"><FormattedNotes text={p.notes} empty="No status report." /></div>
         ) : (
           <SyncedTextarea
             key={pid}
             id={`pnotes-${pid}`}
             className="notes-area"
             value={p.notes || ''}
-            placeholder="Notes for this project — plans, links, reminders…"
+            placeholder="Where the project stands this week: progress, what’s next, what you’re waiting on…"
             onSave={(v, base) => actions.saveProjectText('notes', v, base)}
           />
         )}
         {conflictUI(`project:${pid}:notes`)}
+        {!ro && <p className="sr-hint">In the report, a line that starts with <code>%t</code> is a title, <code>%h</code> a header, and a dash (<code>-</code>) a bullet.</p>}
       </div>
 
       <TaskTable tasks={active} subsByParent={subsByParent} ctx={ctx} />
@@ -444,6 +614,9 @@ export default function ProjectBoard({ initial }) {
       {archived.length > 0 && (
         <ArchivedTasks tasks={archived} subsByParent={subsByParent} ctx={ctx} open={showArchived} onToggle={toggleArchived} />
       )}
+
+      <Submittals submittals={d.submittals || []} ctx={ctx} />
+      <UpcomingMeetings meetings={d.upcoming_meetings || []} today={d.today} ctx={ctx} />
 
       <ProjectMeetings
         key={pid}
@@ -465,6 +638,9 @@ export default function ProjectBoard({ initial }) {
 
       <MembersPanel project={p} members={d.members} ro={ro} actions={actions} ask={ask} />
 
+      {details && d.can.manage && !ro && (
+        <ProjectDetailsDialog project={p} options={d.field_options} onSaved={detailsSaved} onClose={() => setDetails(false)} />
+      )}
       {toast && <div className="board-toast" role="status">{toast}</div>}
       {stale && <RefreshPill onClick={refresh} />}
       {confirmUI}
@@ -477,4 +653,23 @@ export function addedText(list) {
   if (!names.length) return 'Added to this project.';
   if (names.length === 1) return `${names[0]} was added to this project.`;
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} were added to this project.`;
+}
+
+// Only the fields of an upcoming meeting that changed since the editor opened; text with its base (design §7.4).
+function upcomingBody(f, bases) {
+  const body = {};
+  const base = {};
+  if (f.meeting_date !== bases.meeting_date) body.meeting_date = f.meeting_date;
+  if ((f.meeting_time || '') !== (bases.meeting_time || '')) body.meeting_time = f.meeting_time || '';
+  for (const k of ['title', 'location']) {
+    if (f[k].trim() !== String(bases[k] ?? '').trim()) { body[k] = f[k].trim(); base[k] = bases[k] ?? ''; }
+  }
+  if (Object.keys(base).length) body.base = base;
+  return body;
+}
+
+// Upcoming meetings stay in date and time order after an add or an edit (the loader's order).
+function sortUpcoming(list) {
+  return [...(list || [])].sort((a, b) => String(a.meeting_date).localeCompare(String(b.meeting_date))
+    || String(a.meeting_time || '').localeCompare(String(b.meeting_time || '')) || (Number(a.id) - Number(b.id)));
 }

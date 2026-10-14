@@ -18,7 +18,7 @@ import { openAdminEntrance } from './ClaimAdmin';
 export const TABS = [
   { key: 'home', href: '/', label: 'Home', Icon: IconHome, match: (p) => p === '/' },
   { key: 'my-work', href: '/my-work', label: 'My work', Icon: IconCheck },
-  { key: 'projects', href: '/projects', label: 'Projects', Icon: IconFolder, also: ['/offices', '/teams'] },
+  { key: 'projects', href: '/projects', label: 'Projects', Icon: IconFolder, also: ['/offices', '/teams', '/reports'] },
   { key: 'tasks', href: '/tasks', label: 'All tasks', Icon: IconList },
   { key: 'threads', href: '/threads', label: 'Threads', Icon: IconChat, also: ['/suggestions'] },
   { key: 'culture', href: '/culture', label: 'Culture', Icon: IconTrophy },

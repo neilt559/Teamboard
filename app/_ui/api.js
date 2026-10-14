@@ -49,10 +49,41 @@ const go = (href) => { if (typeof window !== 'undefined') window.location.href =
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isPlainBody = (b) => b != null && typeof b === 'object' && Object.getPrototypeOf(b) === Object.prototype;
 
+// Writes in flight (every api() call that isn't a GET or HEAD, and anything passed to trackWrite), so a page can
+// wait for them before it leaves: fields save on blur, so a click that navigates away (Generate report) would
+// otherwise race the save it just triggered (2026-10-14 review). Per tab; settled writes drop out.
+const inflight = new Set();
+let failedWrites = 0;
+export function trackWrite(promise) {
+  inflight.add(promise);
+  promise.then(() => inflight.delete(promise), () => { inflight.delete(promise); failedWrites += 1; });
+  return promise;
+}
+// Resolves once every write in flight (including ones started while waiting) has settled:
+//   { ok: true }                   all of them succeeded
+//   { ok: false, failed: true }    at least one failed (the caller shows its error; don't navigate on stale data)
+//   { ok: false, timedOut: true }  still running after timeoutMs
+export async function settleWrites(timeoutMs = 20_000) {
+  const t0 = Date.now();
+  const failed0 = failedWrites;
+  while (inflight.size) {
+    const left = timeoutMs - (Date.now() - t0);
+    if (left <= 0) return { ok: false, timedOut: true };
+    await Promise.race([Promise.allSettled([...inflight]), sleep(left)]);
+  }
+  return failedWrites === failed0 ? { ok: true } : { ok: false, failed: true };
+}
+
 // api(path, { method, body, headers, quiet, signal, ... })
 //   body: a JSON string (as old callers pass) or a plain object (stringified here).
 //   quiet: no shell banner (background polls); errors still throw.
-export async function api(path, opts = {}) {
+export function api(path, opts = {}) {
+  const method = String(opts.method || 'GET').toUpperCase();
+  const p = request(path, opts);
+  return method === 'GET' || method === 'HEAD' ? p : trackWrite(p);
+}
+
+async function request(path, opts) {
   const { headers, quiet = false, body, ...rest } = opts;
   const method = String(rest.method || 'GET').toUpperCase();
   const init = {

@@ -10,6 +10,7 @@ import useServerState from '@/app/_ui/useServerState';
 import { useRefreshOnFocus } from '@/app/_ui/useRefresh';
 import { useTaskEdits, statusPatch, ErrorBanner, Toast, FilterToggle, fmtAddedIn, fmtAddedTitle, DueChip } from './task-list-ui';
 import './lists.css';
+import { projectTitle } from '@/lib/projects';
 
 // All tasks (inventory §1.9), ported from the old single page. Same filters, sort, inline edits and the
 // localStorage key tb_alltasks_filters (search is never saved), so filters set before the rebuild still apply.
@@ -137,7 +138,7 @@ export default function GlobalTasks({ data, viewer }) {
   const personName = (id) => (id == null ? '' : nameById.get(String(id)) || '');
   const slRank = { red: 0, yellow: 1, green: 2, '': 3 };
   const cmp = {
-    project: (a, b) => (a.project_name || '—').localeCompare(b.project_name || '—', undefined, { numeric: true }),
+    project: (a, b) => (a.project_title || a.project_name || '—').localeCompare(b.project_title || b.project_name || '—', undefined, { numeric: true }),
     task: (a, b) => (a.title || '').localeCompare(b.title || ''),
     owner: (a, b) => (personName(a.assignee_id) || 'zzzz').localeCompare(personName(b.assignee_id) || 'zzzz'),
     stoplight: (a, b) => ((slRank[a.stoplight || ''] ?? 3) - (slRank[b.stoplight || ''] ?? 3)),
@@ -215,7 +216,7 @@ export default function GlobalTasks({ data, viewer }) {
         <label>Project
           <select value={fx.project} onChange={(e) => setFilter({ project: e.target.value })}>
             <option value="all">All projects</option>
-            {projectChoices.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            {projectChoices.map((p) => <option key={p.id} value={String(p.id)}>{projectTitle(p)}</option>)}
           </select>
         </label>
         <label>Person
@@ -275,7 +276,7 @@ export default function GlobalTasks({ data, viewer }) {
                 return (
                   <tr key={t.id}>
                     <td>
-                      <Link href={`/projects/${t.project_id}`} prefetch={false} className="proj-link" title="Open this project">{t.project_name || '—'}</Link>
+                      <Link href={`/projects/${t.project_id}`} prefetch={false} className="proj-link" title="Open this project">{t.project_title || t.project_name || '—'}</Link>
                       {t.team_name ? <div className="gt-where">{t.office_name ? `${t.office_name} › ` : ''}{t.team_name}</div> : null}
                     </td>
                     <td>
@@ -326,7 +327,7 @@ export default function GlobalTasks({ data, viewer }) {
                 {t.parent_id ? <span className="subtask-arrow">↳ </span> : null}{t.title || 'Untitled task'}
               </Link>
               <div className="lt-card-where">
-                <Link href={`/projects/${t.project_id}`} prefetch={false}>{t.project_name || '—'}</Link>
+                <Link href={`/projects/${t.project_id}`} prefetch={false}>{t.project_title || t.project_name || '—'}</Link>
                 {t.team_name ? <span> · {t.office_name ? `${t.office_name} › ` : ''}{t.team_name}</span> : null}
                 {t.parent_id ? <span> · in {t.parent_title || 'Untitled task'}</span> : null}
               </div>

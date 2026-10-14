@@ -3,6 +3,8 @@ import { requirePageViewer, publicViewer, tagUpdating } from '@/lib/viewer';
 import { loadTeam } from '@/lib/queries/teams';
 import { canManageTeamsIn } from '@/lib/access';
 import { loadSpace } from '@/lib/queries/spaces';
+import { loadProjectFieldOptions } from '@/lib/queries/project';
+import { canCreateProjectIn } from '@/lib/policy';
 import ThreadPreview from '../../threads/_components/ThreadPreview';
 import TeamOverview from './TeamOverview';
 
@@ -48,8 +50,11 @@ export default async function TeamPage({ params }) {
   if (!data) notFound();
   const pv = publicViewer(viewer);
   let space = null;
+  // The New project dialog's owner / jurisdiction suggestions (A6.4), only for people who may add one here.
+  let createOptions = null;
   try {
     space = await loadSpace(viewer, `team:${data.team.id}`);
+    if (canCreateProjectIn(viewer, data.team) && !data.team.archived) createOptions = await loadProjectFieldOptions(viewer);
   } catch (e) {
     throw tagUpdating(e);
   }
@@ -58,6 +63,7 @@ export default async function TeamPage({ params }) {
       viewer={pv}
       data={data}
       spaceLink={space ? { href: space.href, name: space.name, unread: space.unread } : null}
+      createOptions={createOptions}
       threadSlot={space ? <ThreadPreview scope="team" teamId={data.team.id} viewer={viewer} /> : null}
     />
   );

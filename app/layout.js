@@ -11,6 +11,9 @@ import './styles/admin.css';
 import './styles/profile.css';
 import './styles/directory.css';
 import './styles/geo.css';
+// A6 (design-amendments A6.4-A6.7): project structure on the board, and the weekly owner reports (print CSS).
+import './styles/projects-a6.css';
+import './styles/reports.css';
 
 export const metadata = {
   title: { default: 'TeamBoard', template: '%s · TeamBoard' },

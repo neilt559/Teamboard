@@ -18,6 +18,8 @@ import ErrorBanner from '../../offices/_ui/ErrorBanner';
 import AddTaskModal from './AddTaskModal';
 import TeamRoster from './TeamRoster';
 import SpaceLink from '../../threads/_components/SpaceLink';
+import CreateProjectDialog from '@/app/_ui/CreateProjectDialog';
+import { projectTitle } from '@/lib/projects';
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const same = (a, b) => a != null && b != null && String(a) === String(b);
@@ -33,7 +35,7 @@ function Owner({ person }) {
 // (Release 2) its thread.
 // Moving the team to another office needs team rights in both offices; project add / rename / archive /
 // delete follow lib/policy.js exactly as the API does.
-export default function TeamOverview({ viewer, data, threadSlot = null, spaceLink = null }) {
+export default function TeamOverview({ viewer, data, threadSlot = null, spaceLink = null, createOptions = null }) {
   const router = useRouter();
   useRefreshOnFocus(30_000);
   const [state, setState] = useServerState(data);
@@ -74,12 +76,6 @@ export default function TeamOverview({ viewer, data, threadSlot = null, spaceLin
       setState((s) => ({ ...s, team: { ...s.team, office_id: prev } }));
       fail(e);
     }
-  }
-
-  async function addProject(name) {
-    const np = await api('/api/projects', { method: 'POST', body: { name, team_id: team.id } });
-    if (np && np.id) router.push(`/projects/${np.id}`);
-    else router.refresh();
   }
 
   async function saveNotes(p, text, base) {
@@ -154,8 +150,8 @@ export default function TeamOverview({ viewer, data, threadSlot = null, spaceLin
   }
 
   async function deleteProject(p) {
-    if (!(await ask({ title: `Delete “${p.name}” and all of its tasks?`, confirmLabel: 'Delete', danger: true }))) return;
-    if (!(await ask({ title: `Are you REALLY really sure? “${p.name}” and all its tasks will be gone for good.`, confirmLabel: 'Delete for good', danger: true }))) return;
+    if (!(await ask({ title: `Delete “${projectTitle(p)}” and all of its tasks?`, confirmLabel: 'Delete', danger: true }))) return;
+    if (!(await ask({ title: `Are you REALLY really sure? “${projectTitle(p)}” and all its tasks will be gone for good.`, confirmLabel: 'Delete for good', danger: true }))) return;
     setState((s) => ({ ...s, projects: s.projects.filter((x) => x.id !== p.id), tasks: s.tasks.filter((t) => !same(t.project_id, p.id)) }));
     try {
       await api(`/api/projects/${p.id}`, { method: 'DELETE' });
@@ -257,18 +253,18 @@ export default function TeamOverview({ viewer, data, threadSlot = null, spaceLin
             return (
               <div key={p.id} className="overview-card">
                 <div className="overview-card-head">
-                  <Link href={`/projects/${p.id}`} prefetch={false} className="overview-open">{p.name}</Link>
+                  <Link href={`/projects/${p.id}`} prefetch={false} className="overview-open">{projectTitle(p)}</Link>
                   <span className="ov-head-side">
                     <span className="count">{plural(count, 'task')}</span>
-                    <MoreMenu items={projectMenu(p)} label={`Actions for ${p.name}`} />
+                    <MoreMenu items={projectMenu(p)} label={`Actions for ${projectTitle(p)}`} />
                   </span>
                 </div>
                 <SyncedTextarea
                   key={p.id}
                   className="overview-notes"
                   value={p.notes || ''}
-                  placeholder="Project notes…"
-                  aria-label={`Notes for ${p.name}`}
+                  placeholder="Status Report…"
+                  aria-label={`Status Report for ${projectTitle(p)}`}
                   onSave={(v, base) => saveNotes(p, v, base)}
                 />
                 {conflict && (
@@ -340,13 +336,17 @@ export default function TeamOverview({ viewer, data, threadSlot = null, spaceLin
       {threadSlot}
 
       {addingTaskFor && (
-        <AddTaskModal people={people} projectName={addingProject?.name} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />
+        <AddTaskModal people={people} projectName={addingProject ? projectTitle(addingProject) : ''} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />
       )}
       {dialog?.kind === 'project' && (
-        <NameDialog
-          title="New project" label="New project name" initial="New Project" fallback="New Project" mode="create"
-          confirmLabel="Add project" busyLabel="Adding…"
-          onSubmit={addProject} onClose={() => setDialog(null)}
+        <CreateProjectDialog
+          teams={[{ id: team.id, name: team.name, office_id: team.office_id, office_name: office?.name || '' }]}
+          teamId={team.id}
+          fixedTeam
+          teamName={team.name}
+          owners={createOptions?.owners || []}
+          jurisdictions={createOptions?.jurisdictions || []}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog?.kind === 'rename-project' && (

@@ -10,6 +10,7 @@ import { withDefaults } from '@/lib/prefs';
 import { addDays } from '@/lib/time';
 import { useTaskEdits, statusPatch, ErrorBanner, Toast, fmtDue } from '../tasks/task-list-ui';
 import '../tasks/lists.css';
+import { projectTitle } from '@/lib/projects';
 
 // My work (design §2.1). Tasks come from lib/queries/tasks.js loadMyWork (visible projects only, open, not
 // Done, assigned to my linked name). Edits go through PATCH /api/tasks/:id like All tasks; a task set to Done
@@ -35,7 +36,7 @@ function groupOf(due, today, weekEnd) {
 const byDueThenPriority = (a, b) =>
   (a.due_date || '9999-99-99').localeCompare(b.due_date || '9999-99-99')
   || ((SL_RANK[a.stoplight || ''] ?? 3) - (SL_RANK[b.stoplight || ''] ?? 3))
-  || (a.project_name || '').localeCompare(b.project_name || '', undefined, { numeric: true, sensitivity: 'base' });
+  || (a.project_title || a.project_name || '').localeCompare(b.project_title || b.project_name || '', undefined, { numeric: true, sensitivity: 'base' });
 
 function TaskItem({ t, today, showProject, onUpdate, onStatus }) {
   const overdue = t.due_date && t.due_date < today;
@@ -47,7 +48,7 @@ function TaskItem({ t, today, showProject, onUpdate, onStatus }) {
           {t.parent_id ? <span className="subtask-arrow">↳ </span> : null}{t.title || 'Untitled task'}
         </Link>
         <div className="lt-task-where">
-          {showProject && <><Link href={`/projects/${t.project_id}`} prefetch={false}>{t.project_name}</Link> · </>}
+          {showProject && <><Link href={`/projects/${t.project_id}`} prefetch={false}>{t.project_title || t.project_name}</Link> · </>}
           {t.office_name} › {t.team_name}
           {t.parent_id ? <> · in {t.parent_title || 'Untitled task'}</> : null}
         </div>
@@ -150,7 +151,7 @@ export default function MyWork({ data, today, viewer }) {
       const m = new Map();
       for (const t of open) {
         const k = String(t.project_id);
-        if (!m.has(k)) m.set(k, { key: `p${k}`, project_id: k, label: t.project_name || 'Untitled project', where: `${t.office_name} › ${t.team_name}`, items: [] });
+        if (!m.has(k)) m.set(k, { key: `p${k}`, project_id: k, label: t.project_title || t.project_name || 'Untitled project', where: `${t.office_name} › ${t.team_name}`, items: [] });
         m.get(k).items.push(t);
       }
       return [...m.values()].sort((a, b) => byName({ name: a.label }, { name: b.label }))
@@ -226,7 +227,7 @@ export default function MyWork({ data, today, viewer }) {
             <ul className="lt-mprojects">
               {shownProjects.map((p) => (
                 <li key={p.id} className="lt-mproj">
-                  <Link href={`/projects/${p.id}`} prefetch={false} className="lt-mproj-name">{p.name || 'Untitled project'}</Link>
+                  <Link href={`/projects/${p.id}`} prefetch={false} className="lt-mproj-name">{projectTitle(p) || 'Untitled project'}</Link>
                   <div className="lt-mproj-where">{p.office_name} › {p.team_name}</div>
                   <div className="lt-mproj-stats">
                     {p.my_open > 0 ? <span className="lt-stat lt-stat-mine"><b>{p.my_open}</b> mine</span> : null}

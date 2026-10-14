@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { requirePageViewer } from '@/lib/viewer';
 import { loadTaskPage } from '@/lib/queries/project';
+import { projectTitle } from '@/lib/projects';
 import TaskDetail from './TaskDetail';
 
 // /projects/[projectId]/tasks/[taskId] (design §2.1): one task, phone-first (the board's cards open this page).
@@ -17,7 +18,7 @@ export async function generateMetadata({ params }) {
   const ok = ID.test(String(params.projectId)) && ID.test(String(params.taskId));
   const data = ok ? await loadTaskPage(viewer, String(params.projectId), String(params.taskId)) : null;
   if (!data) notFound();                                  // before streaming starts: a real 404 status
-  return { title: `${data.task.title || (data.task.parent_id ? 'Untitled subtask' : 'Untitled task')} · ${data.project.name}` };
+  return { title: `${data.task.title || (data.task.parent_id ? 'Untitled subtask' : 'Untitled task')} · ${projectTitle(data.project)}` };
 }
 
 export default async function TaskPage({ params }) {

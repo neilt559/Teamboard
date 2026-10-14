@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/app/_ui/api';
 import { IconCaret, IconPin, IconCheck } from '@/app/icons';
 import { withDefaults, MAX_FOLLOWED } from '@/lib/prefs';
+import { projectTitle } from '@/lib/projects';
 
 // Settings > Customize (design §11). Preferences follow the person across devices (users.prefs, PATCH
 // /api/prefs). Each control saves on its own, right away, and the page refreshes so the shell picks it up
@@ -144,10 +145,10 @@ export default function CustomizeForm({ viewer, data }) {
             {pinned.map((x, i) => (
               <li key={x.id} className="cz-pin">
                 <IconPin size={15} />
-                <Link href={`/projects/${x.id}`} prefetch={false} className="cz-pin-name">{x.name}</Link>
+                <Link href={`/projects/${x.id}`} prefetch={false} className="cz-pin-name">{projectTitle(x)}</Link>
                 {x.archived && <span className="acct-tag test">Archived</span>}
-                <button type="button" className="cz-move" onClick={() => movePin(i, -1)} disabled={i === 0} aria-label={`Move ${x.name} up`}><IconCaret size={16} className="cz-up" /></button>
-                <button type="button" className="cz-move" onClick={() => movePin(i, 1)} disabled={i === pinned.length - 1} aria-label={`Move ${x.name} down`}><IconCaret size={16} /></button>
+                <button type="button" className="cz-move" onClick={() => movePin(i, -1)} disabled={i === 0} aria-label={`Move ${projectTitle(x)} up`}><IconCaret size={16} className="cz-up" /></button>
+                <button type="button" className="cz-move" onClick={() => movePin(i, 1)} disabled={i === pinned.length - 1} aria-label={`Move ${projectTitle(x)} down`}><IconCaret size={16} /></button>
                 <button type="button" className="btn btn-plain btn-sm" onClick={() => unpin(x.id)}>Unpin</button>
               </li>
             ))}
