@@ -8,8 +8,7 @@ import { mondayOf, projectTitle, stageLabel, stageSteps, statusReportTitle } fro
 import { ScheduleRadios } from '@/app/_ui/project-status';
 import { fmtMonthDay } from '@/app/_ui/project-format';
 
-// Project header (design §2.3): the name (inline rename for people who may manage the project), progress over
-// ALL top-level tasks (archived Done tasks still count, rule 21), the team select (move), "+ Add Task", and a
+// Project header (design §2.3): the name (inline rename for people who may manage the project), the team select (move), "+ Add Task", and a
 // "more" menu with Archive / Restore and Delete. A team move asks first (it changes who is on the project, A4). Capabilities come from the loader (canManageProject,
 // canMoveProject targets, canDeleteProject), so the header shows exactly what the API allows.
 // A6.5 + A11 (direction B): the project number shows next to the rename box (it is edited in Project details). Under
@@ -21,7 +20,8 @@ import { fmtMonthDay } from '@/app/_ui/project-format';
 // Lime means the current stage; brick means Behind. Schedule and stage are for everyone who sees the project; an
 // archived project shows them read-only. Phone: the strip stacks and the stage line turns vertical (container
 // queries on the strip's width, project-strip.css).
-export default function ProjectHeader({ project: p, can, teams, pct, doneCount, total, memberCount, ro, actions, conflictUI, ask, today }) {
+// (The tasks-done bar left the header, Neil 2026-10-15: "irrelevant because tasks will get added and removed".)
+export default function ProjectHeader({ project: p, can, teams, memberCount, ro, actions, conflictUI, ask, today }) {
   const [menu, setMenu] = useState(false);
   const wrap = useRef(null);
 
@@ -94,10 +94,6 @@ export default function ProjectHeader({ project: p, can, teams, pct, doneCount, 
         ) : (
           <h1 className="proj-title-ro">{projectTitle(p)}</h1>
         )}
-        <div className="proj-progress">
-          <div className="progress" title={`${pct}% done`}><span style={{ width: `${pct}%` }} /></div>
-          <span className="progress-label">{doneCount}/{total} done</span>
-        </div>
         {can.move && !ro ? (
           <label className="team-select-wrap">Team
             <select className="team-select" value={p.team_id ?? ''} onChange={(e) => actions.moveProject(e.target.value)}>

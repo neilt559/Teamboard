@@ -283,6 +283,9 @@ export default function ReportSheet({ project: p, reportDate, preparedBy }) {
                   <div>
                     <h1 className="rs-h1">Project status report</h1>
                     <p className="rs-meta"><b>{sheetName(p)}</b><i>·</i>{fmtDayYear(reportDate)}</p>
+                    {p.report_link && (
+                      <p className="rs-docs">Project documents: <a href={p.report_link} target="_blank" rel="noopener noreferrer">Open the Egnyte folder</a></p>
+                    )}
                   </div>
                   <Schedule status={p.schedule_status} />
                 </header>

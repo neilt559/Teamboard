@@ -28,11 +28,11 @@ export function fmtDue(s, withYear = false) {
 // preview or notes editor and, for an expanded top-level task, its subtasks and "+ Add subtask".
 // ctx = { pid, people, ro, mounted, focusId, actions, conflictUI, expandedSubs, expandedNotes, toggleSubs, toggleNotes }
 export default function TaskRow({ t, isSub = false, subs = [], ctx }) {
-  const { people, ro, mounted, focusId, actions, conflictUI, expandedSubs, expandedNotes, toggleSubs, toggleNotes } = ctx;
+  const { people, ro, mounted, focusId, actions, conflictUI, expandedSubs, expandedNotes, toggleSubs, toggleNotes, noSubs = false } = ctx;
   const owner = personById(people, t.assignee_id);
   const hasNotes = (t.notes || '').trim().length > 0;
   const notesOpen = !!expandedNotes[t.id];
-  const subOpen = !isSub && !!expandedSubs[t.id];
+  const subOpen = !isSub && !noSubs && !!expandedSubs[t.id];
   const subDone = subs.filter((s) => s.status === 'done').length;
   const label = isSub ? 'subtask' : 'task';
   return (
@@ -42,7 +42,7 @@ export default function TaskRow({ t, isSub = false, subs = [], ctx }) {
           <div className={isSub ? 'subtask-title-cell' : 'title-cell'}>
             {isSub ? (
               <span className="subtask-arrow" aria-hidden="true">↳</span>
-            ) : (
+            ) : noSubs ? null : (
               <button type="button" className="subtask-toggle" title="Show / add subtasks" aria-expanded={subOpen} aria-label={`Subtasks of ${t.title || 'this task'}`} onClick={() => toggleSubs(t.id)}>
                 <IconCaret size={13} className={`caret${subOpen ? '' : ' caret-closed'}`} />
                 {subs.length > 0 && <span className="sub-badge">{subDone}/{subs.length}</span>}

@@ -58,6 +58,8 @@
 .rs-pack .rs-h1 { font: 700 var(--h1)/1 var(--rs-cond); letter-spacing: .075em; text-transform: uppercase; color: var(--rs-ink); }
 .rs-pack .rs-meta { margin-top: var(--g2); font: 400 var(--body)/1.3 var(--rs-text); color: var(--rs-gray); }
 .rs-meta b { font-weight: 600; color: var(--rs-ink); }
+.rs-pack .rs-docs { margin-top: 3px; font: 400 var(--small, 11px)/1.3 var(--rs-text); color: var(--rs-gray); }
+.rs-docs a { color: var(--rs-ink); font-weight: 600; text-decoration: underline; text-decoration-color: #c2d02e; text-underline-offset: 2px; }
 .rs-meta i, .rs-item-who i { font-style: normal; padding: 0 .3em; color: var(--rs-rule); }
 
 /* schedule: the title block's "issued for" row, one box marked */

@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import { requirePageViewer, publicViewer, tagUpdating } from '@/lib/viewer';
 import { loadTeam } from '@/lib/queries/teams';
 import { canManageTeamsIn } from '@/lib/access';
-import { loadProjectFieldOptions } from '@/lib/queries/project';
+import { loadProjectFieldOptions, loadProjectPage } from '@/lib/queries/project';
+import { nowFromRequestContext } from '@/lib/clock';
 import { canCreateProjectIn } from '@/lib/policy';
 import TeamOverview from './TeamOverview';
 
@@ -54,5 +55,13 @@ export default async function TeamPage({ params }) {
   } catch (e) {
     throw tagUpdating(e);
   }
-  return <TeamOverview viewer={pv} data={data} createOptions={createOptions} />;
+  // Each project's review panel uses the project page's own loader (same rights: tb_can_see_project).
+  let boards;
+  try {
+    const now = nowFromRequestContext();
+    boards = (await Promise.all(data.projects.map((p) => loadProjectPage(viewer, p.id, now)))).filter(Boolean);
+  } catch (e) {
+    throw tagUpdating(e);
+  }
+  return <TeamOverview viewer={pv} data={data} boards={boards} createOptions={createOptions} />;
 }

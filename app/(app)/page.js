@@ -14,7 +14,6 @@ import WhatsNewWidget from './_widgets/WhatsNewWidget';
 import AnnouncementsWidget from './_widgets/AnnouncementsWidget';
 import PostsWidget from './_widgets/PostsWidget';
 import ChallengeWidget from './_widgets/ChallengeWidget';
-import EventsWidget from './_widgets/EventsWidget';
 import BracketWidget, { BracketCadenceNotice } from './_widgets/BracketWidget';
 import GeoWidget from './_widgets/GeoWidget';
 
@@ -37,7 +36,6 @@ const WIDGETS = {
   announcements: AnnouncementsWidget,
   threads: PostsWidget,                          // the stored key; the Suggestions/Announcements card (A10.4)
   challenge: ChallengeWidget,
-  events: EventsWidget,
   bracket: BracketWidget,
   geo: GeoWidget,
   admin_queue: AdminQueueWidget,

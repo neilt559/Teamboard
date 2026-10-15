@@ -1,5 +1,4 @@
-import { handle, notFound, parseId } from '@/lib/http';
-import { archiveEvent, loadEvent, patchEvent } from '@/lib/queries/events';
+import { handle, HttpError } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -7,21 +6,9 @@ export const revalidate = 0;
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// GET /api/culture/events/:id -> { event }. Everyone signed in; an archived event is 404 except for organizers.
-export const GET = handle(async ({ viewer, params }) => {
-  const event = await loadEvent(viewer, parseId(params.id));
-  if (!event) throw notFound('Event not found');
-  return { event };
-});
-
-// PATCH /api/culture/events/:id { title?, details?, location?, link_url? (each with base, design §7.3), office_id?,
-// all_day?, starts_on?, ends_on?, start_time?, end_time?, tz?, cancelled?, archived? } -> { ok, row }.
-// Culture organizers and admins only; 409 with the current row when a text field changed since its base.
-export const PATCH = handle(async ({ viewer, params, body, now }) => {
-  const row = await patchEvent(viewer, params.id, await body(), now);
-  return { ok: true, row };
-}, { auth: 'organizer' });
-
-// DELETE /api/culture/events/:id: archive (soft; nothing is removed; organizers restore with PATCH { archived: false }).
-// A missing or already archived event answers { ok: true }. Culture organizers and admins only.
-export const DELETE = handle(async ({ viewer, params }) => archiveEvent(viewer, params.id), { auth: 'organizer' });
+// Retired with the culture events calendar (Neil, 2026-10-15). The events stay in culture_events (nothing is
+// deleted); signed-in callers get 410 so an old open tab reloads, signed-out ones 401.
+const retired = () => new HttpError(410, 'The culture calendar was removed. Reload the page.', { code: 'retired' });
+export const GET = handle(async () => { throw retired(); });
+export const PATCH = handle(async () => { throw retired(); });
+export const DELETE = handle(async () => { throw retired(); });

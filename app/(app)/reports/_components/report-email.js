@@ -120,6 +120,7 @@ function projectHtml(p, i, { reportDate, preparedBy }) {
     + `<p style="margin:0 0 4px;color:${GRAY};">${facts}</p>`
     + `<p style="margin:0 0 4px;color:${GRAY};">Schedule: ${scheduleHtml(p.schedule_status)}</p>`
     + `<p style="margin:0;color:${GRAY};">${esc(stageLine(p))}: ${stagesHtml(p)}</p>`
+    + (p.report_link ? `<p style="margin:4px 0 0;color:${GRAY};">Project documents: <a href="${esc(p.report_link)}" style="color:${INK};font-weight:600;">Open the Egnyte folder</a></p>` : '')
     + h2(sheetWeekTitle(p)) + notesHtml(p.status_body ?? p.status_report)
     + (items.length ? h2('Attention Items', `${items.length} open${late ? `, ${late} late` : ''}`) + itemsHtml(items, reportDate) : '')
     + h2('Meetings ahead', meetings.length ? `Next ${meetings.length}` : '') + meetingsHtml(meetings, reportDate)
@@ -152,6 +153,7 @@ function projectText(p, { reportDate, preparedBy }) {
   const L = ['PROJECT STATUS REPORT', `${sheetName(p)} · ${fmtDayYear(reportDate)}`];
   L.push([p.project_number ? `Project No. ${p.project_number}` : '', `Owner: ${p.owner_company || '-'}`, `Jurisdiction: ${p.jurisdiction || '-'}`].filter(Boolean).join(' · '));
   L.push(`Schedule: ${scheduleOf(p.schedule_status)?.label || 'Not set'}`);
+  if (p.report_link) L.push(`Project documents: ${p.report_link}`);
   L.push(p.steps?.length
     ? `${stageLine(p)}: ${p.steps.map((s) => (s.state === 'current' ? `[${s.label}]` : s.state === 'done' ? `${s.label} (complete)` : s.label)).join(' > ')}`
     : 'Stage: no stages set');

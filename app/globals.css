@@ -241,7 +241,7 @@ tbody tr:hover td { background: #fcfcfa; }
 .info-action:hover { background: #eef0dd; border-color: var(--lime); }
 .info-del { opacity: .5; }
 .info-row:hover .info-del { opacity: 1; }
-.info-empty { color: var(--muted); font-size: 13px; margin: 4px 2px; }
+.info-empty { color: #b3b0b1; font-size: 12.5px; margin: 4px 2px; }
 .info-hint { color: var(--muted); font-size: 11.5px; margin: 10px 2px 0; line-height: 1.5; }
 .info-hint code { background: #f1f1f2; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
 .row-x { border: none; background: none; color: var(--muted); font-size: 18px; line-height: 1; opacity: 0; }

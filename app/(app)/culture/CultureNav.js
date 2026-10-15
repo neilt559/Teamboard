@@ -1,17 +1,17 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { IconHome, IconTrophy, IconGlobe, IconMedal, IconCalendar } from '@/app/icons';
+import { IconHome, IconTrophy, IconGlobe, IconMedal } from '@/app/icons';
 
 // The Culture sub-nav. Active item: same gray with a lime underline (rule 42), like the header tabs.
-// Release 3 (K1, K2) adds Challenge (/culture/challenge) and Calendar (/culture/calendar).
+// Release 3 (K1) adds Challenge (/culture/challenge).
 // K1: Challenge opens this month's challenge (/culture/challenge redirects); it stays active on every
 // /culture/challenge* page (list, one challenge, new, edit).
-// K2: Calendar stays active on the calendar and on every /culture/events/* page (one event, new, edit).
+// K2's Calendar was taken out of the app (Neil, 2026-10-15: "I don't want the calendar"); its data is kept and its
+// pages redirect to /culture.
 const ITEMS = [
   { href: '/culture', label: 'Overview', Icon: IconHome, exact: true },
   { href: '/culture/challenge', label: 'Challenge', Icon: IconMedal, prefix: '/culture/challenge' },
-  { href: '/culture/calendar', label: 'Calendar', Icon: IconCalendar, also: '/culture/events' },
   { href: '/culture/brackets', label: 'Brackets', Icon: IconTrophy },
   { href: '/culture/geoguessr', label: 'GeoGuessr', Icon: IconGlobe },
 ];

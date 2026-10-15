@@ -4,18 +4,17 @@ import { IconExternal, IconPaperclip } from '@/app/icons';
 import { SyncedField } from '@/app/synced';
 import { byPos, copyText, isFilePath, isWebUrl } from '@/app/_ui/tasks';
 
-// "Additional project info" (inventory §1.7): label / value rows in creation order. Web links get "Open" (new
-// tab); local and UNC paths get "Copy", because browsers can't open them (rule 47). Delete now asks first
-// (design §13 #12).
+// The old "Additional project info" rows (inventory §1.7). Neil removed the section on 2026-10-15 in favor of the
+// Report Egnyte Link; rows written before stay (nothing is deleted) and show here, folded, only on projects that
+// have some, so their links can be copied over and the rows deleted. No new rows. Web links get "Open" (new
+// tab); local and UNC paths get "Copy", because browsers can't open them (rule 47). Delete asks first.
 export default function ProjectInfo({ rows, ctx }) {
   const { ro, actions, conflictUI, focusId } = ctx;
   const list = [...(rows || [])].sort(byPos);
+  if (!list.length) return null;
   return (
-    <div className="info-panel">
-      <div className="info-head">
-        <label className="notes-label"><IconPaperclip size={14} /> Additional project info <span>· links, documents &amp; references</span></label>
-        {!ro && <button type="button" className="btn btn-lime btn-sm" onClick={actions.addInfo}>+ Add row</button>}
-      </div>
+    <details className="info-panel info-old">
+      <summary className="notes-label"><IconPaperclip size={14} /> Earlier project info ({list.length}) <span>· copy what the owner needs into the Egnyte folder</span></summary>
       {list.length > 0 && (
         <div className="info-table">
           <div className="info-row info-row-head">
@@ -28,11 +27,7 @@ export default function ProjectInfo({ rows, ctx }) {
           ))}
         </div>
       )}
-      {list.length === 0 && (
-        <p className="info-empty">Nothing here yet — add rows for document links, permit numbers, file paths, contacts, etc.</p>
-      )}
-      <p className="info-hint">Web links (http/https) become clickable and open in a new tab. Local/network paths (<code>C:\…</code> or <code>\\server\…</code>) can’t be clickable from a website — use <b>Copy</b> and paste into File Explorer’s address bar.</p>
-    </div>
+    </details>
   );
 }
 

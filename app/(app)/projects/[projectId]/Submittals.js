@@ -214,9 +214,9 @@ export default function Submittals({ submittals, ctx }) {
   const archived = (submittals || []).filter((s) => s.archived);
 
   return (
-    <section className="info-panel sub-panel" id="submittals" aria-labelledby="submittals-h">
+    <section className="info-panel sub-panel" id={ctx.review ? undefined : 'submittals'} aria-labelledby={ctx.review ? `submittals-h-${ctx.pid}` : 'submittals-h'}>
       <div className="info-head">
-        <h2 className="notes-label sec-h" id="submittals-h"><IconFile size={14} /> Submittals <span>· in the weekly owner report</span></h2>
+        <h2 className="notes-label sec-h" id={ctx.review ? `submittals-h-${ctx.pid}` : 'submittals-h'}><IconFile size={14} /> Submittals <span>· in the weekly owner report</span></h2>
         <div className="sec-actions">
           {archived.length > 0 && (
             <button type="button" className="btn btn-plain btn-sm" aria-pressed={showArchived} onClick={() => setShowArchived((v) => !v)}>
@@ -243,7 +243,7 @@ export default function Submittals({ submittals, ctx }) {
           </ul>
         </div>
       ) : (
-        <p className="info-empty">No submittals yet{ro ? '.' : ' — add one for each package you send to an agency (e.g. “Village of Lakeview, Final engineering submittal”).'}</p>
+        <p className="info-empty">No submittals yet{ro || ctx.review ? '.' : ' — add one for each package you send to an agency (e.g. “Village of Lakeview, Final engineering submittal”).'}</p>
       )}
       {showArchived && archived.length > 0 && (
         <div className="sub-archived">

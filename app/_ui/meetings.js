@@ -314,7 +314,7 @@ function MeetingRow({ m, seriesName, open, onToggle, readOnly, onEdit, onRestore
 //   seriesNotice(series)                    -> optional node under a series (e.g. a rename conflict)
 export function ProjectMeetings({
   meetings, series = [], today, readOnly = false, onCreate, onSave, onArchive, onAddSeries, onRenameSeries, onArchiveSeries,
-  onDiscard, onDirtyChange, seriesNotice,
+  onDiscard, onDirtyChange, seriesNotice, idKey = '', compact = false,
 }) {
   const [composing, setComposing] = useState(false);
   const [editing, setEditing] = useState({});         // meeting id -> true while being edited
@@ -386,9 +386,9 @@ export function ProjectMeetings({
 
   const shownPast = allPast ? past : past.slice(0, PAST_SHOWN);
   return (
-    <section className="info-panel pm-panel pm2-panel" id="meetings" aria-labelledby="pm2-h">
+    <section className="info-panel pm-panel pm2-panel" id={idKey ? undefined : 'meetings'} aria-labelledby={`pm2-h${idKey ? `-${idKey}` : ''}`}>
       <div className="info-head">
-        <h2 className="notes-label sec-h" id="pm2-h"><IconCalendar size={14} /> Meetings <span>· upcoming ones go in the weekly owner report, never the minutes</span></h2>
+        <h2 className="notes-label sec-h" id={`pm2-h${idKey ? `-${idKey}` : ''}`}><IconCalendar size={14} /> Meetings <span>· upcoming ones go in the weekly owner report, never the minutes</span></h2>
         <div className="sec-actions">
           {(series.length > 0 || !readOnly) && (
             <button type="button" className="btn btn-plain btn-sm wi" onClick={() => setSeriesOpen(true)}>
@@ -415,15 +415,16 @@ export function ProjectMeetings({
       <h3 className="pm2-h">Upcoming <span>{upcoming.length}</span></h3>
       {upcoming.length ? <div className="pm2-list" aria-label="Upcoming meetings">{upcoming.map(renderMeeting)}</div>
         : <p className="ov-empty pm2-empty">No upcoming meetings.</p>}
-      <h3 className="pm2-h">Past <span>{past.length}</span></h3>
-      {past.length ? <div className="pm2-list" aria-label="Past meetings">{shownPast.map(renderMeeting)}</div>
-        : <p className="ov-empty pm2-empty">No past meetings.</p>}
-      {past.length > PAST_SHOWN && (
+      {/* compact (the team page's weekly review): upcoming meetings only; the past ones stay on the project page. */}
+      {!compact && <h3 className="pm2-h">Past <span>{past.length}</span></h3>}
+      {!compact && (past.length ? <div className="pm2-list" aria-label="Past meetings">{shownPast.map(renderMeeting)}</div>
+        : <p className="ov-empty pm2-empty">No past meetings.</p>)}
+      {!compact && past.length > PAST_SHOWN && (
         <button type="button" className="btn btn-plain btn-sm pm2-more" aria-expanded={allPast} onClick={() => setAllPast((x) => !x)}>
           {allPast ? 'Show fewer' : `Show all past (${past.length})`}
         </button>
       )}
-      {archived.length > 0 && (
+      {!compact && archived.length > 0 && (
         <div className="pm2-archived">
           <button type="button" className="btn btn-plain btn-sm wi" aria-expanded={showArchived} onClick={() => setShowArchived((x) => !x)}>
             <IconArchive size={13} /> {showArchived ? 'Hide archived' : `Show archived (${archived.length})`}

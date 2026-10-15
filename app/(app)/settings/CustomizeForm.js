@@ -24,7 +24,8 @@ const WIDGET_LABELS = {
 };
 // The challenge/events arrive in Release 3. Until then their Home cards render nothing, so they aren't offered
 // here (the agents shipping them remove the key from this list). Threads and announcements shipped in Release 2.
-const NOT_YET = new Set([]);   // Release 3: K1 shipped the challenge card, K2 the events card
+// The events card left with the calendar (Neil, 2026-10-15); a stored 'events' key is kept but never shown.
+const NOT_YET = new Set(['events']);
 const NOT_YET_LANDING = new Set([]);
 
 function Saved({ on }) {

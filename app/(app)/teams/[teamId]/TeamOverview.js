@@ -1,21 +1,18 @@
 'use client';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconCheck, IconArchive, IconTrash } from '@/app/icons';
 import Crumbs from '@/app/_ui/Crumbs';
 import { api, ConflictError } from '@/app/_ui/api';
-import ConflictNotice from '@/app/_ui/ConflictNotice';
 import { useConfirm } from '@/app/_ui/ConfirmDialog';
 import { useRefreshOnFocus } from '@/app/_ui/useRefresh';
 import useServerState from '@/app/_ui/useServerState';
-import { STOPLIGHTS, byPos, initials, personById } from '@/app/_ui/tasks';
-import { SyncedTextarea } from '@/app/synced';
 import { canManageTeamsIn, canCreateProjectIn, canManageProject, canDeleteProject, isAdmin, inMyOffices } from '@/lib/policy';
 import NameDialog from '../../offices/_ui/NameDialog';
 import MoreMenu from '../../offices/_ui/MoreMenu';
 import ErrorBanner from '../../offices/_ui/ErrorBanner';
-import AddTaskModal from './AddTaskModal';
+import ProjectBoard from '../../projects/[projectId]/ProjectBoard';
 import TeamRoster from './TeamRoster';
 import CreateProjectDialog from '@/app/_ui/CreateProjectDialog';
 import { projectTitle } from '@/lib/projects';
@@ -23,28 +20,23 @@ import { projectTitle } from '@/lib/projects';
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 
-function Owner({ person }) {
-  return person
-    ? <span className="ov-owner"><span className="avatar xs" style={{ background: person.color }}>{initials(person.name)}</span>{person.name}</span>
-    : <span className="ov-owner ov-unassigned">Unassigned</span>;
-}
 
-// The Team overview (inventory §1.10, design §2.1/§2.3): the team's visible projects as cards with their notes,
-// open task lists, "Mark done" and "+ Add task", plus the team's roster (A4: it drives project membership).
+// The Team page (inventory §1.10, design §2.1/§2.3), reworked for the Friday review (Neil, 2026-10-15): every
+// visible project of the team, in project-number order, as a compact panel (ProjectBoard variant 'review'):
+// Status Report, Submittals, Attention Items, Meetings, then the top-level tasks (no subtasks), all edited in
+// place, so the weekly owner reports are ready when the meeting ends. Plus the team's roster (A4: it drives
+// project membership).
 // Moving the team to another office needs team rights in both offices; project add / rename / archive /
 // delete follow lib/policy.js exactly as the API does.
-export default function TeamOverview({ viewer, data, createOptions = null }) {
+export default function TeamOverview({ viewer, data, boards = [], createOptions = null }) {
   const router = useRouter();
   useRefreshOnFocus(30_000);
   const [state, setState] = useServerState(data);
-  const [menuFor, setMenuFor] = useState(null);
-  const [addingTaskFor, setAddingTaskFor] = useState(null);
   const [dialog, setDialog] = useState(null);          // { kind: 'project' } | { kind: 'rename-project', project } | { kind: 'rename-team' }
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [conflicts, setConflicts] = useState({});      // projectId -> { err, mine }
   const [confirmUI, ask] = useConfirm();
-  const { team, office, projects, tasks, people, roster } = state;
+  const { team, office, projects, roster } = state;
   const setRoster = (fn) => setState((s) => ({ ...s, roster: fn(s.roster) }));
   const admin = isAdmin(viewer);
   const canManageTeam = canManageTeamsIn(viewer, team.office_id);
@@ -74,55 +66,6 @@ export default function TeamOverview({ viewer, data, createOptions = null }) {
       setState((s) => ({ ...s, team: { ...s.team, office_id: prev } }));
       fail(e);
     }
-  }
-
-  async function saveNotes(p, text, base) {
-    setState((s) => ({ ...s, projects: s.projects.map((x) => (x.id === p.id ? { ...x, notes: text } : x)) }));
-    try {
-      const r = await api(`/api/projects/${p.id}`, { method: 'PATCH', body: { notes: text, base: { notes: base } } });
-      const stored = r?.row && typeof r.row.notes === 'string' ? r.row.notes : text;
-      setState((s) => ({ ...s, projects: s.projects.map((x) => (x.id === p.id ? { ...x, notes: stored } : x)) }));
-      setConflicts((c) => { const n = { ...c }; delete n[p.id]; return n; });
-      return stored;
-    } catch (e) {
-      if (e instanceof ConflictError) {
-        const theirs = e.current?.notes ?? '';
-        setState((s) => ({ ...s, projects: s.projects.map((x) => (x.id === p.id ? { ...x, notes: theirs } : x)) }));
-        setConflicts((c) => ({ ...c, [p.id]: { err: e, mine: text } }));
-      } else {
-        fail(e);
-      }
-      throw e;
-    }
-  }
-
-  // Close first, then create (as before). Assigning someone linked to an account adds them to the project.
-  async function createTaskWithOwner(title, assigneeId) {
-    const projectId = addingTaskFor;
-    setAddingTaskFor(null);
-    if (!projectId) return;
-    try {
-      const r = await api('/api/tasks', { method: 'POST', body: { project_id: projectId, title, assignee_id: assigneeId } });
-      // POST /api/tasks returns added_members: [{ user_id, name }] when the owner's account just joined (§6).
-      const added = Array.isArray(r?.added_members) ? r.added_members.filter((a) => a && a.name) : [];
-      if (added.length) setNotice(`${added.map((a) => a.name).join(', ')} ${added.length === 1 ? 'was' : 'were'} added to this project.`);
-      router.refresh();
-    } catch (e) { fail(e); }
-  }
-
-  // Top-level tasks archive on Done (rule 20); subtasks never do (they stay listed, marked done).
-  async function markDone(t) {
-    const top = t.parent_id == null;
-    setState((s) => ({
-      ...s,
-      tasks: top
-        ? s.tasks.filter((x) => x.id !== t.id && !same(x.parent_id, t.id))
-        : s.tasks.map((x) => (x.id === t.id ? { ...x, status: 'done' } : x)),
-    }));
-    try {
-      await api(`/api/tasks/${t.id}`, { method: 'PATCH', body: top ? { status: 'done', archived: true } : { status: 'done' } });
-      router.refresh();
-    } catch (e) { fail(e); }
   }
 
   async function renameProject(p, name) {
@@ -187,7 +130,6 @@ export default function TeamOverview({ viewer, data, createOptions = null }) {
   ];
 
   const officeCrumb = office ? { label: office.name, href: office.archived && !admin ? null : `/offices/${office.id}` } : null;
-  const addingProject = addingTaskFor ? projects.find((p) => p.id === addingTaskFor) : null;
 
   return (
     <>
@@ -242,79 +184,16 @@ export default function TeamOverview({ viewer, data, createOptions = null }) {
           <p>{canAddProject ? 'Click “+ Add Project” to create one.' : 'Projects you can see in this team show up here.'}</p>
         </div>
       ) : (
-        <div className="overview-grid">
-          {projects.map((p) => {
-            const projTop = tasks.filter((t) => same(t.project_id, p.id) && t.parent_id == null).sort(byPos);
-            const count = projTop.length;
-            const conflict = conflicts[p.id];
+        <div className="rv-list">
+          {(boards || []).filter((b) => projects.some((x) => same(x.id, b.project.id))).map((b) => {
+            const p = projects.find((x) => same(x.id, b.project.id)) || b.project;
             return (
-              <div key={p.id} className="overview-card">
-                <div className="overview-card-head">
-                  <Link href={`/projects/${p.id}`} prefetch={false} className="overview-open">{projectTitle(p)}</Link>
-                  <span className="ov-head-side">
-                    <span className="count">{plural(count, 'task')}</span>
-                    <MoreMenu items={projectMenu(p)} label={`Actions for ${projectTitle(p)}`} />
-                  </span>
-                </div>
-                <SyncedTextarea
-                  key={p.id}
-                  className="overview-notes"
-                  value={p.notes || ''}
-                  placeholder="Status Report…"
-                  aria-label={`Status Report for ${projectTitle(p)}`}
-                  onSave={(v, base) => saveNotes(p, v, base)}
-                />
-                {conflict && (
-                  <ConflictNotice
-                    conflict={conflict.err}
-                    field="notes"
-                    mine={conflict.mine}
-                    onKeepMine={(theirs) => saveNotes(p, conflict.mine, theirs).catch(() => {})}
-                    onUseTheirs={() => setConflicts((c) => { const n = { ...c }; delete n[p.id]; return n; })}
-                  />
-                )}
-                <div className="ov-tasks">
-                  {projTop.length === 0 && <div className="ov-empty">No tasks yet.</div>}
-                  {projTop.map((t) => {
-                    const subs = tasks.filter((x) => same(x.parent_id, t.id)).sort(byPos);
-                    const href = `/projects/${p.id}/tasks/${t.id}`;
-                    return (
-                      <div key={t.id} className="ov-task" style={{ borderLeftColor: t.stoplight && STOPLIGHTS[t.stoplight] ? STOPLIGHTS[t.stoplight] : 'transparent' }}>
-                        <button type="button" className="ov-task-row" aria-expanded={menuFor === t.id} onClick={() => setMenuFor(menuFor === t.id ? null : t.id)} title="Click for options">
-                          <span className="ov-task-title">{t.title || 'Untitled task'}</span>
-                          <Owner person={personById(people, t.assignee_id)} />
-                        </button>
-                        {menuFor === t.id && (
-                          <div className="ov-menu">
-                            <Link href={href} prefetch={false} className="ov-menu-btn">View task</Link>
-                            <button type="button" className="ov-menu-btn ov-menu-done wi" onClick={() => { setMenuFor(null); markDone(t); }}><IconCheck size={13} /> Mark done</button>
-                          </div>
-                        )}
-                        {subs.map((s) => {
-                          const done = s.status === 'done';
-                          return (
-                            <Fragment key={s.id}>
-                              <button type="button" className={`ov-sub ov-sub-click${done ? ' ov-sub-done' : ''}`} aria-expanded={menuFor === s.id} onClick={() => setMenuFor(menuFor === s.id ? null : s.id)} title={done ? 'Done' : 'Click for options'}>
-                                <span className="ov-sub-title">↳ <span className="ov-sub-text">{s.title || 'Untitled subtask'}</span></span>
-                                {done && <span className="ov-done-chip wi" aria-label="Done"><IconCheck size={12} /> Done</span>}
-                                <Owner person={personById(people, s.assignee_id)} />
-                              </button>
-                              {menuFor === s.id && (
-                                <div className="ov-menu ov-menu-sub">
-                                  <Link href={`/projects/${p.id}/tasks/${s.id}`} prefetch={false} className="ov-menu-btn">View task</Link>
-                                  {!done && <button type="button" className="ov-menu-btn ov-menu-done wi" onClick={() => { setMenuFor(null); markDone(s); }}><IconCheck size={13} /> Mark done</button>}
-                                </div>
-                              )}
-                            </Fragment>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                  <button type="button" className="ov-add" onClick={() => setAddingTaskFor(p.id)}>+ Add task</button>
-                </div>
-                <Link href={`/projects/${p.id}`} prefetch={false} className="overview-open-link">Open board →</Link>
-              </div>
+              <ProjectBoard
+                key={b.project.id}
+                initial={b}
+                variant="review"
+                headExtra={<MoreMenu items={projectMenu(p)} label={`Actions for ${projectTitle(p)}`} />}
+              />
             );
           })}
         </div>
@@ -331,9 +210,6 @@ export default function TeamOverview({ viewer, data, createOptions = null }) {
         pmOnlyEditor={!admin && !canManageTeam}
       />
 
-      {addingTaskFor && (
-        <AddTaskModal people={people} projectName={addingProject ? projectTitle(addingProject) : ''} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />
-      )}
       {dialog?.kind === 'project' && (
         <CreateProjectDialog
           teams={[{ id: team.id, name: team.name, office_id: team.office_id, office_name: office?.name || '' }]}

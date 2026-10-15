@@ -194,9 +194,9 @@ export default function AttentionItems({ items, today, fromOptions, ctx }) {
   ));
 
   return (
-    <section className="info-panel at-panel" id="attention-items" aria-labelledby="at-h">
+    <section className="info-panel at-panel" id={ctx.review ? undefined : 'attention-items'} data-section="attention-items" aria-labelledby={ctx.review ? `at-h-${pid}` : 'at-h'}>
       <div className="info-head">
-        <h2 className="notes-label sec-h" id="at-h">
+        <h2 className="notes-label sec-h" id={ctx.review ? `at-h-${pid}` : 'at-h'}>
           <IconAlert size={14} /> Attention Items
           {late > 0 && <b className="at-late-count">{late} overdue</b>}
           <span>· open ones go in the weekly owner report</span>
@@ -227,7 +227,7 @@ export default function AttentionItems({ items, today, fromOptions, ctx }) {
       {open.length > 0 ? (
         <ul className="at-list" aria-label="Open attention items">{open.map(openRow)}</ul>
       ) : (
-        !adding && <p className="info-empty">{received.length ? 'Nothing open. Everything we asked for has come in.' : `No attention items${ro ? '.' : ' — add what you need from the owner, the architect, the village or anyone else, with the date you need it by.'}`}</p>
+        !adding && <p className="info-empty">{received.length ? 'Nothing open. Everything we asked for has come in.' : `No attention items${ro || ctx.review ? '.' : ' — add what you need from the owner, the architect, the village or anyone else, with the date you need it by.'}`}</p>
       )}
       {received.length > 0 && (
         <div className="at-recv-wrap">
