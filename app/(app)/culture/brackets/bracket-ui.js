@@ -1,8 +1,8 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ROUNDS, nextSlot, currentRound } from '@/lib/bracket';
+import { ROUNDS, nextSlot, currentRound, roundWeekday, pickWinner } from '@/lib/bracket';
 import { bracketPolicy, isOrganizer, displayName } from '@/lib/policy';
 import {
   IconCrown, IconTrophy, IconTrash, IconCamera, IconPencil, IconCheck, IconNote, IconRestore, IconLock, IconCalendar,
@@ -16,7 +16,8 @@ import VoterPhotos from '@/app/_ui/VoterPhotos';
 import { api, ConflictError } from '@/app/_ui/api';
 import useServerState from '@/app/_ui/useServerState';
 import { usePoll, useRefreshOnFocus } from '@/app/_ui/useRefresh';
-import { parseRegions, fmtDay } from './format';
+import { parseRegions, fmtDay, closeLabel, fmtStart, untilText } from './format';
+import CadenceNotice from './CadenceNotice';
 
 
 // ---- vote bracket (one shared bracket for everyone) ----------------------
@@ -29,7 +30,8 @@ import { parseRegions, fmtDay } from './format';
 // bracketPolicy (lib/policy.js): the live legacy bracket stays open to everyone (crown_policy 'anyone'),
 // new brackets are run by culture organizers. The server enforces the same rules.
 
-const SEED_LABELS = ['1 seed', '2 seed', '3 seed', 'Wildcard', 'Wildcard'];
+// The wildcard inputs say their seed: in a weekly bracket a tie goes to the better seed (design §10(c)).
+const SEED_LABELS = ['1 seed', '2 seed', '3 seed', '4 seed (Wildcard)', '5 seed (Wildcard)'];
 const POLL_MS = 15_000;                                    // the live bracket polls while a round is open (§7.5)
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 
@@ -54,7 +56,7 @@ function placeholderFor(round, idx, side, regions) {
 
 function Match({ m, ctx, placeholders }) {
   if (!m) return <div className="bk-match" />;
-  const { ent, votesByMatch, usersById, meId, readOnly, editNames, onVote, onAskWin, onAskUndo, onRename, canUndo, isOpen, mayCrown, mayUndo } = ctx;
+  const { ent, votesByMatch, usersById, meId, readOnly, editNames, onVote, onAskWin, onAskUndo, onRename, canUndo, isOpen, mayCrown, mayUndo, auto, startsOn, totals } = ctx;
   const votes = votesByMatch[String(m.id)] || [];
   const ready = !!(m.a_id && m.b_id);
   const decided = !!m.winner_id;
@@ -64,6 +66,18 @@ function Match({ m, ctx, placeholders }) {
   const locked = !readOnly && ready && !decided && !open;
   const votable = !readOnly && !editNames && ready && !decided && open;
   const undoable = !readOnly && !editNames && decided && mayUndo && canUndo(m);
+  const lockTitle = auto && startsOn ? `Opens ${roundWeekday(startsOn, m.round)}` : `Voting opens once every ${ROUNDS[Number(m.round) - 1]} matchup has a winner`;
+  // Weekly brackets (Release 3): who would advance if voting closed now, by the same tie chain as the resolver.
+  let lead = null;
+  if (auto && votable) {
+    const ea = ent[String(m.a_id)];
+    const eb = ent[String(m.b_id)];
+    const cnt = (id) => votes.filter((v) => same(v.entrant_id, id)).length;
+    if (ea && eb) {
+      const w = pickWinner(ea, eb, { [ea.id]: cnt(ea.id), [eb.id]: cnt(eb.id) }, totals || {});
+      lead = { side: w.side, reason: w.reason, who: w.side === 'a' ? ea : eb };
+    }
+  }
 
   const row = (side) => {
     const eid = side === 'a' ? m.a_id : m.b_id;
@@ -72,7 +86,8 @@ function Match({ m, ctx, placeholders }) {
     const mine = sv.some((v) => same(v.user_id, meId));
     const won = decided && same(m.winner_id, eid);
     const lost = decided && !!e && !won;
-    const cls = ['bk-ent', votable && 'votable', mine && 'mine', won && 'won', lost && 'lost', !e && 'empty'].filter(Boolean).join(' ');
+    const leading = !!lead && lead.reason === 'votes' && lead.side === side;
+    const cls = ['bk-ent', votable && 'votable', mine && 'mine', won && 'won', lost && 'lost', !e && 'empty', leading && 'leading'].filter(Boolean).join(' ');
     const doVote = () => onVote(m.id, mine ? null : eid);
     const voterNames = sv.map((v) => nameOfUser(usersById[String(v.user_id)])).join(', ');
     return (
@@ -84,7 +99,7 @@ function Match({ m, ctx, placeholders }) {
         tabIndex={votable ? 0 : undefined}
         aria-pressed={votable ? mine : undefined}
         title={votable ? (mine ? 'Your vote — click to take it back' : `Vote for ${e.name}`)
-          : locked ? `Voting opens once every ${ROUNDS[Number(m.round) - 1]} matchup has a winner` : undefined}
+          : locked ? lockTitle : undefined}
       >
         <div className="bk-line">
           {e && <span className="bk-seed">{e.seed}</span>}
@@ -99,15 +114,16 @@ function Match({ m, ctx, placeholders }) {
           ) : (
             <span className="bk-name" title={e ? e.name : undefined}>{e ? e.name : placeholders[side]}</span>
           )}
+          {leading && <span className="bk-lead">Leading</span>}
           {sv.length > 0 && <span className="bk-count" title={voterNames}>{sv.length}</span>}
           {votable && mayCrown && (
-            <button type="button" className="bk-crown-btn" title={`Declare ${e.name} the winner`} aria-label={`Declare ${e.name} the winner`} onClick={(ev) => { ev.stopPropagation(); onAskWin(m, eid); }}>
+            <button type="button" className="bk-crown-btn" title={auto ? `Decide early: ${e.name} wins` : `Declare ${e.name} the winner`} aria-label={auto ? `Decide early: ${e.name} wins` : `Declare ${e.name} the winner`} onClick={(ev) => { ev.stopPropagation(); onAskWin(m, eid); }}>
               <IconCrown />
             </button>
           )}
           {won && <span className="bk-crown-won" title="Winner"><IconCrown /></span>}
           {won && undoable && (
-            <button type="button" className="bk-undo-btn" title="Undo this result" aria-label="Undo this result" onClick={(ev) => { ev.stopPropagation(); onAskUndo(m); }}><IconRestore size={13} /></button>
+            <button type="button" className="bk-undo-btn" title={auto ? 'Re-open this matchup' : 'Undo this result'} aria-label={auto ? 'Re-open this matchup' : 'Undo this result'} onClick={(ev) => { ev.stopPropagation(); onAskUndo(m); }}><IconRestore size={13} /></button>
           )}
         </div>
         {sv.length > 0 && (
@@ -119,40 +135,82 @@ function Match({ m, ctx, placeholders }) {
     );
   };
 
+  const note = auto ? (decided ? reasonText(m, ent, usersById) : lead && lead.reason !== 'votes' ? tieText(lead) : null) : null;
   return (
     <div className={`bk-match${decided ? ' decided' : ''}${votable ? ' live' : ''}${locked ? ' locked' : ''}${Number(m.round) === 4 ? ' final' : ''}`}>
       {row('a')}
       {row('b')}
+      {note && <div className={`bk-reason${decided ? '' : ' tie'}`}>{note}</div>}
     </div>
   );
+}
+
+// Why a weekly bracket's matchup went the way it did (design §10(c) UI copy), from decide_reason.
+function reasonText(m, ent, usersById) {
+  const by = m.decided_by;
+  if (by !== 'auto' && by !== 'organizer') return null;
+  const aWon = same(m.winner_id, m.a_id);
+  const wv = aWon ? m.a_votes : m.b_votes;
+  const lv = aWon ? m.b_votes : m.a_votes;
+  const w = ent[String(m.winner_id)];
+  const l = ent[String(aWon ? m.b_id : m.a_id)];
+  switch (m.decide_reason) {
+    case 'votes': return `Advanced ${wv ?? 0}–${lv ?? 0}`;
+    case 'seed': return `Tied ${wv ?? 0}–${lv ?? 0} · better seed advanced`;
+    case 'total_votes': return 'Tied · more total votes';
+    case 'quadrant': return w && l ? `Tied · Q${Number(w.quadrant) + 1} before Q${Number(l.quadrant) + 1}` : 'Tied';
+    case 'bye': return 'Advanced';
+    case 'organizer': {
+      const u = m.decided_by_user ? usersById[String(m.decided_by_user)] : null;
+      return `Decided early by ${u ? nameOfUser(u) : 'an organizer'}`;
+    }
+    default: return null;
+  }
+}
+
+// A live weekly matchup that is tied: who advances if it stays that way.
+function tieText(lead) {
+  if (lead.reason === 'seed') return `Tied. The ${lead.who.seed} seed advances if it stays tied.`;
+  if (lead.reason === 'total_votes') return `Tied. ${lead.who.name} advances if it stays tied (more votes this week).`;
+  return `Tied. ${lead.who.name} advances if it stays tied (Q${Number(lead.who.quadrant) + 1}).`;
 }
 
 const noop = () => {};
 
 export function BracketBoard({
   bracket, entrants, matches, votes, usersById, meId, readOnly, editNames, mayCrown = false, mayUndo = false,
-  onVote = noop, onAskWin = noop, onAskUndo = noop, onRename = noop, onRenameRegion = noop,
+  onVote = noop, onAskWin = noop, onAskUndo = noop, onRename = noop, onRenameRegion = noop, schedule = null,
 }) {
+  // Weekly auto brackets (Release 3) follow the calendar: only today's round (Central) is open. Manual ones open
+  // the earliest round with an undecided matchup (one round at a time).
+  const auto = bracket.mode === 'auto' && !!bracket.starts_on && schedule?.mode === 'auto';
   const regions = parseRegions(bracket.regions);
   const ent = {};
   entrants.forEach((e) => { ent[String(e.id)] = e; });
   const votesByMatch = {};
   votes.forEach((v) => { (votesByMatch[String(v.match_id)] = votesByMatch[String(v.match_id)] || []).push(v); });
   const at = (r, i) => matches.find((m) => Number(m.round) === r && Number(m.idx) === i);
+  const cr = auto ? (schedule.phase === 'open' ? schedule.open_round : null) : currentRound(matches);
   const canUndo = (m) => {
+    if (auto && (m.decided_by !== 'organizer' || Number(m.round) !== cr)) return false;   // past rounds are final
     const nx = nextSlot(m.round, m.idx);
     if (!nx) return true;
     const n = at(nx.round, nx.idx);
     return !n || !n.winner_id;
   };
-  const cr = currentRound(matches);
-  const isOpen = (r) => cr !== null && Number(r) <= cr;
-  const ctx = { ent, votesByMatch, usersById, meId, readOnly, editNames, onVote, onAskWin, onAskUndo, onRename, canUndo, isOpen, mayCrown, mayUndo };
+  const isOpen = auto ? (r) => cr !== null && Number(r) === cr : (r) => cr !== null && Number(r) <= cr;
+  const totals = {};
+  if (auto) votes.forEach((v) => { totals[String(v.entrant_id)] = (totals[String(v.entrant_id)] || 0) + 1; });
+  const ctx = {
+    ent, votesByMatch, usersById, meId, readOnly, editNames, onVote, onAskWin, onAskUndo, onRename, canUndo, isOpen, mayCrown, mayUndo,
+    auto, startsOn: bracket.starts_on, totals,
+  };
   // Column header for a round, with a lock while it's waiting its turn.
   const head = (r, cls) => {
-    const waiting = !readOnly && cr !== null && r > cr;
+    const waiting = !readOnly && (auto ? schedule.phase === 'upcoming' || (cr !== null && r > cr) : cr !== null && r > cr);
+    const why = auto ? `Opens ${roundWeekday(bracket.starts_on, r)}` : `Opens once the ${ROUNDS[r - 1]} is finished`;
     return (
-      <div className={`bk-col-head ${cls || ''}${waiting ? ' waiting' : ''}`} title={waiting ? `Opens once the ${ROUNDS[r - 1]} is finished` : undefined}>
+      <div className={`bk-col-head ${cls || ''}${waiting ? ' waiting' : ''}`} title={waiting ? why : undefined}>
         {waiting && <IconLock size={11} />}{ROUNDS[r]}
       </div>
     );
@@ -253,11 +311,7 @@ export function BracketHistory({ past, viewer, activeId = null, onAskDelete }) {
 // Release 3 queues weekly auto brackets ahead of time; they show here, read-only, until they start.
 function UpcomingList({ upcoming }) {
   if (!upcoming || !upcoming.length) return null;
-  const opens = (ymd) => {
-    if (!ymd) return '';
-    const d = new Date(`${ymd}T12:00:00Z`);
-    return isNaN(d) ? ymd : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-  };
+  const opens = (ymd) => fmtStart(ymd);
   return (
     <section className="bk-history bk-upcoming">
       <h3 className="section-title">Upcoming brackets</h3>
@@ -309,6 +363,7 @@ export default function BracketView({ initial, viewer }) {
   const [confirm, setConfirm] = useState(null);
   const [photosOpen, setPhotosOpen] = useState(false);
   const [conflict, setConflict] = useState(null);         // { where, field, mine, err, keep(base) }
+  const [, setTick] = useState(0);                         // the last-hour countdown re-renders
   useRefreshOnFocus(30_000);
 
   const cur = data.current;
@@ -331,7 +386,14 @@ export default function BracketView({ initial, viewer }) {
   const nameOf = (eid) => (curEntrants.find((e) => same(e.id, eid)) || {}).name || 'TBD';
   const countFor = (m, eid) => curVotes.filter((v) => same(v.match_id, m.id) && same(v.entrant_id, eid)).length;
   const champ = current && current.champion_id ? curEntrants.find((e) => same(e.id, current.champion_id)) : null;
-  const openRound = current ? currentRound(curMatches) : null;
+  const schedule = data.schedule || { mode: 'manual' };
+  const auto = !!current && current.mode === 'auto' && schedule.mode === 'auto';
+  const org = isOrganizer(viewer);
+  const openRound = !current ? null : auto ? (schedule.phase === 'open' ? schedule.open_round : null) : currentRound(curMatches);
+  // The server's clock (the test clock in the harness) against the browser's, for the countdown and the timer.
+  const skew = useRef(0);
+  useEffect(() => { const t = Date.parse(data.now || ''); if (Number.isFinite(t)) skew.current = t - Date.now(); }, [data.now]);
+  const nowEst = () => Date.now() + skew.current;
   const openMatches = openRound === null ? [] : curMatches.filter((m) => Number(m.round) === openRound);
   const openDone = openMatches.filter((m) => m.winner_id).length;
   const openTotal = openMatches.length;
@@ -347,7 +409,21 @@ export default function BracketView({ initial, viewer }) {
   usePoll(async () => {
     const j = await api('/api/brackets/current', { quiet: true });
     setServer((s) => ({ ...j, users: mergeUsers(s.users, j.users) }));
-  }, POLL_MS, { enabled: openRound !== null });
+  }, POLL_MS, { enabled: openRound !== null || (auto && schedule.phase === 'closing') });
+  // Weekly brackets change on their own at midnight Central: one refresh just after the next close (+ grace).
+  useEffect(() => {
+    if (!auto || !schedule.next_close) return undefined;
+    const delay = Number(schedule.next_close) - nowEst() + 1500;
+    if (!(delay > 0) || delay > 7 * 86_400_000) return undefined;
+    const t = setTimeout(() => { reload(); }, delay);
+    return () => clearTimeout(t);
+  }, [auto, schedule.next_close, reload]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // The countdown in the last hour of a round.
+  useEffect(() => {
+    if (!auto || openRound === null) return undefined;
+    const t = setInterval(() => setTick((x) => x + 1), 30_000);
+    return () => clearInterval(t);
+  }, [auto, openRound]);
 
   const patchCur = (fn) => setData((d) => (d.current ? { ...d, current: fn(d.current) } : d));
 
@@ -472,6 +548,21 @@ export default function BracketView({ initial, viewer }) {
     const o = nameOf(otherId);
     const vw = countFor(m, eid);
     const vo = countFor(m, otherId);
+    if (auto) {
+      const r = Number(m.round);
+      setConfirm({
+        title: `Decide early: ${w} wins?`,
+        lines: [
+          <>Votes so far — <b>{w}</b>: {vw} · <b>{o}</b>: {vo}</>,
+          vo > vw ? <span className="bk-warn">Heads up: {o} has more votes.</span> : null,
+          r >= 4 ? <>{w} will be crowned champion of “{current.name}”.</>
+            : <>{w} moves on to the {ROUNDS[r + 1]}, which still opens {roundWeekday(current.starts_on, r + 1)} as scheduled. You can re-open it until midnight Central.</>,
+        ],
+        confirmLabel: 'Yes, decide it now',
+        onConfirm: () => declareWinner(m, eid),
+      });
+      return;
+    }
     let note = null;
     if (vw + vo === 0) note = <span className="bk-warn">Nobody has voted in this matchup yet.</span>;
     else if (vo > vw) note = <span className="bk-warn">Heads up: {o} has more votes.</span>;
@@ -490,6 +581,15 @@ export default function BracketView({ initial, viewer }) {
 
   const askUndo = (m) => {
     const w = nameOf(m.winner_id);
+    if (auto) {
+      setConfirm({
+        title: 'Re-open this matchup?',
+        lines: [`${w}’s early win is cleared and voting goes on until midnight Central.`],
+        confirmLabel: 'Yes, re-open',
+        onConfirm: () => undoWinner(m.id),
+      });
+      return;
+    }
     const nx = nextSlot(m.round, m.idx);
     const n = nx && curMatches.find((x) => Number(x.round) === nx.round && Number(x.idx) === nx.idx);
     const nVotes = n ? curVotes.filter((v) => same(v.match_id, n.id)).length : 0;
@@ -507,7 +607,22 @@ export default function BracketView({ initial, viewer }) {
     });
   };
 
+  const switchManual = () => setConfirm({
+    title: 'Switch this bracket to manual?',
+    lines: [
+      'Rounds stop closing on their own at midnight. Organizers then declare each winner, one round at a time.',
+      'Results already decided stay. This can’t be switched back.',
+    ],
+    confirmLabel: 'Switch to manual',
+    danger: true,
+    onConfirm: async () => {
+      try { await api(`/api/brackets/${current.id}`, { method: 'PATCH', body: { mode: 'manual' } }); await reload(); }
+      catch (e) { setError(e.message); reload(); }
+    },
+  });
+
   const startNew = () => {
+    if (auto) { router.push('/culture/brackets/new'); return; }       // a weekly one starts on its Monday
     if (current && !current.champion_id) {
       setConfirm({
         title: 'Start a new bracket?',
@@ -569,6 +684,8 @@ export default function BracketView({ initial, viewer }) {
             <div className="bk-hint">
               {editNames
                 ? 'Editing names — click any name to fix it. Votes are paused while editing.'
+                : auto
+                  ? <>Tap a name to vote (tap again to take it back). Rounds close at midnight Central; ties go to the better seed.{org ? <> · <IconCrown size={12} /> decides a matchup early</> : null}</>
                 : pol.canCrown
                   ? <>Tap a name to vote (tap again to take it back) · <IconCrown size={12} /> declares the winner once everyone’s voted</>
                   : <>Tap a name to vote (tap again to take it back) · a culture organizer declares each winner</>}
@@ -587,12 +704,34 @@ export default function BracketView({ initial, viewer }) {
                 {editNames ? <><IconCheck size={14} /> Done editing</> : <><IconPencil size={14} /> Edit names</>}
               </button>
             )}
+            {auto && org && <Link className="btn btn-plain btn-sm wi" href={`/culture/brackets/new?mode=auto&from=${current.id}`} prefetch={false}><IconCalendar size={14} /> Repeat next Monday</Link>}
+            {auto && org && !champ && <button type="button" className="btn btn-plain btn-sm" onClick={switchManual}>Switch to manual</button>}
             {canCreate && <button type="button" className="btn btn-lime btn-sm" onClick={startNew}>+ New bracket</button>}
           </div>
         </div>
         {conflictUI('head')}
         {champ && <ChampionBanner name={champ.name} bracketName={current.name} onNew={canCreate ? startNew : null} />}
-        {openRound !== null && (
+        {auto && openRound !== null && (() => {
+          const c = closeLabel(schedule.closes_at, viewer?.tz);
+          const left = Date.parse(schedule.closes_at || '') - nowEst();
+          return (
+            <div className="bk-round-status auto">
+              <span className="bk-rs-dot" aria-hidden="true" />
+              <span>Voting open: <b>{ROUNDS[openRound]}</b> · closes tonight at {c.ct}{c.mine ? ` (${c.mine} your time)` : ''}</span>
+              {left > 0 && left <= 3_600_000 && <span className="bk-rs-soon">Closes in {untilText(schedule.closes_at, nowEst())}</span>}
+              <span className="bk-rs-next"><IconCalendar size={12} /> {openRound < ROUNDS.length - 1
+                ? <>The {ROUNDS[openRound + 1]} opens {roundWeekday(current.starts_on, openRound + 1)}</>
+                : <>The champion shows Saturday</>}</span>
+            </div>
+          );
+        })()}
+        {auto && schedule.phase === 'closing' && (
+          <div className="bk-round-status auto">
+            <span className="bk-rs-dot" aria-hidden="true" />
+            <span>Voting is closed. The last results are being decided — this takes a moment after midnight.</span>
+          </div>
+        )}
+        {!auto && openRound !== null && (
           <div className="bk-round-status">
             <span className="bk-rs-dot" aria-hidden="true" />
             <span>Voting open: <b>{ROUNDS[openRound]}</b> · {openDone} of {openTotal} decided</span>
@@ -602,9 +741,9 @@ export default function BracketView({ initial, viewer }) {
           </div>
         )}
         <BracketBoard
-          bracket={current} entrants={curEntrants} matches={curMatches} votes={curVotes}
+          bracket={current} entrants={curEntrants} matches={curMatches} votes={curVotes} schedule={schedule}
           usersById={usersById} meId={viewer ? viewer.id : null} readOnly={false} editNames={editNames && pol.canEdit}
-          mayCrown={pol.canCrown} mayUndo={pol.canUndo}
+          mayCrown={auto ? org : pol.canCrown} mayUndo={auto ? org : pol.canUndo}
           onVote={castVote} onAskWin={askWin} onAskUndo={askUndo}
           onRename={renameEntrant} onRenameRegion={saveRegions}
         />
@@ -634,6 +773,7 @@ export default function BracketView({ initial, viewer }) {
         <h1 className="wi-h"><IconTrophy size={24} /> Bracket</h1>
       </div>
       <ErrorBar message={error} onClose={() => setError('')} />
+      <CadenceNotice cadence={data.cadence && data.cadence.warn ? { ...data.cadence, repeat_id: auto ? current.id : null } : null} />
       {body}
       <UpcomingList upcoming={data.upcoming} />
       <BracketHistory past={past} viewer={viewer} onAskDelete={askDelete} />
@@ -654,20 +794,61 @@ export default function BracketView({ initial, viewer }) {
 
 // A past (or upcoming) bracket, read-only: no voting, crowns, undo or locks; vote counts and headshots
 // stay. initial = loadBracket(viewer, id).
-export function PastBracketView({ initial, viewer }) {
+export function PastBracketView({ initial, viewer, mondays = null }) {
   const router = useRouter();
   const [history, setHistory] = useState(initial.history || []);
   useEffect(() => { setHistory(initial.history || []); }, [initial]);
   const [confirm, setConfirm] = useState(null);
   const [error, setError] = useState('');
+  const [editNames, setEditNames] = useState(false);
+  const [names, setNames] = useState(() => ({ bracket: initial.bracket, entrants: initial.entrants }));
+  useEffect(() => { setNames({ bracket: initial.bracket, entrants: initial.entrants }); }, [initial]);
+  const [moveTo, setMoveTo] = useState(initial.bracket.starts_on || '');
   const d = initial;
-  const b = d.bracket;
+  const b = names.bracket;
   const upcoming = b.mode === 'auto' && !b.activated_at && !b.archived;
+  // An upcoming weekly bracket stays editable for organizers until its Monday (design §10(c) Lifecycle).
+  const tools = upcoming && isOrganizer(viewer);
   const usersById = useMemo(() => {
     const o = {};
     (d.users || []).forEach((u) => { o[String(u.id)] = u; });
     return o;
   }, [d.users]);
+
+  const fail = (e) => { setError(e.message); router.refresh(); throw e; };
+  async function renameEntrant(entrantId, name, base) {
+    try {
+      const r = await api(`/api/bracket-entrants/${entrantId}`, { method: 'PATCH', body: { name, base: { name: base } } });
+      const stored = r.row ? r.row.name : name;
+      setNames((x) => ({ ...x, entrants: x.entrants.map((e) => (same(e.id, entrantId) ? { ...e, name: stored } : e)) }));
+      return stored;
+    } catch (e) { return fail(e); }
+  }
+  async function saveRegion(q, v) {
+    const r = parseRegions(b.regions);
+    r[q] = v;
+    try {
+      const res = await api(`/api/brackets/${b.id}`, { method: 'PATCH', body: { regions: r } });
+      const stored = res.row && res.row.regions ? res.row.regions : JSON.stringify(r);
+      setNames((x) => ({ ...x, bracket: { ...x.bracket, regions: stored } }));
+      return parseRegions(stored)[q];
+    } catch (e) { return fail(e); }
+  }
+  async function saveName(v, base) {
+    try {
+      const res = await api(`/api/brackets/${b.id}`, { method: 'PATCH', body: { name: v, base: { name: base } } });
+      const stored = res.row ? res.row.name : v;
+      setNames((x) => ({ ...x, bracket: { ...x.bracket, name: stored } }));
+      return stored;
+    } catch (e) { return fail(e); }
+  }
+  async function reschedule() {
+    setError('');
+    try {
+      await api(`/api/brackets/${b.id}`, { method: 'PATCH', body: { starts_on: moveTo } });
+      router.refresh();
+    } catch (e) { setError(e.message); }
+  }
 
   async function deleteBracket(x) {
     setHistory((h) => h.filter((y) => !same(y.id, x.id)));
@@ -687,12 +868,45 @@ export function PastBracketView({ initial, viewer }) {
       <ErrorBar message={error} onClose={() => setError('')} />
       <div className="bk-past-banner">
         <Link className="btn btn-plain btn-sm" href="/culture/brackets">← Back to current bracket</Link>
-        <span>{upcoming ? 'Upcoming bracket' : 'Past bracket'} · <b>{b.name}</b> · {fmtDay(b.completed_at || b.created_at, viewer?.tz)}</span>
+        {upcoming ? (
+          <span>Upcoming bracket · <b>{b.name}</b> · Starts {fmtStart(b.starts_on, { long: true })} · voting opens 12:00 AM CT</span>
+        ) : (
+          <span>Past bracket · <b>{b.name}</b> · {fmtDay(b.completed_at || b.created_at, viewer?.tz)}</span>
+        )}
       </div>
+      {tools && (
+        <div className="bk-upcoming-tools">
+          {editNames ? (
+            <SyncedField
+              className="bk-title-input"
+              value={b.name}
+              aria-label="Bracket name"
+              onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+              onSave={(v, base) => { const n = v.trim(); if (!n) return false; return saveName(n, base); }}
+            />
+          ) : null}
+          <button type="button" className="btn btn-plain btn-sm wi" onClick={() => setEditNames((x) => !x)}>
+            {editNames ? <><IconCheck size={14} /> Done editing</> : <><IconPencil size={14} /> Edit names</>}
+          </button>
+          {Array.isArray(mondays) && mondays.length > 0 && (
+            <span className="bk-move">
+              <label htmlFor="bk-move-start">Starts</label>
+              <select id="bk-move-start" className="field" value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
+                {mondays.filter((m) => !m.taken || m.ymd === b.starts_on).map((m) => (
+                  <option key={m.ymd} value={m.ymd}>{fmtStart(m.ymd)}</option>
+                ))}
+              </select>
+              <button type="button" className="btn btn-ink btn-sm" disabled={!moveTo || moveTo === b.starts_on} onClick={reschedule}>Move start</button>
+            </span>
+          )}
+          <button type="button" className="btn btn-plain btn-sm wi" onClick={() => setConfirm(deleteConfirm(b, () => deleteBracket(b)))}><IconTrash size={14} /> Delete</button>
+        </div>
+      )}
       {b.champion_name && <ChampionBanner name={b.champion_name} bracketName={b.name} />}
       <BracketBoard
-        bracket={b} entrants={d.entrants} matches={d.matches} votes={d.votes}
-        usersById={usersById} meId={null} readOnly editNames={false}
+        bracket={b} entrants={names.entrants} matches={d.matches} votes={d.votes} schedule={d.schedule}
+        usersById={usersById} meId={null} readOnly editNames={tools && editNames}
+        onRename={renameEntrant} onRenameRegion={saveRegion}
       />
       {(b.notes || '').trim() && (
         <div className="notes-panel bk-notes">
@@ -708,7 +922,10 @@ export function PastBracketView({ initial, viewer }) {
 
 // ---------------------------------------------------------------- /culture/brackets/new
 
-function BracketSetup({ isFirst, initial, onCancel, onCreate }) {
+function BracketSetup({ isFirst, initial, onCancel, onCreate, mode: mode0 = 'auto', mondays = [], startsOn = '', current = null, onModeChange = noop }) {
+  const [mode, setModeState] = useState(mode0);
+  const setMode = (m) => { setModeState(m); onModeChange(m); };
+  const [start, setStart] = useState(startsOn);
   const [name, setName] = useState(initial?.name || '');
   const [regions, setRegions] = useState(initial?.regions || ['Quadrant 1', 'Quadrant 2', 'Quadrant 3', 'Quadrant 4']);
   const [grid, setGrid] = useState(() => initial?.entrants || [0, 1, 2, 3].map(() => ['', '', '', '', '']));
@@ -722,7 +939,11 @@ function BracketSetup({ isFirst, initial, onCancel, onCreate }) {
     if (missing) { setErr(`Fill in all 20 spots — ${missing} still empty.`); return; }
     setErr('');
     setBusy(true);
-    const ok = await onCreate({ name: name.trim(), regions: regions.map((r) => r.trim()), entrants: grid.map((r) => r.map((s) => s.trim())) });
+    if (mode === 'auto' && !start) { setErr('Pick the Monday it starts.'); return; }
+    const ok = await onCreate({
+      mode, ...(mode === 'auto' ? { starts_on: start } : {}),
+      name: name.trim(), regions: regions.map((r) => r.trim()), entrants: grid.map((r) => r.map((s) => s.trim())),
+    });
     setBusy(false);
     if (!ok) setErr('Couldn’t create the bracket — please try again.');
   };
@@ -738,6 +959,31 @@ function BracketSetup({ isFirst, initial, onCancel, onCreate }) {
     <div className="bk-setup">
       <h2>{isFirst ? 'Set up your first bracket' : 'New bracket'}</h2>
       <p className="bk-setup-sub">20 spots across 4 quadrants. In each quadrant the two wildcards play first and the winner faces the 1 seed, while the 2 and 3 seeds face each other.</p>
+      <fieldset className="bk-setup-mode">
+        <legend className="atm-label">How it runs</legend>
+        <label className={`bk-mode-opt${mode === 'auto' ? ' on' : ''}`}>
+          <input type="radio" name="bk-mode" value="auto" checked={mode === 'auto'} onChange={() => setMode('auto')} />
+          <span><b>Weekly</b> · one round a day, Monday to Friday. Each round closes at midnight Central on its own; ties go to the better seed.</span>
+        </label>
+        <label className={`bk-mode-opt${mode === 'manual' ? ' on' : ''}`}>
+          <input type="radio" name="bk-mode" value="manual" checked={mode === 'manual'} onChange={() => setMode('manual')} />
+          <span><b>Manual</b> · starts now; an organizer declares each winner, one round at a time.</span>
+        </label>
+      </fieldset>
+      {mode === 'auto' && (
+        <div className="bk-setup-start">
+          <label className="atm-label" htmlFor="bk-setup-start">Starts Monday</label>
+          <select id="bk-setup-start" className="field" value={start} onChange={(e) => setStart(e.target.value)}>
+            {!start && <option value="">Pick a Monday</option>}
+            {mondays.map((m) => (
+              <option key={m.ymd} value={m.ymd} disabled={!!m.taken}>{fmtStart(m.ymd)}{m.taken ? ` · taken (${m.taken})` : ''}</option>
+            ))}
+          </select>
+          {current && current.mode !== 'auto' && !current.champion_id && start && (
+            <p className="cu-note">When this starts on {fmtStart(start)}, “{current.name}” moves to Past brackets (no champion yet).</p>
+          )}
+        </div>
+      )}
       <label className="atm-label" htmlFor="bk-setup-name">Bracket name</label>
       <input id="bk-setup-name" className="field bk-setup-name" placeholder="e.g. Best Chicago Pizza" value={name} onChange={(e) => setName(e.target.value)} />
       <div className="bk-setup-grid">
@@ -756,21 +1002,24 @@ function BracketSetup({ isFirst, initial, onCancel, onCreate }) {
       {err && <div className="bk-err">{err}</div>}
       <div className="modal-actions">
         {onCancel && <button type="button" className="btn btn-plain" onClick={onCancel}>Cancel</button>}
-        <button type="button" className="btn btn-ink" disabled={busy} onClick={submit}>{busy ? 'Creating…' : 'Create bracket'}</button>
+        <button type="button" className="btn btn-ink" disabled={busy} onClick={submit}>{busy ? 'Saving…' : mode === 'auto' ? 'Schedule bracket' : 'Create bracket'}</button>
       </div>
     </div>
   );
 }
 
 // isFirst: no brackets yet. current: the live bracket's summary (or null). template: ?from=<id> prefill.
-export function NewBracketView({ isFirst, current, template }) {
+export function NewBracketView({ isFirst, current, template, mode = 'auto', mondays = [], startsOn = '' }) {
   const router = useRouter();
   const [error, setError] = useState('');
+  const [chosen, setChosen] = useState(mode);
   const create = async (p) => {
     setError('');
     try {
-      await api('/api/brackets', { method: 'POST', body: { mode: 'manual', ...p } });
-      router.push('/culture/brackets');
+      const r = await api('/api/brackets', { method: 'POST', body: { mode: 'manual', ...p } });
+      // A weekly bracket that starts later opens on its own page (upcoming); one starting today is live at once.
+      // (the bracket's own page redirects to the live board when it is current).
+      router.push(r && r.mode === 'auto' && r.id ? `/culture/brackets/${r.id}` : '/culture/brackets');
       router.refresh();
       return true;
     } catch (e) { setError(e.message); return false; }
@@ -781,7 +1030,7 @@ export function NewBracketView({ isFirst, current, template }) {
         <h1 className="wi-h"><IconTrophy size={24} /> Bracket</h1>
       </div>
       <ErrorBar message={error} onClose={() => setError('')} />
-      {current && !current.champion_id && (
+      {current && !current.champion_id && chosen === 'manual' && (
         <p className="cu-note">
           <IconLock size={13} /> “{current.name}” doesn’t have a champion yet. Once you create the new one, it moves to Past brackets as unfinished.
         </p>
@@ -789,6 +1038,11 @@ export function NewBracketView({ isFirst, current, template }) {
       <BracketSetup
         isFirst={isFirst}
         initial={template}
+        mode={mode}
+        mondays={mondays}
+        startsOn={startsOn}
+        current={current}
+        onModeChange={setChosen}
         onCancel={() => router.push('/culture/brackets')}
         onCreate={create}
       />

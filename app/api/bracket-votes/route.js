@@ -1,7 +1,8 @@
 import { handle, parseId, notFound, HttpError } from '@/lib/http';
 import { query, transaction } from '@/lib/db';
 import { ROUNDS } from '@/lib/bracket';
-import { readMatch } from '../brackets/_shared';
+import { advanceDueBrackets } from '@/lib/bracket-auto';
+import { readMatch, voteWindow, autoRefusal } from '../brackets/_shared';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -9,14 +10,12 @@ export const revalidate = 0;
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Today's checks, in today's order (inventory §1.14). The voter always comes from the session (rule 23);
-// one vote per user per matchup (rule 24). Manual brackets: a round opens once every earlier matchup has
-// a winner. The auto branch ($5 open round, $6 close) is Release 3; it gets NULLs here, so it never matches.
-function refusal(m, entrantId) {
+// Manual brackets: today's checks, in today's order (inventory §1.14). The voter always comes from the session
+// (rule 23); one vote per user per matchup (rule 24). A round opens once every earlier matchup has a winner.
+function manualRefusal(m, entrantId) {
   if (!m || m.deleted) return notFound('Matchup not found');
   if (m.archived) return new HttpError(409, 'This bracket is closed.');
   if (m.winner_id) return new HttpError(409, 'A winner was already picked for this matchup.');
-  if (m.mode === 'auto') return new HttpError(409, 'Voting on this bracket opens with its scheduled round.');
   if (m.earlier_open > 0) {
     return new HttpError(409, `Voting for the ${ROUNDS[m.round]} opens once the ${ROUNDS[m.round - 1]} is finished.`);
   }
@@ -25,8 +24,13 @@ function refusal(m, entrantId) {
   if (entrantId !== m.a_id && entrantId !== m.b_id) return new HttpError(400, 'That entrant isn’t in this matchup.');
   return null;
 }
+// Weekly auto brackets (Release 3): only the round open today (CT), until midnight Central (design §10(c) messages).
+const refusal = (m, entrantId, now) => (m && !m.deleted && m.mode === 'auto'
+  ? autoRefusal(m, entrantId, now)
+  : manualRefusal(m, entrantId));
 
-// The guard both statements share (design §10(c) "Voting").
+// The guard both statements share (design §10(c) "Voting"): $5 = the open round and $6 = this round's close, for
+// auto brackets only (NULL for manual ones, whose branch never reads them).
 const GUARD = `NOT b.archived AND b.deleted_at IS NULL AND m.winner_id IS NULL
   AND ((b.mode = 'manual' AND NOT EXISTS (SELECT 1 FROM bracket_matches p
           WHERE p.bracket_id = m.bracket_id AND p.round < m.round AND p.winner_id IS NULL))
@@ -51,22 +55,24 @@ export const POST = handle(async ({ viewer, body, now }) => {
   const b = await body();
   const mid = parseId(b.match_id);
   const eid = b.entrant_id ? parseId(b.entrant_id) : null;
+  await advanceDueBrackets(now);                     // a round that just closed is decided before anyone votes on
   const m = await readMatch(mid);
-  const no = refusal(m, eid);
+  const no = refusal(m, eid, now);
   if (no) throw no;
-  const params = [mid, String(viewer.id), eid, new Date(now).toISOString(), null, null];
-  // FOR SHARE blocks a resolver's FOR UPDATE (Release 3) while the vote is written.
+  const w = voteWindow(m, now);
+  const params = [mid, String(viewer.id), eid, new Date(now).toISOString(), w.open, w.closeIso];
+  // FOR SHARE blocks the resolver's FOR UPDATE while the vote is written, so a vote either commits before the
+  // resolver's snapshot (and is counted: its created_at is before the close) or sees the decided match.
   const res = await transaction([
     query('SELECT id FROM bracket_matches WHERE id = $1::bigint FOR SHARE', [mid]),
     query(eid ? VOTE_SQL : RETRACT_SQL, params),
   ]);
   if (eid && !res[1].rows.length) {
     // Something changed between the read and the write (a winner was picked, an undo reopened an earlier
-    // round, ...): re-read and give the message that applies now.
-    const again = refusal(await readMatch(mid), eid);
+    // round, the round closed, ...): re-read and give the message that applies now.
+    const again = refusal(await readMatch(mid), eid, now);
     if (again) throw again;
     throw new HttpError(409, 'That matchup just changed — refresh and try again.');
   }
   return { ok: true };
 }, { legacyWrite: true });
-

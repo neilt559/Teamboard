@@ -1,9 +1,10 @@
-import { handle, parseId, notFound, forbidden, HttpError } from '@/lib/http';
+import { handle, parseId, notFound, forbidden, bad, HttpError } from '@/lib/http';
 import { query, transaction } from '@/lib/db';
 import { bracketPolicy, isAdmin, isOrganizer } from '@/lib/access';
 import { guardedPatch, norm } from '@/lib/patch';
 import { loadBracket, CURRENT_SQL } from '@/lib/queries/brackets';
-import { BRACKET_LOCK, normRegions } from '../_shared';
+import { advanceDueBrackets } from '@/lib/bracket-auto';
+import { BRACKET_LOCK, normRegions, checkStartMonday, TAKEN_MONDAY } from '../_shared';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -25,9 +26,9 @@ async function readBracket(id) {
 
 // GET /api/brackets/:id -> { bracket, entrants, matches, votes, users, is_current } for any bracket that
 // isn't soft-deleted (current or past), or 404 "Bracket not found".
-export const GET = handle(async ({ viewer, params }) => {
+export const GET = handle(async ({ viewer, params, now }) => {
   const id = parseId(params.id);
-  const d = await loadBracket(viewer, id);
+  const d = await loadBracket(viewer, id, now);
   if (!d) throw notFound('Bracket not found');
   return { bracket: d.bracket, entrants: d.entrants, matches: d.matches, votes: d.votes, users: d.users, is_current: d.is_current };
 });
@@ -38,12 +39,64 @@ export const GET = handle(async ({ viewer, params }) => {
 //   { deleted: false }   admin restore of a soft-deleted bracket. If another bracket is live by then, the
 //        restored one goes to Past brackets (archived) so there is still one current bracket (rule 26).
 //   { archived: false }  admin un-archive; 409 while a different bracket is live.
+//   { starts_on }        weekly auto bracket, organizers: move (postpone) its start while it is upcoming, to
+//        another free Monday from today on (design §10(c) organizer overrides). 409 once it has started.
+//   { mode: 'manual' }   weekly auto bracket that has started, organizers: switch to manual crowning for good
+//        (one-way). Rounds already decided stay; organizers crown the rest one round at a time.
 export const PATCH = handle(async ({ viewer, params, body, now }) => {
   const id = parseId(params.id);
   const b = await body();
+  if (has(b, 'starts_on') || has(b, 'mode')) await advanceDueBrackets(now);   // a Monday that just came starts it
   const row = await readBracket(id);
   if (!row) throw notFound('Bracket not found');
   const out = { ok: true };
+
+  if (has(b, 'starts_on')) {
+    if (row.deleted_at) throw notFound('Bracket not found');
+    if (!isOrganizer(viewer)) throw forbidden('Only culture organizers can reschedule brackets.');
+    if (row.mode !== 'auto') throw new HttpError(409, 'Only a weekly bracket has a start Monday.');
+    if (row.activated_at || row.archived) throw new HttpError(409, 'This bracket has already started.');
+    const day = checkStartMonday(b.starts_on, now);
+    let r;
+    try {
+      r = await query(
+        `WITH u AS (
+           UPDATE brackets SET starts_on = $2::text, updated_at = $4::timestamptz, updated_by = $3::bigint
+           WHERE id = $1::bigint AND mode = 'auto' AND activated_at IS NULL AND NOT archived AND deleted_at IS NULL
+           RETURNING id, starts_on),
+         a AS (INSERT INTO audit_log (actor_id, action, entity, entity_id, detail)
+               SELECT $3::bigint, 'bracket.reschedule', 'brackets', u.id::text,
+                      jsonb_build_object('from', $5::text, 'to', u.starts_on) FROM u)
+         SELECT count(*)::int AS n FROM u`,
+        [id, day, String(viewer.id), new Date(now).toISOString(), row.starts_on]);
+    } catch (e) {
+      if (e?.code === '23505') throw new HttpError(409, TAKEN_MONDAY);
+      throw e;
+    }
+    if (!Number(r.rows[0]?.n || 0)) throw new HttpError(409, 'This bracket has already started.');
+    out.starts_on = day;
+  }
+
+  if (has(b, 'mode')) {
+    if (row.deleted_at) throw notFound('Bracket not found');
+    if (b.mode !== 'manual') throw bad('A bracket can only be switched to manual.');
+    if (!isOrganizer(viewer)) throw forbidden('Only culture organizers can switch a bracket to manual.');
+    if (row.mode === 'manual') return out;
+    if (row.archived) throw new HttpError(409, 'This bracket is closed.');
+    if (!row.activated_at) throw new HttpError(409, 'This bracket hasn’t started yet. Change its start Monday instead.');
+    const r = await query(
+      `WITH u AS (
+         UPDATE brackets SET mode = 'manual', updated_at = $3::timestamptz, updated_by = $2::bigint
+         WHERE id = $1::bigint AND mode = 'auto' AND activated_at IS NOT NULL AND NOT archived AND deleted_at IS NULL
+         RETURNING id, resolved_through),
+       a AS (INSERT INTO audit_log (actor_id, action, entity, entity_id, detail)
+             SELECT $2::bigint, 'bracket.switch_manual', 'brackets', u.id::text,
+                    jsonb_build_object('resolved_through', u.resolved_through) FROM u)
+       SELECT count(*)::int AS n FROM u`,
+      [id, String(viewer.id), new Date(now).toISOString()]);
+    if (!Number(r.rows[0]?.n || 0)) throw new HttpError(409, 'This bracket just changed — refresh and try again.');
+    out.mode = 'manual';
+  }
 
   if (has(b, 'deleted') && b.deleted === false) {
     if (!isAdmin(viewer)) throw forbidden('Only admins can restore brackets.');

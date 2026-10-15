@@ -1,27 +1,27 @@
-import { requirePageViewer } from '@/lib/viewer';
 import { notFound } from 'next/navigation';
-import { IconTrophy } from '@/app/icons';
+import { requirePageViewer, publicViewer } from '@/lib/viewer';
+import { loadChallengePage } from '@/lib/queries/challenges';
+import ChallengeView from '../_components/ChallengeView';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M4 (K1) (design §2.1, §15).
+// /culture/challenges/[id]: one challenge (design §2.1, §10(a); agent K1): "Log my stats", my entries (edit and
+// delete my own until the end date + 3 days), my standing and the leaderboards (Individuals / Offices / Departments).
+// Organizers also edit or archive the challenge and see every entry. Everyone reads every challenge; an archived
+// one is the not-found page except for organizers.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 export const maxDuration = 60;
 
-export const metadata = { title: 'Challenge' };
+export async function generateMetadata({ params }) {
+  const viewer = await requirePageViewer();
+  const data = await loadChallengePage(viewer, params.id);
+  return { title: data?.challenge?.title || 'Challenge' };
+}
 
 export default async function ChallengePage({ params }) {
   const viewer = await requirePageViewer();
   if (!/^[0-9]{1,18}$/.test(String(params.id))) notFound();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconTrophy size={24} /> Challenge</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>A challenge: log your stats, your entries and the leaderboards.</p>
-      </div>
-    </div>
-  );
+  const data = await loadChallengePage(viewer, params.id);
+  if (!data) notFound();
+  return <ChallengeView initial={data} viewer={publicViewer(viewer)} />;
 }

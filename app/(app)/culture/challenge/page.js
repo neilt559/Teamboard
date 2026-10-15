@@ -1,7 +1,10 @@
-import { requirePageViewer } from '@/lib/viewer';
-import { IconTrophy } from '@/app/icons';
+import { redirect } from 'next/navigation';
+import { requirePageViewer, tagUpdating } from '@/lib/viewer';
+import { nowFromRequestContext } from '@/lib/clock';
+import { currentChallengeId } from '@/lib/queries/challenges';
 
-// Placeholder from M0 so the route exists and is guarded; replaced in M4 (K1) (design §2.1, §15).
+// /culture/challenge: "this month's challenge" (design §2.1, §10(a); agent K1). Sends you to the featured challenge
+// (the company challenge running today, Central), else a running challenge in your offices, else the challenge list.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -11,15 +14,11 @@ export const metadata = { title: 'This month’s challenge' };
 
 export default async function CurrentChallengePage() {
   const viewer = await requirePageViewer();
-  return (
-    <div className="coming-soon">
-      <div className="proj-head">
-        <h1 className="wi-h"><IconTrophy size={24} /> This month’s challenge</h1>
-      </div>
-      <div className="empty">
-        <h3>Coming soon</h3>
-        <p>This month’s challenge: log your stats and see the leaderboards.</p>
-      </div>
-    </div>
-  );
+  let id;
+  try {
+    id = await currentChallengeId(viewer, nowFromRequestContext());
+  } catch (e) {
+    throw tagUpdating(e);
+  }
+  redirect(id ? `/culture/challenges/${id}` : '/culture/challenges');
 }

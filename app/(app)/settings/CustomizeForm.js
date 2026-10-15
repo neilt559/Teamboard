@@ -23,8 +23,8 @@ const WIDGET_LABELS = {
   bracket: 'Bracket', geo: 'GeoGuessr', admin_queue: 'Approval queue (admins)',
 };
 // The challenge/events arrive in Release 3. Until then their Home cards render nothing, so they aren't offered
-// here (the agents shipping them remove the key from this list).
-const NOT_YET = new Set(['challenge', 'events']);
+// here (the agents shipping them remove the key from this list). Threads and announcements shipped in Release 2.
+const NOT_YET = new Set([]);   // Release 3: K1 shipped the challenge card, K2 the events card
 const NOT_YET_LANDING = new Set([]);
 
 function Saved({ on }) {

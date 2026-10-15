@@ -78,3 +78,10 @@ export const IconEyeOff = (p) => (
   </Svg>
 );
 export const IconX = (p) => <Svg {...p}><path d="M6 6l12 12M18 6L6 18" /></Svg>;
+// Release 3 (K1): the monthly challenge (Culture sub-nav, Home widget, challenge pages).
+export const IconMedal = (p) => <Svg {...p}><path d="M8 3l3.2 6.3M16 3l-3.2 6.3" /><circle cx="12" cy="15" r="6" /><path d="M12 12.6v4.8" /></Svg>;
+export const IconPlus = (p) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>;
+// Release 3 (K2): the culture events calendar (month navigation, event times and places).
+export const IconChevronLeft = (p) => <Svg {...p}><path d="M15 6l-6 6 6 6" /></Svg>;
+export const IconClock = (p) => <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>;
+export const IconMapPin = (p) => <Svg {...p}><path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></Svg>;

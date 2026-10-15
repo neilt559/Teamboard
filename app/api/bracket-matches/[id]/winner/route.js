@@ -1,8 +1,9 @@
 import { handle, parseId, bad, notFound, forbidden, HttpError } from '@/lib/http';
 import { query } from '@/lib/db';
 import { isOrganizer } from '@/lib/access';
-import { ROUNDS, nextSlot } from '@/lib/bracket';
-import { readMatch } from '../../../brackets/_shared';
+import { ROUNDS, nextSlot, scheduledRound, closesAt } from '@/lib/bracket';
+import { advanceDueBrackets } from '@/lib/bracket-auto';
+import { readMatch, voteWindow, autoRefusal } from '../../../brackets/_shared';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -10,30 +11,39 @@ export const revalidate = 0;
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Winners are picked by hand in manual brackets ("who's in the office changes day to day", rule 50). The
-// legacy bracket (crown_policy 'anyone') stays open to everyone; new brackets are crowned by organizers.
-// Auto brackets (Release 3) are decided at midnight Central; K3 adds the organizer "decide early" here.
+// Manual brackets: winners are picked by hand ("who's in the office changes day to day", rule 50). The legacy
+// bracket (crown_policy 'anyone') stays open to everyone; new manual brackets are crowned by organizers.
+// Weekly auto brackets (Release 3, design §10(c)) are decided at midnight Central by lib/bracket-auto.js;
+// organizers and admins may only "decide early" a matchup of the round open today, and re-open their own early
+// decision while that round is still open. A past round is final.
 
 const CROWN_FAIL = 'Couldn’t declare that winner — the matchup may already be decided, or its round isn’t open yet. Refresh and try again.';
-const AUTO_MSG = 'This bracket advances on its own at midnight Central.';
 const ORG_ONLY = 'Only culture organizers can pick winners in this bracket.';
+const ORG_EARLY = 'Only culture organizers can decide a matchup early.';
+const ORG_REOPEN = 'Only culture organizers can re-open a matchup.';
+const FINAL = 'Past rounds are final.';
 
-// One atomic statement (design §10(c) "Manual crown"): the guarded UPDATE (not archived or deleted, manual,
-// policy, undecided, both sides set, the entrant is one of them, every earlier round decided), the slot fill
-// in the next round (or the champion), and an audit row. Two crowns at once can't both win (rule 25).
+// One atomic statement (design §10(c) "Manual crown" and "Decide early"): the guarded UPDATE (not archived or
+// deleted, undecided, both sides set, the entrant is one of them; manual: policy and every earlier round
+// decided; auto: organizers only, the round open now, before its close), the slot fill in the next round (or
+// the champion), and an audit row. Two crowns at once can't both win (rule 25). $6 open round / $7 its close:
+// auto brackets only (NULL for manual ones, whose branch never reads them).
 const CROWN_SQL = `
 WITH d AS (
   UPDATE bracket_matches m
-     SET winner_id = $2::bigint, decided_at = $4::timestamptz, decided_by = 'manual', decided_by_user = $3::bigint,
-         decide_reason = 'manual',
+     SET winner_id = $2::bigint, decided_at = $4::timestamptz,
+         decided_by = CASE WHEN b.mode = 'auto' THEN 'organizer' ELSE 'manual' END, decided_by_user = $3::bigint,
+         decide_reason = CASE WHEN b.mode = 'auto' THEN 'organizer' ELSE 'manual' END,
          a_votes = (SELECT count(*) FROM bracket_votes v WHERE v.match_id = m.id AND v.entrant_id = m.a_id),
          b_votes = (SELECT count(*) FROM bracket_votes v WHERE v.match_id = m.id AND v.entrant_id = m.b_id)
     FROM brackets b
-   WHERE m.id = $1::bigint AND b.id = m.bracket_id AND NOT b.archived AND b.deleted_at IS NULL AND b.mode = 'manual'
-     AND (b.crown_policy = 'anyone' OR $5::boolean)
+   WHERE m.id = $1::bigint AND b.id = m.bracket_id AND NOT b.archived AND b.deleted_at IS NULL
      AND m.winner_id IS NULL AND m.a_id IS NOT NULL AND m.b_id IS NOT NULL AND $2::bigint IN (m.a_id, m.b_id)
-     AND NOT EXISTS (SELECT 1 FROM bracket_matches p WHERE p.bracket_id = m.bracket_id AND p.round < m.round AND p.winner_id IS NULL)
-  RETURNING m.id, m.bracket_id, m.round, m.idx),
+     AND ((b.mode = 'manual' AND (b.crown_policy = 'anyone' OR $5::boolean)
+           AND NOT EXISTS (SELECT 1 FROM bracket_matches p WHERE p.bracket_id = m.bracket_id AND p.round < m.round AND p.winner_id IS NULL))
+       OR (b.mode = 'auto' AND $5::boolean AND b.activated_at IS NOT NULL
+           AND m.round = $6::int AND $4::timestamptz < $7::timestamptz))
+  RETURNING m.id, m.bracket_id, m.round, m.idx, m.decided_by),
 fill AS (
   UPDATE bracket_matches n
      SET a_id = CASE WHEN d.round > 0 AND d.idx % 2 = 0 THEN $2::bigint ELSE n.a_id END,
@@ -46,7 +56,8 @@ champ AS (
     FROM d WHERE d.round = 4 AND x.id = d.bracket_id),
 au AS (
   INSERT INTO audit_log (actor_id, action, entity, entity_id, detail)
-  SELECT $3::bigint, 'bracket.crown', 'bracket_matches', d.id::text,
+  SELECT $3::bigint, CASE WHEN d.decided_by = 'organizer' THEN 'bracket.decide_early' ELSE 'bracket.crown' END,
+         'bracket_matches', d.id::text,
          jsonb_build_object('bracket_id', d.bracket_id, 'round', d.round, 'idx', d.idx, 'winner_id', $2::bigint)
   FROM d)
 SELECT count(*)::int AS decided FROM d`;
@@ -58,28 +69,43 @@ export const POST = handle(async ({ viewer, params, body, now }) => {
   if (!b.entrant_id) throw bad('entrant_id required');
   const eid = parseId(b.entrant_id);
   const org = isOrganizer(viewer);
-  const r = await query(CROWN_SQL, [id, eid, String(viewer.id), new Date(now).toISOString(), org]);
+  await advanceDueBrackets(now);
+  const pre = await readMatch(id);
+  if (pre && pre.mode === 'auto' && !pre.deleted && !pre.archived) {
+    if (!org) throw forbidden(ORG_EARLY);
+    const no = autoRefusal(pre, eid, now, { early: true });
+    if (no) throw no;
+  }
+  const w = voteWindow(pre, now);
+  const r = await query(CROWN_SQL, [id, eid, String(viewer.id), new Date(now).toISOString(), org, w.open, w.closeIso]);
   if (Number(r.rows[0]?.decided || 0) > 0) return { ok: true };
   // Nothing changed: say why (today's 409 text for everything that isn't a permission or mode question).
   const m = await readMatch(id);
   if (m && !m.deleted && !m.archived) {
-    if (m.mode === 'auto') throw new HttpError(409, AUTO_MSG);
+    if (m.mode === 'auto') {
+      if (!org) throw forbidden(ORG_EARLY);
+      throw autoRefusal(m, eid, now, { early: true }) || new HttpError(409, 'That matchup just changed — refresh and try again.');
+    }
     if (m.crown_policy !== 'anyone' && !org) throw forbidden(ORG_ONLY);
   }
   throw new HttpError(409, CROWN_FAIL);
 }, { legacyWrite: true });
 
-// Undo (design §10(c) "Manual undo"), one statement: lock the match (guarded by crown_policy), lock the next
-// match and refuse when it is decided, write the next match's votes to audit_log, clear them (today's rule 25),
-// empty the slot (or clear the champion), then clear the winner. Locking the next match (rising rounds, the same
-// order a crown locks in, so no deadlock) makes a crown of it that commits while this runs visible here: the
+// Undo (design §10(c) "Manual undo" and "Reopen"), one statement: lock the match (guarded by crown_policy; for
+// auto brackets: organizers, an organizer's early decision, the round open now and before its close), lock the
+// next match and refuse when it is decided, write the next match's votes to audit_log, clear them (today's rule
+// 25), empty the slot (or clear the champion), then clear the winner. Locking the next match (rising rounds, the
+// same order a crown locks in, so no deadlock) makes a crown of it that commits while this runs visible here: the
 // undo then waits, re-reads it decided and refuses, instead of emptying the slot of a decided match (rule 25).
+// $4 open round / $5 now / $6 its close: auto brackets only (NULL for manual ones).
 const UNDO_SQL = `
 WITH m AS (
   SELECT m.id, m.bracket_id, m.round, m.idx, m.winner_id
     FROM bracket_matches m JOIN brackets b ON b.id = m.bracket_id
-   WHERE m.id = $1::bigint AND m.winner_id IS NOT NULL AND NOT b.archived AND b.deleted_at IS NULL AND b.mode = 'manual'
-     AND (b.crown_policy = 'anyone' OR $3::boolean)
+   WHERE m.id = $1::bigint AND m.winner_id IS NOT NULL AND NOT b.archived AND b.deleted_at IS NULL
+     AND ((b.mode = 'manual' AND (b.crown_policy = 'anyone' OR $3::boolean))
+       OR (b.mode = 'auto' AND $3::boolean AND m.decided_by = 'organizer' AND m.round = $4::int
+           AND $5::timestamptz < $6::timestamptz))
    FOR UPDATE OF m),
 nx AS (
   SELECT n.id, n.winner_id FROM bracket_matches n JOIN m ON n.bracket_id = m.bracket_id
@@ -109,25 +135,37 @@ clr AS (
   RETURNING c.id)
 SELECT (SELECT count(*) FROM clr)::int AS undone`;
 
-// DELETE /api/bracket-matches/:id/winner -> { ok }. Today's checks and messages, in order: 404 "Matchup not
-// found"; 409 "This bracket is closed."; no winner -> { ok }; 409 "Undo the {next round} result first."
-export const DELETE = handle(async ({ viewer, params }) => {
+// DELETE /api/bracket-matches/:id/winner -> { ok }. Manual: today's checks and messages, in order: 404 "Matchup
+// not found"; 409 "This bracket is closed."; no winner -> { ok }; 409 "Undo the {next round} result first."
+// Auto: organizers only; "Past rounds are final." for anything but an organizer's early decision in the round
+// open now.
+export const DELETE = handle(async ({ viewer, params, now }) => {
   const id = parseId(params.id);
   const org = isOrganizer(viewer);
+  await advanceDueBrackets(now);
   const why = (m) => {
     if (!m || m.deleted) return notFound('Matchup not found');
     if (m.archived) return new HttpError(409, 'This bracket is closed.');
     if (!m.winner_id) return null;                                     // nothing to undo
-    if (m.mode === 'auto') return new HttpError(409, AUTO_MSG);
-    if (m.crown_policy !== 'anyone' && !org) return forbidden(ORG_ONLY);
+    if (m.mode === 'auto') {
+      if (!org) return forbidden(ORG_REOPEN);
+      if (m.decided_by !== 'organizer' || m.round !== scheduledRound(m.starts_on, now) || now >= closesAt(m.starts_on, m.round)) {
+        return new HttpError(409, FINAL);
+      }
+    } else if (m.crown_policy !== 'anyone' && !org) {
+      return forbidden(ORG_ONLY);
+    }
     const nx = nextSlot(m.round, m.idx);
     if (nx && m.next_winner_id) return new HttpError(409, `Undo the ${ROUNDS[nx.round]} result first.`);
     return undefined;                                                  // allowed
   };
-  const before = why(await readMatch(id));
+  const pre = await readMatch(id);
+  const before = why(pre);
   if (before === null) return { ok: true };
   if (before) throw before;
-  const r = await query(UNDO_SQL, [id, String(viewer.id), org]);
+  const w = voteWindow(pre, now);
+  const nowIso = w.open == null ? null : new Date(now).toISOString();
+  const r = await query(UNDO_SQL, [id, String(viewer.id), org, w.open, nowIso, w.closeIso]);
   if (Number(r.rows[0]?.undone || 0) > 0) return { ok: true };
   const after = why(await readMatch(id));                              // someone else got there first
   if (after === null) return { ok: true };

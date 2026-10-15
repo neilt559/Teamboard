@@ -15,7 +15,7 @@ import AnnouncementsWidget from './_widgets/AnnouncementsWidget';
 import PostsWidget from './_widgets/PostsWidget';
 import ChallengeWidget from './_widgets/ChallengeWidget';
 import EventsWidget from './_widgets/EventsWidget';
-import BracketWidget from './_widgets/BracketWidget';
+import BracketWidget, { BracketCadenceNotice } from './_widgets/BracketWidget';
 import GeoWidget from './_widgets/GeoWidget';
 
 // Home: the dashboard (design §2.1 "/", §11). The widgets show in the viewer's saved order (Settings ›
@@ -81,6 +81,8 @@ export default async function HomePage({ searchParams }) {
         </nav>
       </div>
       <HomeNotices notice={notice} notices={dash.notices} seenAt={prefs.position_notice_seen_at} />
+      {/* Release 3 (K3): organizers only, from Wednesday on, when no weekly bracket starts next Monday. */}
+      <WidgetBoundary name="bracket_cadence"><BracketCadenceNotice viewer={viewer} now={now} /></WidgetBoundary>
       <WhatsNewWidget viewer={pv} />
       {list.length === 0 ? (
         <div className="empty">

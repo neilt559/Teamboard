@@ -19,6 +19,8 @@ import './styles/reports.css';
 // A11: the owner report drawn as a plan sheet (and its print CSS), and the project header strip.
 import './styles/report-sheet.css';
 import './styles/project-strip.css';
+// Release 3 (K1): the monthly challenge pages, the Home challenge widget and the /culture challenge cards.
+import './styles/challenges.css';
 
 export const metadata = {
   title: { default: 'TeamBoard', template: '%s · TeamBoard' },

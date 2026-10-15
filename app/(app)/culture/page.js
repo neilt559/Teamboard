@@ -2,12 +2,14 @@ import { requirePageViewer } from '@/lib/viewer';
 import { nowFromRequestContext } from '@/lib/clock';
 import { loadCultureHub } from '@/lib/queries/brackets';
 import { IconTrophy } from '@/app/icons';
-import { BracketCard } from '../_widgets/BracketWidget';
+import { BracketCard, BracketCadenceNotice } from '../_widgets/BracketWidget';
 import GeoWidget from '../_widgets/GeoWidget';
+import { ChallengeHubCards } from '../_widgets/ChallengeWidget';   // Release 3 (K1): current + past challenges
+import { EventsHubCard } from '../_widgets/EventsWidget';           // Release 3 (K2): the next events
 
-// /culture: the Culture hub (design §2.1, §10). Release 1 cards: the bracket and GeoGuessr. Release 3 adds the
-// monthly challenge, upcoming events, past challenges and the organizer "nothing scheduled" warning; until
-// then those are left out rather than shown as placeholders. Cards stack on phones.
+// /culture: the Culture hub (design §2.1, §10): the monthly challenge, upcoming events, the bracket, GeoGuessr
+// and past challenges, plus (organizers only) the "nothing scheduled for next Monday" bracket warning. Cards
+// stack on phones.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -17,16 +19,21 @@ export const metadata = { title: 'Culture' };
 
 export default async function CulturePage() {
   const viewer = await requirePageViewer();
-  const hub = await loadCultureHub(viewer, nowFromRequestContext());
+  const now = nowFromRequestContext();
+  const hub = await loadCultureHub(viewer, now);
   return (
     <div className="culture-hub">
       <div className="proj-head">
         <h1 className="wi-h"><IconTrophy size={24} /> Culture</h1>
       </div>
-      <p className="cu-intro">The fun side of TeamBoard: vote in the bracket and post your office’s daily GeoGuessr score.</p>
+      <p className="cu-intro">The fun side of TeamBoard: log your stats in the monthly challenge, see what’s on the culture calendar, vote in the bracket and post your office’s daily GeoGuessr score.</p>
+      <BracketCadenceNotice viewer={viewer} now={now} />
       <div className="home-grid cu-cards">
+        <ChallengeHubCards viewer={viewer} now={now} part="current" />
+        <EventsHubCard viewer={viewer} now={now} />
         <BracketCard summary={hub.bracket} />
         <GeoWidget />
+        <ChallengeHubCards viewer={viewer} now={now} part="past" />
       </div>
     </div>
   );

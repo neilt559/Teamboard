@@ -2,13 +2,14 @@ import Link from 'next/link';
 import { requirePageViewer } from '@/lib/viewer';
 import { nowFromRequestContext } from '@/lib/clock';
 import { isOrganizer } from '@/lib/policy';
-import { loadBracketSummary, loadBracketTemplate } from '@/lib/queries/brackets';
+import { loadBracketSummary, loadBracketTemplate, loadStartMondays } from '@/lib/queries/brackets';
 import { IconTrophy } from '@/app/icons';
 import { NewBracketView } from '../bracket-ui';
 
 // /culture/brackets/new: the bracket setup form (the old BracketSetup), for culture organizers and admins
 // (design §4.5: new brackets are organizer-managed). ?from=<id> prefills names, regions and entrants from
-// that bracket. Release 3 adds the mode picker (weekly auto-advance) and the start Monday.
+// that bracket ("Repeat next Monday"). Release 3: how it runs (weekly auto-advance, the default, or manual) and
+// the start Monday (?mode=auto|manual and ?starts_on=YYYY-MM-DD preselect them).
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -32,14 +33,23 @@ export default async function NewBracketPage({ searchParams }) {
       </div>
     );
   }
-  const summary = await loadBracketSummary(viewer, nowFromRequestContext());
+  const now = nowFromRequestContext();
+  const summary = await loadBracketSummary(viewer, now);
   const from = typeof searchParams?.from === 'string' ? searchParams.from : null;
   const template = from ? await loadBracketTemplate(from) : null;
+  const starts = await loadStartMondays(now);
+  const want = typeof searchParams?.starts_on === 'string' ? searchParams.starts_on : '';
+  const pick = starts.mondays.find((m) => m.ymd === want && !m.taken)?.ymd
+    || starts.mondays.find((m) => m.ymd === starts.free_monday)?.ymd
+    || starts.mondays.find((m) => !m.taken)?.ymd || '';
   return (
     <NewBracketView
       isFirst={!summary}
       current={summary?.current ?? null}
       template={template}
+      mode={searchParams?.mode === 'manual' ? 'manual' : 'auto'}
+      mondays={starts.mondays}
+      startsOn={pick}
     />
   );
 }
