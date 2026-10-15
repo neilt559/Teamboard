@@ -9,14 +9,13 @@ import { RefreshPill } from '@/app/_ui/useRefresh';
 import ConflictNotice from '@/app/_ui/ConflictNotice';
 import { useConfirm } from '@/app/_ui/ConfirmDialog';
 import Crumbs from '@/app/_ui/Crumbs';
-import { ProjectMeetings } from '@/app/_ui/meetings';
+import { ProjectMeetings, NEW_SERIES } from '@/app/_ui/meetings';
 import ProjectHeader from './ProjectHeader';
 import TaskTable from './TaskTable';
 import ArchivedTasks from './ArchivedTasks';
 import ProjectInfo from './ProjectInfo';
 import MembersPanel from './MembersPanel';
 import Submittals from './Submittals';
-import UpcomingMeetings from './UpcomingMeetings';
 import AttentionItems from './AttentionItems';
 import ProjectDetailsDialog from './ProjectDetailsDialog';
 import useBoardSync from './useBoardSync';
@@ -27,13 +26,15 @@ import { projectTitle, parseStages } from '@/lib/projects';
 // series, additional info and the Members panel. Server-rendered data, optimistic edits, and a 20 s poll of the
 // project's rev counter instead of the old whole-database poll (§7.5).
 // A6 (design-amendments A6.5): the header's schedule status, stage stepper, Project details and Generate report;
-// the notes are the "Status Report" (it goes to the owner in the weekly report); Submittals and Upcoming meetings
-// sections. Every A6 write bumps the project's rev like any other write (wrote()).
-// A8 (design-amendments A8.3): the Attention Items section between Submittals and Upcoming meetings.
+// the notes are the "Status Report" (it goes to the owner in the weekly report); the Submittals section. Every A6
+// write bumps the project's rev like any other write (wrote()).
+// A8 (design-amendments A8.3): the Attention Items section after Submittals.
+// A9 (design-amendments A9.2): ONE Meetings section (Upcoming / Past, minutes inside, series as a label) replaces
+// both the meeting minutes and A6's Upcoming meetings; meetings and series are archived, never deleted.
 
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 const nPeople = (n) => `${n} ${n === 1 ? 'person' : 'people'}`;
-const LISTS = { task: 'tasks', info: 'info', meeting: 'meetings', series: 'series', submittal: 'submittals', upcoming: 'upcoming_meetings', attention: 'attention_items' };
+const LISTS = { task: 'tasks', info: 'info', meeting: 'meetings', series: 'series', submittal: 'submittals', attention: 'attention_items' };
 const URLS = {
   task: (id) => `/api/tasks/${id}`,
   info: (id) => `/api/info/${id}`,
@@ -41,7 +42,6 @@ const URLS = {
   series: (id) => `/api/meeting-series/${id}`,
   project: (id) => `/api/projects/${id}`,
   submittal: (id, pid) => `/api/projects/${pid}/submittals/${id}`,
-  upcoming: (id, pid) => `/api/projects/${pid}/upcoming-meetings/${id}`,
   attention: (id, pid) => `/api/projects/${pid}/attention-items/${id}`,
 };
 // A project row from the API (PATCH answers carry stages as an array; a 409's current row carries the stored
@@ -70,7 +70,7 @@ export default function ProjectBoard({ initial }) {
   const [showArchived, setShowArchived] = useState(false);
   const [focusId, setFocusId] = useState(null);
   const [draftDirty, setDraftDirty] = useState(false);
-  const [a6Dirty, setA6Dirty] = useState({});            // open upcoming-meeting drafts
+  const [a6Dirty, setA6Dirty] = useState({});            // open attention-item drafts
   const [details, setDetails] = useState(false);         // the Project details dialog
   const [confirmUI, ask] = useConfirm();
   const toastTimer = useRef(null);
@@ -302,19 +302,35 @@ export default function ProjectBoard({ initial }) {
     try { await api(URLS.info(r.id), { method: 'DELETE' }); wrote(); refreshNow(); } catch (e) { fail(e); refreshNow(); }
   }, [ask, removeLocal, refreshNow, fail, wrote]);
 
-  // ---------------------------------------------------------------- meetings and series
-  const createMeeting = useCallback(async (seriesId, fields) => {
+  // ---------------------------------------------------------------- meetings and series (A9)
+  // "New series…" in the editor: the series is made first, then the meeting goes into it. An active series with
+  // that name is used instead (also when a retry follows a meeting save that failed after its series was made).
+  const seriesRef = useRef(d.series);
+  seriesRef.current = d.series;
+  const seriesFor = useCallback(async (fields, newName) => {
+    if (fields.series_id !== NEW_SERIES) return fields;
+    const key = String(newName || '').trim().toLowerCase();
+    const have = (seriesRef.current || []).find((s) => !s.archived && String(s.name || '').trim().toLowerCase() === key);
+    if (have) return { ...fields, series_id: String(have.id) };
+    const row = await api('/api/meeting-series', { method: 'POST', body: { project_id: pid, name: newName } });
+    wrote();
+    if (row?.id != null) appendLocal('series', row);
+    return { ...fields, series_id: row?.id != null ? String(row.id) : null };
+  }, [pid, appendLocal, wrote]);
+  const createMeeting = useCallback(async (fields, newName) => {
     touch();
-    const row = await api('/api/project-meetings', { method: 'POST', body: { project_id: pid, series_id: seriesId || null, ...fields } });
+    const f = await seriesFor(fields, newName);
+    const row = await api('/api/project-meetings', { method: 'POST', body: { project_id: pid, ...f } });
     wrote();
     if (row?.id != null) appendLocal('meeting', row);
     refreshNow();
     return row;
-  }, [touch, pid, appendLocal, refreshNow, wrote]);
-  const saveMeeting = useCallback(async (m, patch, base) => {
+  }, [touch, seriesFor, pid, appendLocal, refreshNow, wrote]);
+  const saveMeeting = useCallback(async (m, patch, base, newName) => {
     touch();
     try {
-      const r = await api(URLS.meeting(m.id), { method: 'PATCH', body: { ...patch, base } });
+      const p2 = await seriesFor(patch, newName);
+      const r = await api(URLS.meeting(m.id), { method: 'PATCH', body: { ...p2, base } });
       wrote();
       if (r?.row) mergeLocal('meeting', m.id, r.row);
     } catch (e) {
@@ -322,11 +338,7 @@ export default function ProjectBoard({ initial }) {
       else handleGone('meeting', m.id, e);
       throw e;
     }
-  }, [touch, mergeLocal, handleGone, wrote]);
-  const deleteMeeting = useCallback(async (m) => {
-    removeLocal('meeting', (x) => same(x.id, m.id));
-    try { await api(URLS.meeting(m.id), { method: 'DELETE' }); wrote(); refreshNow(); } catch (e) { fail(e); refreshNow(); }
-  }, [removeLocal, refreshNow, fail, wrote]);
+  }, [touch, seriesFor, mergeLocal, handleGone, wrote]);
   const addSeries = useCallback(async (name) => {
     touch();
     try {
@@ -334,16 +346,13 @@ export default function ProjectBoard({ initial }) {
       wrote();
       if (row?.id != null) appendLocal('series', row);
       refreshNow();
+      return row;
     } catch (e) { fail(e); throw e; }
   }, [touch, pid, appendLocal, refreshNow, fail, wrote]);
-  // A rename that loses a race shows a conflict notice under the series head (the dialog closes either way).
+  // A rename that loses a race shows a conflict notice under the series (the dialog row closes either way).
   const renameSeries = useCallback(async (sv, name) => {
     try { await saveText('series', sv.id, 'name', name, sv.name); } catch {}
   }, [saveText]);
-  const deleteSeries = useCallback(async (sv) => {
-    setD((x) => ({ ...x, series: x.series.filter((s) => !same(s.id, sv.id)), meetings: x.meetings.filter((m) => !same(m.series_id, sv.id)) }));
-    try { await api(URLS.series(sv.id), { method: 'DELETE' }); wrote(); refreshNow(); } catch (e) { fail(e); refreshNow(); }
-  }, [setD, refreshNow, fail, wrote]);
 
   // ---------------------------------------------------------------- members
   const addMembers = useCallback(async (ids) => {
@@ -410,7 +419,7 @@ export default function ProjectBoard({ initial }) {
     }
   }, [touch, pid, wrote, mergeLocal, fail]);
 
-  // ---------------------------------------------------------------- A6: submittals and upcoming meetings
+  // ---------------------------------------------------------------- A6: submittals (and A9 archive of meetings and series)
   // Writes to one submittal or meeting go out one at a time, in the order they were made, so a slow earlier write
   // can never land after a later one (2026-10-14 review: a date typed segment by segment stored an in-between
   // value). Only the newest write's answer is merged, so an older answer never flickers the field back.
@@ -437,6 +446,9 @@ export default function ProjectBoard({ initial }) {
     job.then(() => { if (q[key] === job) delete q[key]; });
     return job;
   }, [mergeLocal, pid, wrote, fail, handleGone, refreshNow]);
+  // A9: archive or restore a meeting or a series (meetings and series are never deleted).
+  const archiveMeeting = useCallback((m, archived) => patchItem('meeting', m.id, { archived }), [patchItem]);
+  const archiveSeries = useCallback((sv, archived) => patchItem('series', sv.id, { archived }), [patchItem]);
 
   const addSubmittal = useCallback(async () => {
     touch();
@@ -457,40 +469,6 @@ export default function ProjectBoard({ initial }) {
     await patchItem('submittal', s.id, { archived: true });
   }, [ask, patchItem]);
 
-  const createUpcoming = useCallback(async (f) => {
-    touch();
-    const r = await api(`/api/projects/${pid}/upcoming-meetings`, {
-      method: 'POST',
-      body: { meeting_date: f.meeting_date, meeting_time: f.meeting_time || '', title: f.title.trim(), location: f.location.trim() },
-    });
-    wrote();
-    if (r?.row?.id != null) {
-      setD((x) => ({ ...x, upcoming_meetings: sortUpcoming(mergeById(x.upcoming_meetings, r.row)) }));
-    }
-    refreshNow();
-  }, [touch, pid, wrote, setD, refreshNow]);
-  const saveUpcoming = useCallback(async (m, f, bases) => {
-    const body = upcomingBody(f, bases);
-    if (!Object.keys(body).some((k) => k !== 'base')) return;
-    touch();
-    try {
-      const r = await api(URLS.upcoming(m.id, pid), { method: 'PATCH', body });
-      wrote();
-      if (r?.row) setD((x) => ({ ...x, upcoming_meetings: sortUpcoming(mergeById(x.upcoming_meetings, r.row)) }));
-    } catch (e) {
-      if (e instanceof ConflictError && e.current) mergeLocal('upcoming', m.id, e.current);
-      else handleGone('upcoming', m.id, e);
-      throw e;
-    }
-  }, [touch, pid, wrote, setD, mergeLocal, handleGone]);
-  const archiveUpcoming = useCallback(async (m) => {
-    if (!(await ask({
-      title: `Archive “${m.title}”?`,
-      lines: ['It leaves this list and the weekly report. “Show archived” brings it back.'],
-      confirmLabel: 'Archive',
-    }))) return;
-    await patchItem('upcoming', m.id, { archived: true });
-  }, [ask, patchItem]);
   // ---------------------------------------------------------------- A8: attention items
   const createAttention = useCallback(async (f) => {
     touch();
@@ -562,8 +540,6 @@ export default function ProjectBoard({ initial }) {
     addSubmittal, archiveSubmittal,
     patchSubmittal: (id, patch) => patchItem('submittal', id, patch),
     saveSubmittalText: (id, field, v, base) => saveText('submittal', id, field, v, base),
-    createUpcoming, saveUpcoming, archiveUpcoming,
-    patchUpcoming: (id, patch) => patchItem('upcoming', id, patch),
     createAttention, saveAttention, receiveAttention, reopenAttention, archiveAttention,
     patchAttention: (id, patch) => patchItem('attention', id, patch),
     setDraftDirty: setDraftFlag,
@@ -664,19 +640,18 @@ export default function ProjectBoard({ initial }) {
 
       <Submittals submittals={d.submittals || []} ctx={ctx} />
       <AttentionItems items={d.attention_items || []} today={d.today} fromOptions={d.attention_from || []} ctx={ctx} />
-      <UpcomingMeetings meetings={d.upcoming_meetings || []} today={d.today} ctx={ctx} />
-
       <ProjectMeetings
         key={pid}
         meetings={d.meetings}
         series={d.series}
+        today={d.today}
         readOnly={ro}
         onCreate={createMeeting}
         onSave={saveMeeting}
-        onDelete={deleteMeeting}
+        onArchive={archiveMeeting}
         onAddSeries={addSeries}
         onRenameSeries={renameSeries}
-        onDeleteSeries={deleteSeries}
+        onArchiveSeries={archiveSeries}
         onDiscard={() => refreshNow()}
         onDirtyChange={setDraftDirty}
         seriesNotice={(sv) => conflictUI(`series:${sv.id}:name`)}
@@ -703,19 +678,6 @@ export function addedText(list) {
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} were added to this project.`;
 }
 
-// Only the fields of an upcoming meeting that changed since the editor opened; text with its base (design §7.4).
-function upcomingBody(f, bases) {
-  const body = {};
-  const base = {};
-  if (f.meeting_date !== bases.meeting_date) body.meeting_date = f.meeting_date;
-  if ((f.meeting_time || '') !== (bases.meeting_time || '')) body.meeting_time = f.meeting_time || '';
-  for (const k of ['title', 'location']) {
-    if (f[k].trim() !== String(bases[k] ?? '').trim()) { body[k] = f[k].trim(); base[k] = bases[k] ?? ''; }
-  }
-  if (Object.keys(base).length) body.base = base;
-  return body;
-}
-
 // Only the fields of an attention item that changed since the editor opened; text with its base (design §7.4).
 function attentionBody(f, bases) {
   const body = {};
@@ -726,10 +688,4 @@ function attentionBody(f, bases) {
   }
   if (Object.keys(base).length) body.base = base;
   return body;
-}
-
-// Upcoming meetings stay in date and time order after an add or an edit (the loader's order).
-function sortUpcoming(list) {
-  return [...(list || [])].sort((a, b) => String(a.meeting_date).localeCompare(String(b.meeting_date))
-    || String(a.meeting_time || '').localeCompare(String(b.meeting_time || '')) || (Number(a.id) - Number(b.id)));
 }

@@ -1,6 +1,6 @@
 /* A6 project structure (design-amendments A6.4, A6.5): the New project / Project details dialogs, the project
-   header's facts line, schedule segmented button and stage stepper, the Status Report hint, Submittals and
-   Upcoming meetings. Builds on globals.css (.modal, .field, .info-panel, .notes-label, .status-select,
+   header's facts line, schedule segmented button and stage stepper, the Status Report hint and Submittals (A6's
+   Upcoming meetings became part of Meetings in A9: board.css .pm2-*). Builds on globals.css (.modal, .field, .info-panel, .notes-label, .status-select,
    .date-input, .row-icon) and board.css. Desktop >= 721 px; phone <= 720 px (cards, 44 px targets, 16 px inputs
    from shell.css). Imported from app/layout.js. */
 
@@ -118,7 +118,7 @@ button.stage-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 
 .sr-hint code { background: #f1f1f2; padding: 0 5px; border-radius: 4px; font-size: 11px; }
 .status-report-panel .notes-ro { white-space: normal; }
 
-/* ---------- section heads (Submittals, Upcoming meetings) ---------- */
+/* ---------- section heads (Submittals, Attention Items) ---------- */
 h2.sec-h { margin: 0; }
 .sec-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
@@ -163,39 +163,8 @@ h2.sec-h { margin: 0; }
 .sub-arow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; background: #fbfbfb; }
 .sub-arow-main { flex: 1 1 auto; min-width: 0; font-size: 13.5px; overflow-wrap: anywhere; }
 
-/* ---------- Upcoming meetings ---------- */
-.um-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.um-row { display: flex; align-items: center; gap: 14px; padding: 9px 10px; border-bottom: 1px solid var(--line); }
-.um-list > .um-row:last-child { border-bottom: none; }
-.um-row.past { background: #fafafa; }
-.um-row.past .um-title, .um-row.past .um-date { color: var(--ink-2); }
-.um-row.archived { background: #fbfbfb; }
-.um-when { flex: 0 0 150px; display: flex; flex-direction: column; gap: 1px; }
-.um-date { font-size: 13.5px; font-weight: 700; color: var(--ink); }
-.um-time { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.um-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.um-title { font-size: 14px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
-.um-loc { font-size: 12.5px; color: var(--ink-2); overflow-wrap: anywhere; }
-.um-tags { display: flex; gap: 4px; }
-.um-tags .lt-chip { margin-left: 0; }
-.um-act { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
-.um-archive { opacity: .55; }
-.um-row:hover .um-archive, .um-archive:focus-visible { opacity: 1; }
-.um-new { margin-bottom: 10px; }
-.um-form { border: 1px solid var(--lime-dark); border-radius: 10px; background: #fffdf5; padding: 10px 12px; width: 100%; }
-.um-editing { display: block; padding: 8px; }
-.um-form-grid { display: grid; grid-template-columns: 160px 130px minmax(0, 1.4fr) minmax(0, 1fr); gap: 10px; }
-.um-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.um-f > span { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
-.um-f > span i { font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; }
-.um-f .field { margin-top: 0; padding: 8px 10px; font-size: 13.5px; background: #fff; }
-.um-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
-.um-form .ofc-dialog-err { margin-top: 8px; }
-
 @media (max-width: 1100px) {
   .sub-row { grid-template-columns: minmax(110px, 1fr) minmax(130px, 1.2fr) 160px minmax(220px, 1.8fr) 34px; }
-  .um-form-grid { grid-template-columns: 150px 120px minmax(0, 1fr); }
-  .um-f-loc { grid-column: 1 / -1; }
 }
 
 /* ---------- phones ---------- */
@@ -229,7 +198,7 @@ h2.sec-h { margin: 0; }
   .sec-h > span, .status-report-panel .notes-label > span { flex: 1 1 100%; }
   .sec-actions { width: 100%; }
   /* a focused field stays clear of the fixed bottom bar */
-  .sub-row input, .sub-row select, .um-form input, .status-report-panel textarea { scroll-margin-bottom: calc(58px + env(safe-area-inset-bottom) + 16px); }
+  .sub-row input, .sub-row select, .pm2-grid input, .status-report-panel textarea { scroll-margin-bottom: calc(58px + env(safe-area-inset-bottom) + 16px); }
   .sec-actions .btn { flex: 1 1 auto; }
 
   /* submittal cards */
@@ -256,22 +225,10 @@ h2.sec-h { margin: 0; }
   .sub-days { width: 100%; }
   .sub-expected { grid-column: 1 / -1; }
   .sub-arow { flex-wrap: wrap; }
-
-  /* upcoming meetings */
-  .um-row { flex-wrap: wrap; gap: 6px 12px; padding: 10px; }
-  .um-when { flex: 1 1 0; min-width: 0; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
-  .um-main { flex: 1 1 100%; order: 3; }
-  .um-act { order: 2; }
-  .um-act .btn { min-height: 40px; }
-  .um-archive { opacity: 1; min-width: 40px; height: 40px; }
-  .um-form-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .um-f-title, .um-f-loc { grid-column: 1 / -1; }
-  .um-f .field { min-height: 44px; }
-  .um-form-actions .btn { flex: 1 1 auto; }
 }
 
 @media (hover: none) {
-  .sub-archive, .um-archive { opacity: 1; }
+  .sub-archive { opacity: 1; }
 }
 
 /* ---------- A8 Attention Items ---------- */

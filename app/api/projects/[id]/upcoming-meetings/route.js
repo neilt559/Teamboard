@@ -1,6 +1,4 @@
 import { handle, HttpError } from '@/lib/http';
-import { listUpcoming, createUpcoming } from '@/lib/queries/project-items';
-import { chicagoToday } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -8,20 +6,9 @@ export const revalidate = 0;
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// GET /api/projects/:id/upcoming-meetings -> { meetings: [...], today } (design-amendments A6.2, A6.5): every
-// upcoming-meeting row of the project by date and time, archived and past ones included (flags archived, past =
-// before today, Central). Anyone who can see the project; otherwise the same 404 as a missing project.
-export const GET = handle(async ({ viewer, params, now }) => {
-  const today = chicagoToday(now);
-  const meetings = await listUpcoming(viewer, params.id, today);
-  if (!meetings) throw new HttpError(404, 'Project not found');
-  return { meetings, today };
-});
-
-// POST /api/projects/:id/upcoming-meetings {meeting_date, meeting_time?, title, location?} -> { ok, row }.
-// meeting_date 'YYYY-MM-DD' and title (what / with whom) required; meeting_time 'HH:MM' (24 h) or empty.
-// Anyone who can see the project (A6.3); bumps projects.rev.
-export const POST = handle(async ({ viewer, params, body, now }) => {
-  const row = await createUpcoming(viewer, params.id, await body(), chicagoToday(now));
-  return { ok: true, row };
-});
+// Retired by design-amendments A9: the A6 upcoming meetings were merged into the project's Meetings
+// (/api/project-meetings, with a time and a place; the old rows are archived, never deleted). Signed-in callers get
+// 410, so an old open tab reloads.
+const retired = () => new HttpError(410, 'Upcoming meetings are now part of Meetings. Reload the page.', { code: 'retired' });
+export const GET = handle(async () => { throw retired(); });
+export const POST = handle(async () => { throw retired(); });
