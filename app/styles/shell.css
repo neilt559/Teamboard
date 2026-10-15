@@ -220,3 +220,13 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 @media (prefers-reduced-motion: reduce) {
   .drawer, .drawer-backdrop, .drawer-panel, .tree-caret .icon { transition: none; }
 }
+
+/* the left bar's project search (2026-10-15) */
+.nav-search { position: relative; display: flex; align-items: center; margin: 0 0 12px; }
+.nav-search > .icon { position: absolute; left: 9px; color: var(--muted); pointer-events: none; }
+.nav-search input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 7px 28px 7px 29px; font: inherit; font-size: 13px; color: var(--ink); }
+.nav-search input:focus { outline: none; border-color: var(--lime-dark); box-shadow: 0 0 0 3px rgba(203, 206, 0, .18); }
+.nav-search-x { position: absolute; right: 4px; border: none; background: none; color: var(--muted); padding: 5px; border-radius: 6px; cursor: pointer; display: inline-grid; place-items: center; }
+.nav-search-x:hover { color: var(--ink); background: #f1f1f2; }
+.nav-nomatch a { text-decoration: underline; }
+@media (max-width: 720px) { .nav-search input { font-size: 16px; min-height: 44px; } }

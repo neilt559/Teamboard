@@ -20,7 +20,9 @@ import { openAdminEntrance } from './ClaimAdmin';
 export const TABS = [
   { key: 'home', href: '/', label: 'Home', Icon: IconHome, match: (p) => p === '/' },
   { key: 'my-work', href: '/my-work', label: 'My work', Icon: IconCheck },
-  { key: 'projects', href: '/projects', label: 'Projects', Icon: IconFolder, also: ['/offices', '/teams', '/reports'] },
+  // Not in the desktop header (Neil, 2026-10-15: every project is in the left bar, which has a search); the phone
+  // bar keeps it, since phones have no left bar on screen.
+  { key: 'projects', href: '/projects', label: 'Projects', Icon: IconFolder, also: ['/offices', '/teams', '/reports'], noHeader: true },
   { key: 'tasks', href: '/tasks', label: 'All tasks', Icon: IconList },
   { key: 'posts', href: '/suggestions', label: BOARD_LABEL, short: BOARD_SHORT, Icon: IconMegaphone, also: ['/threads'] },
   { key: 'culture', href: '/culture', label: 'Culture', Icon: IconTrophy },
@@ -190,7 +192,7 @@ export default function Header({ viewer, nav, pathname, drawerOpen, onMenu }) {
         </Link>
       </div>
       <nav className="header-actions header-tabs" aria-label="Main" ref={tabsRef}>
-        {TABS.map(({ key, href, label, Icon }) => (
+        {TABS.filter((t) => !t.noHeader).map(({ key, href, label, Icon }) => (
           <Link
             key={key}
             href={href}

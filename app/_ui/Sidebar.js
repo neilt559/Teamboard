@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { IconCaret, IconPin, IconArchive, IconChevronRight } from '../icons';
+import { IconCaret, IconPin, IconArchive, IconChevronRight, IconSearch, IconX } from '../icons';
 import { projectTitle } from '@/lib/projects';
 
 // Left navigation (design §2.2): pinned projects, the "My offices" tree (home, extra and followed offices ->
@@ -70,18 +70,46 @@ function ProjectRow({ p, pathname, onNavigate, pin = false }) {
   );
 }
 
+// The left bar's search (Neil, 2026-10-15): type part of a project number or name and the tree keeps only the
+// matching projects, with their teams and offices opened; Esc or the x clears it.
+const norm = (v) => String(v ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+const matches = (p, q) => !q || norm(`${p.project_number || ''} ${projectTitle(p)}`).includes(q);
+
 export function NavTree({ nav, pathname, onNavigate }) {
   const [collapsed, toggle] = useCollapsed();
+  const [query, setQuery] = useState('');
+  const q = norm(query);
   const offices = nav?.offices || [];
   const teams = nav?.teams || [];
-  const projects = nav?.projects || [];
+  const projects = (nav?.projects || []).filter((p) => matches(p, q));
   const officeById = new Map(offices.map((o) => [String(o.id), o]));
   const treeOffices = (nav?.tree_office_ids || []).map((id) => officeById.get(String(id))).filter(Boolean);
   const projectById = new Map(projects.map((p) => [String(p.id), p]));
   const pinned = (nav?.pinned || []).map((id) => projectById.get(String(id))).filter(Boolean);
 
+  const shownTeams = q ? teams.filter((t) => projects.some((p) => same(p.team_id, t.id) && !p.archived)) : teams;
+  const shownOffices = q ? treeOffices.filter((o) => shownTeams.some((t) => same(t.office_id, o.id))) : treeOffices;
+  const none = q && !pinned.length && !shownOffices.length;
+
   return (
     <div className="nav-tree">
+      <div className="nav-search" role="search">
+        <IconSearch size={14} />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setQuery(''); }}
+          placeholder="Search projects (number or name)"
+          aria-label="Search projects by number or name"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {query && <button type="button" className="nav-search-x" onClick={() => setQuery('')} aria-label="Clear the search"><IconX size={13} /></button>}
+      </div>
+      {none && (
+        <p className="team-empty nav-empty nav-nomatch">No projects match “{query.trim()}”. <Link href={`/projects?q=${encodeURIComponent(query.trim())}`} prefetch={false} onClick={onNavigate}>Search all projects</Link></p>
+      )}
       {pinned.length > 0 && (
         <section className="nav-section" aria-label="Pinned projects">
           <h2 className="nav-h">Pinned</h2>
@@ -91,13 +119,13 @@ export function NavTree({ nav, pathname, onNavigate }) {
 
       <section className="nav-section" aria-label="My offices">
         <h2 className="nav-h">My offices</h2>
-        {treeOffices.length === 0 && (
+        {!q && treeOffices.length === 0 && (
           <p className="team-empty nav-empty">No offices here yet. <Link href="/offices" prefetch={false} onClick={onNavigate}>Browse offices</Link> to follow one.</p>
         )}
-        {treeOffices.map((office) => {
-          const oCollapsed = collapsed.o.includes(String(office.id));
+        {shownOffices.map((office) => {
+          const oCollapsed = !q && collapsed.o.includes(String(office.id));
           const officeHref = `/offices/${office.id}`;
-          const officeTeams = teams.filter((t) => same(t.office_id, office.id));
+          const officeTeams = shownTeams.filter((t) => same(t.office_id, office.id));
           return (
             <div key={office.id} className="office">
               <div className={`office-head${pathname === officeHref ? ' viewing' : ''}`}>
@@ -117,7 +145,7 @@ export function NavTree({ nav, pathname, onNavigate }) {
               {!oCollapsed && (
                 <div className="office-teams">
                   {officeTeams.map((team) => {
-                    const tCollapsed = collapsed.t.includes(String(team.id));
+                    const tCollapsed = !q && collapsed.t.includes(String(team.id));
                     const teamHref = `/teams/${team.id}`;
                     const teamProjects = projects.filter((p) => same(p.team_id, team.id) && !p.archived);
                     return (
@@ -136,11 +164,11 @@ export function NavTree({ nav, pathname, onNavigate }) {
                           </Link>
                         </div>
                         {!tCollapsed && teamProjects.map((p) => <ProjectRow key={p.id} p={p} pathname={pathname} onNavigate={onNavigate} />)}
-                        {!tCollapsed && teamProjects.length === 0 && <p className="team-empty">No projects to show.</p>}
+                        {!q && !tCollapsed && teamProjects.length === 0 && <p className="team-empty">No projects to show.</p>}
                       </div>
                     );
                   })}
-                  {officeTeams.length === 0 && <p className="team-empty">No teams yet.</p>}
+                  {!q && officeTeams.length === 0 && <p className="team-empty">No teams yet.</p>}
                 </div>
               )}
             </div>
