@@ -370,3 +370,36 @@ span.td-sub-title { display: block; padding: 7px 0; }
   .rl-row { flex-wrap: wrap; }
   .rl-input { flex-basis: 100%; min-height: 44px; font-size: 16px; }
 }
+
+/* ---------- team page cards (Neil, 2026-10-15: three across, compact) ---------- */
+.tc-card { gap: 0; }
+.tc-card .overview-card-head { margin-bottom: 4px; padding-bottom: 6px; border-bottom: 3px solid var(--lime); }
+.tc-card .ov-head-side { display: inline-flex; align-items: center; gap: 6px; }
+.tc-sec { padding: 7px 0 6px; border-bottom: 1px dashed var(--line); }
+.tc-sec:last-of-type { border-bottom: none; }
+.tc-sec-head { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 4px; }
+.tc-sec-head > .icon { color: var(--muted); }
+.tc-n { font-size: 10.5px; font-weight: 700; color: #fff; background: var(--ink-2); border-radius: 999px; padding: 0 6px; letter-spacing: 0; }
+.tc-more { font-size: 11px; font-weight: 700; color: var(--ink-2); text-transform: none; letter-spacing: 0; text-decoration: none; padding: 2px 6px; border-radius: 6px; }
+.tc-more:hover { background: #fafbf0; color: var(--ink); }
+.tc-none { margin: 0; font-size: 12px; color: #b3b0b1; }
+.tc-notes.overview-notes { min-height: 64px; font-size: 13px; }
+.tc-notes-ro { font-size: 13px; color: var(--ink); white-space: pre-wrap; }
+.tc-review { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 11.5px; color: #8a6100; }
+.tc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.tc-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink); min-width: 0; }
+.tc-row.late .tc-main { color: #a3262a; }
+.tc-main { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-main b { font-weight: 700; }
+.tc-sub { color: var(--muted); }
+.tc-when { flex: 0 0 auto; font-weight: 700; font-size: 12px; color: var(--ink-2); }
+.tc-status { flex: 0 0 auto; max-width: 130px; font-size: 11.5px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
+.tc-btn { flex: 0 0 auto; font-size: 11px; font-weight: 700; border: 1px solid #bfe6d2; background: #fff; color: #029457; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+.tc-btn:hover { background: #eafaf1; }
+.tc-tasks.ov-tasks { margin-top: 0; border-top: none; padding-top: 0; }
+.tc-due { flex: 0 0 auto; min-width: 42px; text-align: right; font-size: 11.5px; color: var(--ink-2); }
+.tc-due.late { color: #a3262a; font-weight: 700; }
+@media (max-width: 720px) {
+  .tc-status { max-width: 150px; min-height: 36px; font-size: 13px; }
+  .tc-btn { min-height: 36px; }
+}

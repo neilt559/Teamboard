@@ -12,7 +12,8 @@ import { canManageTeamsIn, canCreateProjectIn, canManageProject, canDeleteProjec
 import NameDialog from '../../offices/_ui/NameDialog';
 import MoreMenu from '../../offices/_ui/MoreMenu';
 import ErrorBanner from '../../offices/_ui/ErrorBanner';
-import ProjectBoard from '../../projects/[projectId]/ProjectBoard';
+import TeamCard from './TeamCard';
+import AddTaskModal from './AddTaskModal';
 import TeamRoster from './TeamRoster';
 import CreateProjectDialog from '@/app/_ui/CreateProjectDialog';
 import { projectTitle } from '@/lib/projects';
@@ -21,11 +22,10 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 
 
-// The Team page (inventory §1.10, design §2.1/§2.3), reworked for the Friday review (Neil, 2026-10-15): every
-// visible project of the team, in project-number order, as a compact panel (ProjectBoard variant 'review'):
-// Status Report, Submittals, Attention Items, Meetings, then the top-level tasks (no subtasks), all edited in
-// place, so the weekly owner reports are ready when the meeting ends. Plus the team's roster (A4: it drives
-// project membership).
+// The Team page (inventory §1.10, design §2.1/§2.3), set up for the Friday review (Neil, 2026-10-15): the team's
+// visible projects in project-number order as cards, three across on a computer (TeamCard: Status Report,
+// submittals, attention items, upcoming meetings and the top-level tasks with who and when; no subtasks), plus the
+// team's roster (A4: it drives project membership).
 // Moving the team to another office needs team rights in both offices; project add / rename / archive /
 // delete follow lib/policy.js exactly as the API does.
 export default function TeamOverview({ viewer, data, boards = [], createOptions = null }) {
@@ -34,6 +34,7 @@ export default function TeamOverview({ viewer, data, boards = [], createOptions 
   const [state, setState] = useServerState(data);
   const [dialog, setDialog] = useState(null);          // { kind: 'project' } | { kind: 'rename-project', project } | { kind: 'rename-team' }
   const [error, setError] = useState(null);
+  const [addingTaskFor, setAddingTaskFor] = useState(null);
   const [notice, setNotice] = useState(null);
   const [confirmUI, ask] = useConfirm();
   const { team, office, projects, roster } = state;
@@ -66,6 +67,19 @@ export default function TeamOverview({ viewer, data, boards = [], createOptions 
       setState((s) => ({ ...s, team: { ...s.team, office_id: prev } }));
       fail(e);
     }
+  }
+
+  // Close first, then create (as before). Assigning someone linked to an account adds them to the project.
+  async function createTaskWithOwner(title, assigneeId) {
+    const projectId = addingTaskFor;
+    setAddingTaskFor(null);
+    if (!projectId) return;
+    try {
+      const r = await api('/api/tasks', { method: 'POST', body: { project_id: projectId, title, assignee_id: assigneeId } });
+      const added = Array.isArray(r?.added_members) ? r.added_members.filter((a) => a && a.name) : [];
+      if (added.length) setNotice(`${added.map((a) => a.name).join(', ')} ${added.length === 1 ? 'was' : 'were'} added to this project.`);
+      router.refresh();
+    } catch (e) { fail(e); }
   }
 
   async function renameProject(p, name) {
@@ -184,15 +198,17 @@ export default function TeamOverview({ viewer, data, boards = [], createOptions 
           <p>{canAddProject ? 'Click “+ Add Project” to create one.' : 'Projects you can see in this team show up here.'}</p>
         </div>
       ) : (
-        <div className="rv-list">
+        <div className="overview-grid">
           {(boards || []).filter((b) => projects.some((x) => same(x.id, b.project.id))).map((b) => {
             const p = projects.find((x) => same(x.id, b.project.id)) || b.project;
             return (
-              <ProjectBoard
+              <TeamCard
                 key={b.project.id}
-                initial={b}
-                variant="review"
-                headExtra={<MoreMenu items={projectMenu(p)} label={`Actions for ${projectTitle(p)}`} />}
+                b={b}
+                menu={<MoreMenu items={projectMenu(p)} label={`Actions for ${projectTitle(p)}`} />}
+                onAddTask={(pid) => setAddingTaskFor(pid)}
+                onError={fail}
+                refresh={() => router.refresh()}
               />
             );
           })}
@@ -210,6 +226,10 @@ export default function TeamOverview({ viewer, data, boards = [], createOptions 
         pmOnlyEditor={!admin && !canManageTeam}
       />
 
+      {addingTaskFor && (() => {
+        const ab = (boards || []).find((x) => same(x.project.id, addingTaskFor));
+        return <AddTaskModal people={ab?.people || []} projectName={ab ? projectTitle(ab.project) : ''} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />;
+      })()}
       {dialog?.kind === 'project' && (
         <CreateProjectDialog
           teams={[{ id: team.id, name: team.name, office_id: team.office_id, office_name: office?.name || '' }]}

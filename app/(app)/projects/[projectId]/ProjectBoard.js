@@ -20,8 +20,7 @@ import Submittals from './Submittals';
 import AttentionItems from './AttentionItems';
 import ProjectDetailsDialog from './ProjectDetailsDialog';
 import useBoardSync from './useBoardSync';
-import { projectTitle, parseStages, scheduleOf } from '@/lib/projects';
-import Link from 'next/link';
+import { projectTitle, parseStages } from '@/lib/projects';
 
 // The project board (design §2.1, §2.3): header (rename, team move, archive, delete), progress, notes, the task
 // table with subtasks and task notes (cards that open the task page on phones), archived tasks, meetings and
@@ -57,11 +56,7 @@ export function useMounted() {
   return m;
 }
 
-// variant 'review' (Neil, 2026-10-15): the team page's compact weekly-review panel for one project: its title,
-// then the Status Report, Submittals, Attention Items, Meetings and the top-level tasks (no subtasks), all edited
-// in place with the same rules as the project page. headExtra: extra controls for its title row (the team page's
-// project menu).
-export default function ProjectBoard({ initial, variant = 'full', headExtra = null }) {
+export default function ProjectBoard({ initial }) {
   const router = useRouter();
   const [d, setD, touch] = useServerState(initial);
   const p = d.project;
@@ -555,20 +550,16 @@ export default function ProjectBoard({ initial, variant = 'full', headExtra = nu
   };
 
   const statusReport = (
-        <div className="notes-panel status-report-panel" id={variant === 'review' ? undefined : 'status-report'}>
+        <div className="notes-panel status-report-panel" id="status-report">
           <h2 className="notes-label" id={`pnotes-h-${pid}`}><IconNote size={14} /> Status Report <span>· goes to the owner in the weekly report</span></h2>
           {reviewPending && (
             <div className="sr-review" role="note">
               <IconAlert size={15} />
-              {variant === 'review' ? (
-                <div className="sr-review-text"><b>Not in the owner reports yet.</b> Take out anything internal, then click <b>Use in reports</b>.</div>
-              ) : (
-                <div className="sr-review-text">
-                  <b>Not in the owner reports yet.</b> This text was written as internal project notes before weekly reports
-                  existed. Read it and take out anything internal (staff names, internal reviews, remarks), then click
-                  <b> Use in reports</b>. Until then the report says “No status report this week.”
-                </div>
-              )}
+              <div className="sr-review-text">
+                <b>Not in the owner reports yet.</b> This text was written as internal project notes before weekly reports
+                existed. Read it and take out anything internal (staff names, internal reviews, remarks), then click
+                <b> Use in reports</b>. Until then the report says “No status report this week.”
+              </div>
               {!ro && (
                 <button type="button" className="btn btn-ink btn-sm wi sr-review-btn" onClick={markReviewed} disabled={reviewBusy}>
                   <IconCheck size={14} /> {reviewBusy ? 'Saving…' : 'Use in reports'}
@@ -609,48 +600,8 @@ export default function ProjectBoard({ initial, variant = 'full', headExtra = nu
       onDiscard={() => refreshNow()}
       onDirtyChange={setDraftDirty}
       seriesNotice={(sv) => conflictUI(`series:${sv.id}:name`)}
-      idKey={variant === 'review' ? pid : ''}
-      compact={variant === 'review'}
     />
   );
-
-  if (variant === 'review') {
-    const sched = scheduleOf(p.schedule_status);
-    return (
-      <section className="project-board pb-review" aria-labelledby={`rv-h-${pid}`} data-project={pid}>
-        <header className="rv-head">
-          <h2 className="rv-title" id={`rv-h-${pid}`}><Link href={`/projects/${pid}`} prefetch={false}>{projectTitle(p)}</Link></h2>
-          {sched && <span className={`rv-sched rv-sched-${p.schedule_status}`}>{sched.label}</span>}
-          <span className="spacer" />
-          {headExtra}
-          <Link href={`/projects/${pid}`} prefetch={false} className="btn btn-plain btn-sm">Open project</Link>
-        </header>
-        {error && (
-          <div className="banner" role="alert">
-            <IconAlert size={16} />
-            <span>{error}</span>
-            <span className="spacer" />
-            <button type="button" className="btn btn-plain btn-sm" onClick={() => setError(null)}>Dismiss</button>
-          </div>
-        )}
-        {statusReport}
-        <Submittals submittals={d.submittals || []} ctx={{ ...ctx, review: true }} />
-        <div className="rv-cols">
-          <div className="rv-col">
-            <AttentionItems items={d.attention_items || []} today={d.today} fromOptions={d.attention_from || []} ctx={{ ...ctx, review: true }} />
-          </div>
-          <div className="rv-col">{meetingsPanel}</div>
-        </div>
-        <div className="info-panel rv-tasks">
-          <h3 className="notes-label">Tasks</h3>
-          <TaskTable tasks={active} subsByParent={{}} ctx={{ ...ctx, noSubs: true }} />
-        </div>
-        {toast && <div className="board-toast" role="status">{toast}</div>}
-        {stale && <RefreshPill onClick={refresh} />}
-        {confirmUI}
-      </section>
-    );
-  }
 
   const crumbs = [
     { label: 'Offices', href: '/offices' },
