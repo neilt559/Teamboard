@@ -14,6 +14,7 @@ import MoreMenu from '../../offices/_ui/MoreMenu';
 import ErrorBanner from '../../offices/_ui/ErrorBanner';
 import TeamCard from './TeamCard';
 import AddTaskModal from './AddTaskModal';
+import { AddSubmittalModal, AddAttentionModal, AddMeetingModal } from './QuickAddModals';
 import TeamRoster from './TeamRoster';
 import CreateProjectDialog from '@/app/_ui/CreateProjectDialog';
 import { projectTitle } from '@/lib/projects';
@@ -35,6 +36,7 @@ export default function TeamOverview({ viewer, data, boards = [], createOptions 
   const [dialog, setDialog] = useState(null);          // { kind: 'project' } | { kind: 'rename-project', project } | { kind: 'rename-team' }
   const [error, setError] = useState(null);
   const [addingTaskFor, setAddingTaskFor] = useState(null);
+  const [quickAdd, setQuickAdd] = useState(null);       // { kind: 'submittal' | 'attention' | 'meeting', pid }
   const [notice, setNotice] = useState(null);
   const [confirmUI, ask] = useConfirm();
   const { team, office, projects, roster } = state;
@@ -207,6 +209,7 @@ export default function TeamOverview({ viewer, data, boards = [], createOptions 
                 b={b}
                 menu={<MoreMenu items={projectMenu(p)} label={`Actions for ${projectTitle(p)}`} />}
                 onAddTask={(pid) => setAddingTaskFor(pid)}
+                onQuickAdd={(kind, pid) => setQuickAdd({ kind, pid })}
                 onError={fail}
                 refresh={() => router.refresh()}
               />
@@ -229,6 +232,16 @@ export default function TeamOverview({ viewer, data, boards = [], createOptions 
       {addingTaskFor && (() => {
         const ab = (boards || []).find((x) => same(x.project.id, addingTaskFor));
         return <AddTaskModal people={ab?.people || []} projectName={ab ? projectTitle(ab.project) : ''} onCreate={createTaskWithOwner} onClose={() => setAddingTaskFor(null)} />;
+      })()}
+      {quickAdd && (() => {
+        const qb = (boards || []).find((x) => same(x.project.id, quickAdd.pid));
+        const pid = quickAdd.pid;
+        const name = qb ? projectTitle(qb.project) : '';
+        const close = () => setQuickAdd(null);
+        const post = (url, body) => api(url, { method: 'POST', body }).then(() => router.refresh());
+        if (quickAdd.kind === 'submittal') return <AddSubmittalModal projectName={name} onClose={close} onSave={(body) => post(`/api/projects/${pid}/submittals`, body)} />;
+        if (quickAdd.kind === 'attention') return <AddAttentionModal projectName={name} onClose={close} onSave={(body) => post(`/api/projects/${pid}/attention-items`, body)} />;
+        return <AddMeetingModal projectName={name} today={qb?.today} onClose={close} onSave={(body) => post('/api/project-meetings', { project_id: pid, ...body })} />;
       })()}
       {dialog?.kind === 'project' && (
         <CreateProjectDialog

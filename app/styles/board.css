@@ -403,3 +403,8 @@ span.td-sub-title { display: block; padding: 7px 0; }
   .tc-status { max-width: 150px; min-height: 36px; font-size: 13px; }
   .tc-btn { min-height: 36px; }
 }
+button.tc-more { border: none; background: none; cursor: pointer; font-family: inherit; }
+.qa-modal .qa-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 10px; }
+.qa-modal .atm-label i { font-style: normal; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.qa-modal .qa-error { margin: 8px 0 0; }
+@media (max-width: 480px) { .qa-modal .qa-two { grid-template-columns: minmax(0, 1fr); } }

@@ -19,7 +19,7 @@ const plain = (raw) => String(raw || '').split('\n').map((l) => l.replace(/^(\s*
 // goes through these on Fridays, so the common updates happen right here: the Status Report text, a submittal's
 // status, "Received" on an attention item, "Mark done" and "+ Add task" on tasks. Anything more detailed opens
 // the project page at that section. b = the project page's own data (loadProjectPage), so rights are the same.
-export default function TeamCard({ b, menu, onAddTask, onError, refresh }) {
+export default function TeamCard({ b, menu, onAddTask, onQuickAdd, onError, refresh }) {
   const p = b.project;
   const pid = String(p.id);
   const today = b.today;
@@ -62,12 +62,13 @@ export default function TeamCard({ b, menu, onAddTask, onError, refresh }) {
     }
   }
 
-  const section = (icon, label, anchor, n, children) => (
+  // kind: the quick-add popup for this section ('submittal' | 'attention' | 'meeting'), or null.
+  const section = (icon, label, kind, n, children) => (
     <div className="tc-sec">
       <div className="tc-sec-head">
         {icon}<span>{label}</span>{n > 0 && <span className="tc-n">{n}</span>}
         <span className="spacer" />
-        {!ro && anchor && <Link href={`/projects/${pid}#${anchor}`} prefetch={false} className="tc-more" title={`Add or edit ${label.toLowerCase()} on the project page`}>+ Add</Link>}
+        {!ro && kind && <button type="button" className="tc-more" onClick={() => onQuickAdd(kind, pid)} aria-label={`Add to ${label} of ${projectTitle(p)}`}>+ Add</button>}
       </div>
       {children}
     </div>
@@ -118,7 +119,7 @@ export default function TeamCard({ b, menu, onAddTask, onError, refresh }) {
         </>
       ))}
 
-      {section(<IconFile size={13} />, 'Submittals', 'submittals', subs.length, subs.length ? (
+      {section(<IconFile size={13} />, 'Submittals', 'submittal', subs.length, subs.length ? (
         <ul className="tc-list">
           {subs.map((s) => {
             const log = submittalLog(s);
@@ -138,7 +139,7 @@ export default function TeamCard({ b, menu, onAddTask, onError, refresh }) {
         </ul>
       ) : <p className="tc-none">None.</p>)}
 
-      {section(<IconAlert size={13} />, 'Attention Items', 'attention-items', items.length, items.length ? (
+      {section(<IconAlert size={13} />, 'Attention Items', 'attention', items.length, items.length ? (
         <ul className="tc-list">
           {items.map((a) => (
             <li key={a.id} className={`tc-row${a.flag === 'overdue' ? ' late' : ''}`}>
@@ -157,7 +158,7 @@ export default function TeamCard({ b, menu, onAddTask, onError, refresh }) {
         </ul>
       ) : <p className="tc-none">None.</p>)}
 
-      {section(<IconCalendar size={13} />, 'Meetings', 'meetings', meetings.length, meetings.length ? (
+      {section(<IconCalendar size={13} />, 'Meetings', 'meeting', meetings.length, meetings.length ? (
         <ul className="tc-list">
           {meetings.map((m) => (
             <li key={m.id} className="tc-row">
