@@ -50,7 +50,9 @@
 .rs-sp-a { min-height: var(--g5); max-height: 0.45in; }
 .rs-sp-c { min-height: var(--g5); }
 
-/* ---------- masthead ---------- */
+/* ---------- masthead: fixed furniture like the title block (Neil, 2026-10-16: it keeps the same share of the paper
+   whatever the content does; only the field below it scales) ---------- */
+.rs-pack .rs-mast { --h1: 19pt; --body: 10.5pt; --g1: 2pt; --g2: 4pt; }
 .rs-pack .rs-h1 { font: 700 var(--h1)/1 var(--rs-cond); letter-spacing: .075em; text-transform: uppercase; color: var(--rs-ink); }
 .rs-pack .rs-meta { margin-top: var(--g2); font: 400 var(--body)/1.3 var(--rs-text); color: var(--rs-gray); }
 .rs-meta b { font-weight: 600; color: var(--rs-ink); }
@@ -202,6 +204,7 @@
     .rs-set { padding: 0; background: none; }
     .rs-pack:not([data-measure]) { --body: 15px; --small: 13px; --label: 12px; --title: 16px; --h1: 21px; --lh: 1.45;
       --g1: 3px; --g2: 5px; --g3: 9px; --g4: 13px; --g5: 20px; --g6: 28px; }
+    .rs-pack:not([data-measure]) .rs-mast { --h1: 21px; --body: 15px; --g1: 3px; --g2: 5px; }
     .rs-pack:not([data-measure]) .rs-sheet { width: auto; height: auto; padding: 0 2px; box-shadow: none; zoom: 1; background: none; }
     .rs-pack:not([data-measure]) .rs-frame { border: 0; height: auto; display: block; }
     .rs-pack:not([data-measure]) .rs-field { display: block; padding: 6px 0 0; overflow: visible; }
