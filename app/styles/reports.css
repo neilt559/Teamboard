@@ -7,7 +7,7 @@
 .rp-page { max-width: 8.5in; margin: 0 auto; }
 .rp-page.rs-page { max-width: none; }
 .rp-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
-.rs-page .rp-actions, .rs-page .rp-pending, .rs-page .rp-cover { max-width: 8.5in; margin-left: auto; margin-right: auto; }
+.rs-page .rp-actions, .rs-page .rp-pending, .rs-page .rp-cover { max-width: 11in; margin-left: auto; margin-right: auto; }
 .rp-actions .btn .icon { color: inherit; }
 .rp-copy .icon { color: var(--lime-dark) !important; }
 .rp-actions-note { flex: 1 1 100%; margin: 0; font-size: 12px; color: var(--muted); text-align: right; min-height: 1.2em; }

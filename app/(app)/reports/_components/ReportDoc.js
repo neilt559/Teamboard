@@ -29,23 +29,23 @@ export function PendingReviewNotice({ projects, packet = false }) {
   );
 }
 
-// One project's owner report drawn as a sheet from a CAGE plan set (design-amendments A11, direction B "Sheet 1 of
-// 2", Neil's changes): a bordered Letter sheet; the masthead with the schedule's check row; the stage stationing line;
-// two columns (the week's Status Report beside the ONE "Attention Items" list and the meetings ahead); the submittal &
-// permit log; and the title block along the bottom edge (logo + offices, project + number, owner, jurisdiction, issued,
-// prepared by, sheet n of N). No abbreviations block and no legend.
+// One project's owner report drawn as a sheet from a CAGE plan set, in landscape (Neil's mockup, 2026-10-16: "Status
+// Report Template.pdf"): a bordered Letter sheet turned sideways with the title block as a strip down the right edge
+// (logo + offices, the project turned to read up the sheet with its number, owner, jurisdiction and issue date, prepared
+// by, sheet 1 of 1). The field: the masthead; two columns (the week's Status Report with the meetings ahead under it;
+// the ONE "Attention Items" list with the schedule under it: "Status: Ahead | On Track | Behind" and the stage line);
+// the submittal & permit log across the foot. No abbreviations block and no legend.
 // Rendered on the server from a lib/queries/reports.js report object ONLY, so nothing internal can reach it: never
 // tasks, subtasks, task notes, members, project info rows, minutes or who edited what.
-// The server draws ONE sheet at full size. The fit pass (SheetFit.js + sheet-fit.js) then copies it into the empty
-// .rs-out next to it, steps spacing and type down (data-fit 0..4, floor 8.5 pt body / 7.5 pt small) and only if it
-// still doesn't fit continues onto sheet 2 with the title block repeated. The title block is its own row of the sheet,
-// so content can never print over it.
+// ALWAYS one page: the fit pass (SheetFit.js + sheet-fit.js) copies the sheet into the empty .rs-out next to it and
+// finds the largest type scale (--k) at which everything fits, so a light week reads large and a heavy week shrinks to
+// fit. The title block is its own column of the sheet, so content can never print over it.
 
 const OFFICES = [['Lisle IL', 'Chicago IL'], ['Chandler AZ', 'Asheville NC'], ['Charlotte NC', 'Lakewood CO'], ['Venice FL', 'cagecivil.com']];
 const nb = (s) => String(s ?? '').replace(/ /g, ' ');
 
 // The Status Report as the sheet's prose: paragraphs, and each header with the bullets under it as one block (blocks
-// are what the fit pass may carry over to sheet 2, so a header never ends a sheet without its bullets).
+// keep their header and bullets together).
 function proseBlocks(text) {
   const out = [];
   let group = null;
@@ -98,53 +98,43 @@ function Prose({ text }) {
   );
 }
 
-const BOX = (
-  <svg className="rs-box" viewBox="0 0 12 12" aria-hidden="true"><rect x=".5" y=".5" width="11" height="11" /><path d="M3 3l6 6M9 3l-6 6" /></svg>
-);
-const SCHED = [['behind', 'Behind'], ['on_track', 'On track'], ['ahead', 'Ahead']];
+const SCHED = [['ahead', 'Ahead'], ['on_track', 'On Track'], ['behind', 'Behind']];
 
-function Schedule({ status }) {
+// The schedule (Neil's mockup): "Status: Ahead | On Track | Behind" with the current one boxed, then the stage line.
+function Schedule({ status, steps }) {
   return (
-    <div className="rs-sched" role="group" aria-label="Schedule">
-      <p className="rs-sched-k">Schedule</p>
-      <div className="rs-checks">
-        {SCHED.map(([k, label]) => (
-          <span key={k} className={`rs-check${status === k ? ' on' : ''}${k === 'behind' ? ' behind' : ''}`}>
-            {BOX}{label}{status === k ? <span className="rs-vh"> (marked)</span> : null}
+    <section className="rs-sched" aria-label="Schedule">
+      <div className="rs-vt"><h2>Schedule</h2></div>
+      <p className="rs-status">
+        <span className="rs-status-k">Status:</span>
+        {SCHED.map(([k, label], i) => (
+          <span key={k} className="rs-status-w">
+            {i > 0 && <i aria-hidden="true">|</i>}
+            <span className={`rs-st${status === k ? ' on' : ''}${k === 'behind' ? ' behind' : ''}`}>
+              {label}{status === k ? <span className="rs-vh"> (current)</span> : null}
+            </span>
           </span>
         ))}
-      </div>
-    </div>
+      </p>
+      <Stages steps={steps} />
+    </section>
   );
 }
 
 function Stages({ steps }) {
-  if (!steps?.length) {
-    return (
-      <section className="rs-stages" aria-label="Project stages">
-        <p className="rs-stages-k">Stage <b>not set</b></p>
-      </section>
-    );
-  }
-  const at = steps.findIndex((s) => s.state === 'current');
+  if (!steps?.length) return <p className="rs-stages-k">Stage not set</p>;
   return (
-    <section className="rs-stages" aria-label="Project stages">
-      <p className="rs-stages-k">Stage <b>{at >= 0 ? `${at + 1} of ${steps.length}` : 'not set'}</b></p>
-      <ol className="rs-line" style={{ '--n': steps.length }}>
-        {steps.map((s, i) => (
-          <li key={s.key} className={`rs-seg${s.state === 'done' ? ' done' : s.state === 'current' ? ' now' : ''}`} aria-current={s.state === 'current' ? 'step' : undefined}>
-            {s.state === 'current' && (
-              <span className="rs-here" aria-hidden="true"><svg viewBox="0 0 7 6"><path d="M0 0h7L3.5 6z" fill="currentColor" /></svg>Now</span>
-            )}
-            <span className="rs-seg-name">
-              {s.label}
-              <span className="rs-vh">{s.state === 'done' ? ' (complete)' : s.state === 'current' ? ' (current stage)' : ''}</span>
-            </span>
-            {i === steps.length - 1 && <span className="rs-end" />}
-          </li>
-        ))}
-      </ol>
-    </section>
+    <ol className="rs-line" style={{ '--n': steps.length }} aria-label="Project stages">
+      {steps.map((s, i) => (
+        <li key={s.key} className={`rs-seg${s.state === 'done' ? ' done' : s.state === 'current' ? ' now' : ''}`} aria-current={s.state === 'current' ? 'step' : undefined}>
+          <span className="rs-seg-name">
+            {s.label}
+            <span className="rs-vh">{s.state === 'done' ? ' (complete)' : s.state === 'current' ? ' (current stage)' : ''}</span>
+          </span>
+          {i === steps.length - 1 && <span className="rs-end" />}
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -209,7 +199,7 @@ function statusDetail(s, reportDate) {
   const bits = [];
   if (d.date) bits.push(`${d.label} ${fmtShort(d.date, reportDate)}`);
   if (d.days) bits.push(`${d.days}-day review`);
-  return bits.join(', ');
+  return bits.map(nb).join(', ');            // each part stays whole; a line may break after the comma
 }
 
 function Log({ subs, reportDate }) {
@@ -227,7 +217,7 @@ function Log({ subs, reportDate }) {
               return (
                 <tr key={s.id} className={s.closed ? 'closed' : undefined}>
                   <td className="ag"><b>{s.agency || 'Agency not set'}</b>{s.title ? <span>{s.title}</span> : null}</td>
-                  <td className="st"><b>{s.status_label}</b>{detail ? <span>{nb(detail)}</span> : null}</td>
+                  <td className="st"><b>{s.status_label}</b>{detail ? <span>{detail}</span> : null}</td>
                   {s.next
                     ? <td className="next"><b>{fmtShort(s.next, reportDate)}</b><span>{s.next_label}</span></td>
                     : <td className="next rs-empty"><span className="rs-dash">{s.closed ? '–' : 'not set'}</span></td>}
@@ -243,6 +233,8 @@ function Log({ subs, reportDate }) {
   );
 }
 
+// The title block: a strip down the right edge (fixed furniture: it never scales with the content). The project
+// part is turned to read up the sheet, the way a plan set's title block does.
 export function TitleBlock({ p, reportDate, by }) {
   return (
     <footer className="rs-tb">
@@ -251,13 +243,17 @@ export function TitleBlock({ p, reportDate, by }) {
         <img src={logo.src} width={logo.width} height={logo.height} alt="CAGE Civil Engineering" />
         <p>{OFFICES.map(([a, b], i) => <span key={i}>{nb(a)} · {nb(b)}</span>)}</p>
       </div>
-      <div className="rs-tb-proj"><span className="rs-k">Project</span>
-        <p className="rs-name"><span className="rs-name-t">{sheetName(p)}</span>{p.project_number ? <span className="rs-no">Project No. <b>{p.project_number}</b></span> : null}</p>
-      </div>
-      <div className="rs-tb-row">
-        <div><span className="rs-k">Owner</span><p className="rs-v">{p.owner_company || '–'}</p></div>
-        <div><span className="rs-k">Jurisdiction</span><p className="rs-v">{p.jurisdiction || '–'}</p></div>
-        <div><span className="rs-k">Issued</span><p className="rs-v">{fmtIssued(reportDate)}</p></div>
+      <div className="rs-tb-proj">
+        <div className="rs-tb-name">
+          <span className="rs-k">Project</span>
+          <p className="rs-name"><span className="rs-name-t">{sheetName(p)}</span></p>
+          {p.project_number ? <p className="rs-no">Project No. <b>{p.project_number}</b></p> : null}
+        </div>
+        <div className="rs-tb-row">
+          <div><span className="rs-k">Owner</span><p className="rs-v">{p.owner_company || '–'}</p></div>
+          <div><span className="rs-k">Jurisdiction</span><p className="rs-v">{p.jurisdiction || '–'}</p></div>
+          <div><span className="rs-k">Issued</span><p className="rs-v">{fmtIssued(reportDate)}</p></div>
+        </div>
       </div>
       <div className="rs-tb-by"><span className="rs-k">Prepared by</span>
         <p className="rs-v">{by?.name || ''}{by?.position ? <span>{by.position}</span> : null}{by?.email ? <span>{by.email}</span> : null}</p>
@@ -275,33 +271,29 @@ export default function ReportSheet({ project: p, reportDate, preparedBy }) {
   return (
     <div className="rs-proj" data-report-project={p.id}>
       <div className="rs-src">
-        <div className="rs-pack" data-fit="0">
+        <div className="rs-pack" data-fit="1">
           <section className="rs-sheet" aria-label="Sheet 1 of 1">
             <div className="rs-frame">
               <div className="rs-field">
                 <header className="rs-mast">
-                  <div>
-                    <h1 className="rs-h1">Project status report</h1>
-                    <p className="rs-meta"><b>{sheetName(p)}</b><i>·</i>{fmtDayYear(reportDate)}</p>
-                    {p.report_link && (
-                      <p className="rs-docs">Project documents: <a href={p.report_link} target="_blank" rel="noopener noreferrer">Open the Egnyte folder</a></p>
-                    )}
-                  </div>
-                  <Schedule status={p.schedule_status} />
+                  <h1 className="rs-h1">Project status report</h1>
+                  <p className="rs-meta"><b>{sheetName(p)}</b><i>·</i>{fmtDayYear(reportDate)}</p>
+                  {p.report_link && (
+                    <p className="rs-docs">Project documents: <a href={p.report_link} target="_blank" rel="noopener noreferrer">Open the Egnyte folder</a></p>
+                  )}
                 </header>
                 <div className="rs-sp rs-sp-a" />
-                <Stages steps={p.steps} />
-                <div className="rs-sp rs-sp-b" />
                 <div className="rs-cols">
                   <div className="rs-col rs-col-l">
                     <section className="rs-notes" aria-label="Status report">
                       <div className="rs-vt"><h2>{sheetWeekTitle(p)}</h2></div>
                       <Prose text={p.status_body ?? p.status_report} />
                     </section>
+                    <Meetings meetings={meetings} reportDate={reportDate} />
                   </div>
                   <div className="rs-col rs-col-r">
                     {items.length > 0 && <Attention items={items} reportDate={reportDate} />}
-                    <Meetings meetings={meetings} reportDate={reportDate} />
+                    <Schedule status={p.schedule_status} steps={p.steps} />
                   </div>
                 </div>
                 <div className="rs-sp rs-sp-c" />

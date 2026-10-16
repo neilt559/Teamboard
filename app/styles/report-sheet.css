@@ -1,20 +1,19 @@
 /* ======================================================================================================================
-   The owner report sheet (design-amendments A11, direction B "Sheet 1 of 2", with Neil's changes). Imported from
-   app/layout.js after reports.css; markup in app/(app)/reports/_components/ReportDoc.js, fit pass in sheet-fit.js.
-   Drawn like a sheet from a CAGE plan set: a bordered Letter sheet, a ruled title block along the bottom edge, view
-   titles over each zone, a stationing line for the stages and an "issued for" check row for the schedule.
-   Everything sits on one sheet: the fit pass steps spacing and type down (data-fit 0 to 4, floor 8.5 pt body /
-   7.5 pt small) and only then flows onto a second sheet that repeats the title block. The title block is its own row
-   of the sheet (and the field clips), so content can never print over it.
+   The owner report sheet, landscape (Neil's mockup, 2026-10-16), drawn like a sheet from a CAGE plan set: a bordered
+   Letter sheet turned sideways with the title block as a strip down the right edge. Imported from app/layout.js after
+   reports.css; markup in app/(app)/reports/_components/ReportDoc.js, fit pass in sheet-fit.js.
+   ALWAYS one page: every type size and gap in the field is a multiple of --k, and the fit pass picks the largest --k
+   at which the field holds its content (0.5 to 1.45), so a light week reads large and a heavy week shrinks to fit.
+   The title block is fixed furniture (it never scales) and its own column of the sheet (the field clips), so content
+   can never print over it.
    Two faces: Barlow Condensed (lettering: title-block labels, the H1, section titles, stage names; the only tracked
-   caps) and Barlow (everything people wrote, every status word, the tables). Nothing under 8 pt except the floor's
-   7.5 pt small text. Lime means one thing, "the stage we are in" (the current-stage bar; the logo is the only other
-   lime). Brick means one thing, "late or behind": the revision cloud, its words, a marked Behind. Everything else is
-   ink and gray, so the sheet still reads in grayscale.
+   caps) and Barlow (everything people wrote, every status word, the tables). Lime means "where we are" (the current
+   schedule status and stage bar; the logo is the only other lime). Brick means "late or behind": the revision cloud,
+   its words, a Behind status. Everything else is ink and gray, so the sheet still reads in grayscale.
    ==================================================================================================================== */
 .rs-set {
   --rs-ink: #1F1F21; --rs-gray: #58585A; --rs-soft: #6C6C6F; --rs-rule: #B1B1B4; --rs-screen: #A3A3A6;
-  --rs-lime: #C2D02E; --rs-brick: #9A3B1F;
+  --rs-lime: #C2D02E; --rs-lime-soft: #EEF2B8; --rs-brick: #9A3B1F; --rs-brick-soft: #F6E3DC;
   --rs-cond: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
   --rs-text: 'Barlow', 'Segoe UI', Arial, sans-serif;
   container: rsset / inline-size;
@@ -29,77 +28,43 @@
 .rs-vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .rs-proj[data-fitted] > .rs-src { display: none; }
 
-/* ---------- density: the fit pass steps data-fit up until the sheet holds its content ---------- */
-.rs-pack { --body: 10pt; --small: 9pt; --label: 8.5pt; --title: 12pt; --h1: 17pt; --lh: 1.42; --sp: 1; }
-.rs-pack[data-fit="1"] { --sp: .82; }
-.rs-pack[data-fit="2"] { --body: 9.5pt; --small: 8.5pt; --label: 8pt; --title: 11.5pt; --h1: 16pt; --lh: 1.38; --sp: .7; }
-.rs-pack[data-fit="3"] { --body: 9pt; --small: 8pt; --label: 8pt; --title: 11pt; --h1: 15.5pt; --lh: 1.34; --sp: .6; }
-.rs-pack[data-fit="4"] { --body: 8.5pt; --small: 7.5pt; --label: 7.5pt; --title: 10.5pt; --h1: 15pt; --lh: 1.3; --sp: .42; }
+/* ---------- the scale: one number for every size in the field ---------- */
 .rs-pack {
-  --g1: calc(2pt * var(--sp)); --g2: calc(4pt * var(--sp)); --g3: calc(7pt * var(--sp)); --g4: calc(11pt * var(--sp));
-  --g5: calc(16pt * var(--sp)); --g6: calc(22pt * var(--sp)); font: 400 var(--body)/var(--lh) var(--rs-text);
+  --k: 1;
+  --body: calc(10.5pt * var(--k)); --small: calc(9.25pt * var(--k)); --label: calc(8.25pt * var(--k));
+  --title: calc(12.5pt * var(--k)); --h1: calc(19pt * var(--k)); --lh: 1.38;
+  --g1: calc(2pt * var(--k)); --g2: calc(4pt * var(--k)); --g3: calc(7pt * var(--k)); --g4: calc(10pt * var(--k));
+  --g5: calc(15pt * var(--k)); --g6: calc(20pt * var(--k));
+  font: 400 var(--body)/var(--lh) var(--rs-text);
 }
 
-/* ---------- the sheet ---------- */
-.rs-sheet { width: 8.5in; height: 11in; padding: 0.3in; margin: 0 auto; background: #fff; }
-.rs-frame { height: 100%; border: 1pt solid var(--rs-ink); display: flex; flex-direction: column; }
-.rs-field { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0.2in 0.32in 0.16in; display: flex; flex-direction: column; }
-.rs-pack[data-measure] .rs-field { padding-bottom: calc(0.16in + 3px); }   /* measuring keeps 3 px in hand */
+/* ---------- the sheet: Letter landscape ---------- */
+.rs-sheet { width: 11in; height: 8.5in; padding: 0.3in; margin: 0 auto; background: #fff; }
+.rs-frame { height: 100%; border: 1pt solid var(--rs-ink); display: flex; flex-direction: row; }
+.rs-field { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; padding: 0.24in 0.3in 0.2in; display: flex; flex-direction: column; }
+.rs-pack[data-measure] .rs-field { padding-bottom: calc(0.2in + 3px); }   /* measuring keeps 3 px in hand */
 .rs-field > * { flex: none; }
-/* leftover height is shared out between the zones (each gap grows to a cap); what is left after that goes above the
-   log, so the log sits on the title block the way a CAD schedule does, and a light week never leaves a band at the foot */
-.rs-field > .rs-sp { flex: 1 1 0; max-height: 0.42in; }
-.rs-sp-a { min-height: var(--g3); }
-.rs-sp-b, .rs-sp-c { min-height: var(--g5); }
-.rs-field > .rs-sp-c { max-height: none; }
+/* leftover height goes between the zones (capped), the rest above the log, so the log sits low the way a CAD
+   schedule does and a light week never leaves an empty band at the foot */
+.rs-field > .rs-sp { flex: 1 1 0; }
+.rs-sp-a { min-height: var(--g5); max-height: 0.45in; }
+.rs-sp-c { min-height: var(--g5); }
 
 /* ---------- masthead ---------- */
-.rs-mast { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.3in; }
 .rs-pack .rs-h1 { font: 700 var(--h1)/1 var(--rs-cond); letter-spacing: .075em; text-transform: uppercase; color: var(--rs-ink); }
 .rs-pack .rs-meta { margin-top: var(--g2); font: 400 var(--body)/1.3 var(--rs-text); color: var(--rs-gray); }
 .rs-meta b { font-weight: 600; color: var(--rs-ink); }
-.rs-pack .rs-docs { margin-top: 3px; font: 400 var(--small, 11px)/1.3 var(--rs-text); color: var(--rs-gray); }
-.rs-docs a { color: var(--rs-ink); font-weight: 600; text-decoration: underline; text-decoration-color: #c2d02e; text-underline-offset: 2px; }
+.rs-pack .rs-docs { margin-top: var(--g1); font: 400 var(--body)/1.3 var(--rs-text); color: var(--rs-gray); }
+.rs-docs a { color: var(--rs-ink); font-weight: 600; text-decoration: underline; text-decoration-color: var(--rs-lime); text-underline-offset: 2px; }
 .rs-meta i, .rs-item-who i { font-style: normal; padding: 0 .3em; color: var(--rs-rule); }
 
-/* schedule: the title block's "issued for" row, one box marked */
-.rs-sched { flex: none; padding-bottom: 1pt; }
-.rs-pack .rs-sched-k { font: 600 var(--small)/1 var(--rs-text); color: var(--rs-gray); margin-bottom: var(--g2); }
-.rs-checks { display: flex; gap: 12pt; }
-.rs-check { display: inline-flex; align-items: center; gap: 4.5pt; font: 500 var(--body)/1 var(--rs-text); color: var(--rs-soft); white-space: nowrap; }
-.rs-box { width: 10pt; height: 10pt; flex: none; overflow: visible; }
-.rs-box rect { fill: #fff; stroke: currentColor; stroke-width: 1.1; }
-.rs-box path { stroke: none; fill: none; }
-.rs-check.on { color: var(--rs-ink); font-weight: 700; }
-.rs-check.on .rs-box path { stroke: currentColor; stroke-width: 1.7; stroke-linecap: square; }
-.rs-check.on.behind { color: var(--rs-brick); }
-
-/* ---------- stage stationing line ---------- */
-.rs-stages-k { display: flex; align-items: baseline; gap: 6pt; font: 600 var(--small)/1 var(--rs-text); color: var(--rs-gray); }
-.rs-stages-k b { color: var(--rs-ink); font-weight: 600; }
-.rs-pack .rs-line { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); margin-top: var(--g3); }
-.rs-seg { position: relative; padding-top: 15pt; }
-/* the run between two stations: screened solid = complete, heavy lime bar = current, dashed = ahead */
-.rs-seg::before { content: ""; position: absolute; left: 0; right: 0; top: 5.25pt; border-top: 1pt dashed var(--rs-ink); }
-.rs-seg.done::before { border-top: 1.5pt solid var(--rs-screen); top: 5pt; }
-.rs-seg.now::before { top: 2pt; height: 7pt; border: 0.75pt solid var(--rs-ink); background: var(--rs-lime); }
-/* station ticks */
-.rs-seg::after { content: ""; position: absolute; left: 0; top: 0; height: 11pt; border-left: 0.75pt solid var(--rs-ink); }
-.rs-seg .rs-end { position: absolute; right: 0; top: 0; height: 11pt; border-left: 0.75pt solid var(--rs-ink); }
-.rs-seg-name { display: block; padding: 0 4pt 0 3pt; font: 600 var(--label)/1.15 var(--rs-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--rs-gray); }
-.rs-seg.done .rs-seg-name { color: var(--rs-soft); font-weight: 500; }
-.rs-seg.now .rs-seg-name { color: var(--rs-ink); font-weight: 700; }
-.rs-here { position: absolute; left: 0; bottom: 100%; margin-bottom: 2.5pt; display: flex; align-items: center; gap: 3pt; font: 600 var(--label)/1 var(--rs-text); }
-.rs-here svg { width: 7pt; height: 6pt; }
-
-/* ---------- two columns: the week's notes beside what is open and what is coming ---------- */
-.rs-cols { display: grid; grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); column-gap: 0.32in; align-items: start; }
+/* ---------- two columns ---------- */
+.rs-cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 0.42in; align-items: start; }
 .rs-col > section + section { margin-top: var(--g6); }
 
 /* view titles: lettering on a heavy line, a quiet count at the right end (where a drawing puts the scale) */
 .rs-vt { display: flex; align-items: baseline; justify-content: space-between; gap: 8pt; padding-bottom: var(--g2); border-bottom: 1pt solid var(--rs-ink); }
 .rs-pack .rs-vt h2 { font: 700 var(--title)/1 var(--rs-cond); letter-spacing: .075em; text-transform: uppercase; color: var(--rs-ink); }
-.rs-vt h2 small { font: 500 var(--small)/1 var(--rs-text); letter-spacing: 0; text-transform: none; color: var(--rs-soft); margin-left: 5pt; }
 .rs-vt p { font: 500 var(--small)/1 var(--rs-text); color: var(--rs-soft); white-space: nowrap; }
 .rs-none { color: var(--rs-soft); font-style: normal; }
 .rs-pack .rs-pad { padding-top: var(--g3); }
@@ -110,10 +75,10 @@
 .rs-pack .rs-prose .rs-grp h3 { font: 600 var(--body)/1.3 var(--rs-text); color: var(--rs-ink); }
 .rs-pack .rs-prose > .rs-grp { margin-top: var(--g4); }
 .rs-pack .rs-prose h3 + ul { margin-top: var(--g1); }
-.rs-prose li { position: relative; padding-left: 11pt; }
-.rs-prose li.lv1 { margin-left: 11pt; }
-.rs-prose li.lv2 { margin-left: 22pt; }
-.rs-prose li.lv3 { margin-left: 33pt; }
+.rs-prose li { position: relative; padding-left: 1.05em; }
+.rs-prose li.lv1 { margin-left: 1.05em; }
+.rs-prose li.lv2 { margin-left: 2.1em; }
+.rs-prose li.lv3 { margin-left: 3.15em; }
 .rs-prose li + li { margin-top: var(--g2); }
 .rs-prose li::before { content: "\2013"; position: absolute; left: 0; color: var(--rs-gray); }
 .rs-pack .rs-prose > .rs-blk:first-child { margin-top: 0; }
@@ -122,27 +87,48 @@
 /* attention items: ONE list, numbered like keynotes; late first, then by need-by date, undated last */
 .rs-items { counter-reset: rsn; }
 .rs-pack .rs-items > ol { padding-top: var(--g4); }
-.rs-item { position: relative; padding-left: 17pt; counter-increment: rsn; break-inside: avoid; }
+.rs-item { position: relative; padding-left: 1.65em; counter-increment: rsn; break-inside: avoid; }
 .rs-item + .rs-item { margin-top: var(--g4); }
-.rs-item::before { content: counter(rsn); position: absolute; left: 0; top: .1em; width: 11pt; height: 11pt; display: grid; place-items: center;
+.rs-item::before { content: counter(rsn); position: absolute; left: 0; top: .1em; width: 1.1em; height: 1.1em; display: grid; place-items: center;
   font: 700 var(--label)/1 var(--rs-text); border: 0.75pt solid var(--rs-ink); border-radius: 50%; }
 .rs-item-what { display: block; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
 .rs-item-who { display: block; color: var(--rs-gray); font-size: var(--small); line-height: 1.38; margin-top: 1pt; overflow-wrap: anywhere; }
 .rs-late-note { color: var(--rs-brick); font-weight: 600; white-space: nowrap; }
 /* the one flourish: a redline revision cloud around what is late (server SVG, redrawn to the measured box) */
 .rs-item.late { margin-top: calc(var(--g4) + 6pt); margin-bottom: 7pt; }
-.rs-item.late + .rs-item.late { margin-top: max(calc(var(--g4) + 6pt), 12.5pt); }   /* two clouds never touch */
-.rs-items ol > .rs-item.late:first-child { margin-top: 7pt; }   /* the ol padding sits above it: room for the cloud */
+.rs-item.late + .rs-item.late { margin-top: max(calc(var(--g4) + 6pt), 12.5pt); }
+.rs-items ol > .rs-item.late:first-child { margin-top: 7pt; }
 .rs-cloud { position: absolute; pointer-events: none; overflow: visible; width: calc(100% + 14px); height: calc(100% + 8px); }
 
 /* meetings ahead */
 .rs-pack .rs-mtgs { margin-top: var(--g1); }
-.rs-mtg { display: grid; grid-template-columns: 0.74in minmax(0, 1fr); column-gap: 7pt; padding: calc(var(--g3) - 1pt) 0 var(--g3); border-bottom: 0.5pt solid var(--rs-rule); break-inside: avoid; }
+.rs-mtg { display: grid; grid-template-columns: 7.2em minmax(0, 1fr); column-gap: 7pt; padding: calc(var(--g3) - 1pt) 0 var(--g3); border-bottom: 0.5pt solid var(--rs-rule); break-inside: avoid; }
 .rs-mtg:last-child { border-bottom: 0; padding-bottom: 0; }
 .rs-mtg-when { font: 600 var(--small)/1.38 var(--rs-text); }
 .rs-mtg-when span { display: block; font-weight: 500; color: var(--rs-gray); }
 .rs-mtg-what { font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
 .rs-mtg-where { display: block; font: 400 var(--small)/1.38 var(--rs-text); color: var(--rs-gray); margin-top: 1pt; }
+
+/* ---------- schedule: "Status: Ahead | On Track | Behind" with the current one boxed, then the stage line ---------- */
+.rs-pack .rs-status { margin-top: var(--g4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--g1) 0; font: 400 var(--body)/1.2 var(--rs-text); color: var(--rs-soft); }
+.rs-status-k { color: var(--rs-ink); margin-right: .45em; }
+.rs-status-w { display: inline-flex; align-items: center; }
+.rs-status-w > i { font-style: normal; color: var(--rs-rule); padding: 0 .35em; }
+.rs-st { padding: .18em .45em; border: 0.75pt solid transparent; }
+.rs-st.on { color: var(--rs-ink); font-weight: 600; background: var(--rs-lime-soft); border-color: var(--rs-lime); }
+.rs-st.on.behind { color: var(--rs-brick); background: var(--rs-brick-soft); border-color: var(--rs-brick); }
+.rs-stages-k { margin-top: var(--g3); font: 500 var(--small)/1 var(--rs-text); color: var(--rs-soft); }
+/* the stage stationing line: screened solid = complete, heavy lime bar = current, dashed = ahead */
+.rs-pack .rs-line { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); margin-top: var(--g5); }
+.rs-seg { position: relative; padding-top: calc(13pt * var(--k)); }
+.rs-seg::before { content: ""; position: absolute; left: 0; right: 0; top: calc(4.5pt * var(--k)); border-top: 1pt dashed var(--rs-ink); }
+.rs-seg.done::before { border-top: 1.5pt solid var(--rs-screen); }
+.rs-seg.now::before { top: calc(1.5pt * var(--k)); height: calc(6.5pt * var(--k)); border: 0.75pt solid var(--rs-ink); background: var(--rs-lime); }
+.rs-seg::after { content: ""; position: absolute; left: 0; top: 0; height: calc(9.5pt * var(--k)); border-left: 0.75pt solid var(--rs-ink); }
+.rs-seg .rs-end { position: absolute; right: 0; top: 0; height: calc(9.5pt * var(--k)); border-left: 0.75pt solid var(--rs-ink); }
+.rs-seg-name { display: block; padding: 0 3pt 0 2pt; font: 600 var(--label)/1.15 var(--rs-cond); letter-spacing: .05em; text-transform: uppercase; color: var(--rs-gray); }
+.rs-seg.done .rs-seg-name { color: var(--rs-soft); font-weight: 500; }
+.rs-seg.now .rs-seg-name { color: var(--rs-ink); font-weight: 700; }
 
 /* ---------- submittal & permit log: a schedule, gridded the way CAD schedules are ---------- */
 .rs-pack .rs-log table { margin-top: var(--g1); width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font: 400 var(--small)/1.36 var(--rs-text); }
@@ -159,66 +145,67 @@
 .rs-log .bic { font-weight: 600; }
 .rs-log tr.closed td, .rs-log tr.closed td b, .rs-log tr.closed td span { color: var(--rs-soft); }
 .rs-log tr.closed td b { font-weight: 500; }
-/* a closed row is history: one quiet line where it fits */
 .rs-log tr.closed td > b, .rs-log tr.closed td > span { display: inline; }
 .rs-log tr.closed td > b + span { margin-left: .35em; }
 .rs-log .rs-dash { color: var(--rs-soft); }
 
-/* ---------- title block (fixed furniture: it never scales with the content) ----------
-   | logo + offices | PROJECT name ........ No. | PREPARED BY | SHEET   |
-   |                | OWNER | JURISDICTION | ISSUED |  (3 lines)  | 1 of 1  | */
-.rs-tb { flex: none; border-top: 1pt solid var(--rs-ink); display: grid; grid-template-columns: 1.74in minmax(0, 1fr) 1.62in 1.08in; grid-template-rows: auto auto; color: var(--rs-ink); }
-.rs-tb > div { border-left: 0.5pt solid var(--rs-rule); padding: 5.5pt 8pt 6pt; min-width: 0; }
-.rs-tb > div:first-child { border-left: 0; }
-.rs-tb .rs-k { display: block; font: 600 8pt/1 var(--rs-cond); letter-spacing: .12em; text-transform: uppercase; color: var(--rs-gray); margin-bottom: 3.5pt; }
+/* ---------- title block: a strip down the right edge (fixed furniture: it never scales with the content) ----------
+   logo + offices / PROJECT (turned to read up the sheet: name, number; owner, jurisdiction, issued) / PREPARED BY /
+   SHEET 1 of 1 */
+.rs-tb { flex: 0 0 1.62in; border-left: 1pt solid var(--rs-ink); display: flex; flex-direction: column; color: var(--rs-ink); min-height: 0; }
+.rs-tb > div { border-top: 0.5pt solid var(--rs-rule); padding: 6pt 8pt; min-width: 0; }
+.rs-tb > div:first-child { border-top: 0; }
+.rs-tb .rs-k { display: block; font: 600 7.5pt/1 var(--rs-cond); letter-spacing: .12em; text-transform: uppercase; color: var(--rs-gray); margin-bottom: 3pt; }
 .rs-tb .rs-v { font: 500 9pt/1.25 var(--rs-text); overflow-wrap: anywhere; }
-.rs-tb .rs-tb-firm { grid-row: 1 / 3; display: flex; flex-direction: column; justify-content: space-between; gap: 5pt; padding: 8pt 10pt 6pt; }
-.rs-tb-firm img { display: block; width: 1.32in; height: auto; }
-.rs-tb-firm p { font: 400 8pt/1.27 var(--rs-text); color: var(--rs-gray); }
+.rs-tb .rs-tb-firm { padding: 8pt 8pt 7pt; }
+.rs-tb-firm img { display: block; width: 100%; height: auto; }
+.rs-tb-firm p { margin-top: 5pt; font: 400 7.5pt/1.3 var(--rs-text); color: var(--rs-gray); }
 .rs-tb-firm p span { display: block; }
-.rs-tb-proj { grid-column: 2; grid-row: 1; }
-.rs-tb-proj .rs-name { display: flex; align-items: baseline; justify-content: space-between; gap: 8pt; font: 700 20pt/1 var(--rs-cond); letter-spacing: .01em; }
-.rs-name-t { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.rs-tb-proj .rs-no { font: 500 9pt/1 var(--rs-text); letter-spacing: 0; color: var(--rs-gray); white-space: nowrap; }
-.rs-tb-proj .rs-no b { font-weight: 600; color: var(--rs-ink); }
-.rs-tb .rs-tb-row { grid-column: 2; grid-row: 2; display: grid; grid-template-columns: 1.42fr 1.15fr 1fr; padding: 0; border-top: 0.5pt solid var(--rs-rule); }
-.rs-tb-row > div { padding: 5.5pt 8pt 6pt; min-width: 0; }
-.rs-tb-row > div + div { border-left: 0.5pt solid var(--rs-rule); }
-.rs-tb-by { grid-column: 3; grid-row: 1 / 3; }
-.rs-tb-by .rs-v span { display: block; color: var(--rs-gray); font-weight: 400; }
-.rs-tb-sheet { grid-column: 4; grid-row: 1 / 3; display: flex; flex-direction: column; }
+/* the project, turned 90 degrees to read bottom to top: the name column, then owner / jurisdiction / issued */
+.rs-tb .rs-tb-proj { flex: 1 1 auto; min-height: 0; padding: 0; display: flex; flex-direction: column; writing-mode: vertical-rl; transform: rotate(180deg); overflow: hidden; }
+/* (in the turned box the block axis runs across the strip: the name column and the details column sit side by side,
+   each the full height; inline runs up the sheet) */
+.rs-tb-name { flex: 1 1 auto; padding: 10pt 7pt; min-width: 0; }
+.rs-tb .rs-tb-proj .rs-k { margin: 0; margin-block-end: 3pt; }
+.rs-tb-name .rs-name { font: 700 19pt/1.02 var(--rs-cond); letter-spacing: .01em; overflow-wrap: anywhere; }
+.rs-name-t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rs-tb-name .rs-no { margin-block-start: 5pt; text-align: end; font: 500 9pt/1 var(--rs-text); color: var(--rs-gray); white-space: nowrap; }
+.rs-tb-name .rs-no b { font-weight: 600; color: var(--rs-ink); }
+.rs-tb .rs-tb-row { flex: none; display: flex; flex-direction: row; border-block-start: 0.5pt solid var(--rs-rule); }
+.rs-tb-row > div { flex: 1 1 0; min-width: 0; padding: 8pt 6pt; overflow: hidden; }
+.rs-tb-row > div + div { border-top: 0; border-left: 0; border-inline-start: 0.5pt solid var(--rs-rule); }
+.rs-tb-row .rs-v { font-size: 8.5pt; }
+.rs-tb-by .rs-v span { display: block; color: var(--rs-gray); font-weight: 400; font-size: 8pt; overflow-wrap: anywhere; }
+.rs-tb-sheet { display: flex; flex-direction: column; min-height: 1.15in; }
 .rs-tb-title { font: 600 9pt/1.2 var(--rs-text); }
 .rs-pack .rs-n { margin-top: auto; display: flex; align-items: baseline; gap: 4pt; }
 .rs-num { font: 700 34pt/0.78 var(--rs-cond); }
 .rs-of { font: 600 9pt/1 var(--rs-text); color: var(--rs-gray); }
 
-/* ---------- screen: the same sheets on a drafting-table gray, scaled to the space ---------- */
+/* ---------- screen: the sheet on a drafting-table gray, scaled to the space ---------- */
 @media screen {
   .rs-set { background: #ECECEE; border-radius: 10px; padding: 0.3in 0 0.4in; }
   .rs-sheet { box-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 4px 18px rgba(0, 0, 0, .06); }
-  .rs-sheet + .rs-sheet, .rs-proj + .rs-proj { margin-top: 0.25in; }
-  @container rsset (min-width: 1090px) { .rs-pack:not([data-measure]) .rs-sheet { zoom: 1.32; } }
-  @container rsset (min-width: 760px) and (max-width: 829px) { .rs-pack:not([data-measure]) .rs-sheet { zoom: .92; } }
+  .rs-proj + .rs-proj { margin-top: 0.25in; }
+  @container rsset (min-width: 1300px) { .rs-pack:not([data-measure]) .rs-sheet { zoom: 1.15; } }
+  @container rsset (min-width: 950px) and (max-width: 1099px) { .rs-pack:not([data-measure]) .rs-sheet { zoom: .86; } }
+  @container rsset (min-width: 760px) and (max-width: 949px) { .rs-pack:not([data-measure]) .rs-sheet { zoom: .69; } }
 }
 /* measuring always uses the sheet as it prints */
-.rs-pack[data-measure] .rs-sheet { zoom: 1 !important; width: 8.5in !important; height: 11in !important; padding: 0.3in !important; }
+.rs-pack[data-measure] .rs-sheet { zoom: 1 !important; width: 11in !important; height: 8.5in !important; padding: 0.3in !important; }
 
-/* ---------- phone: the sheets become one reading column; the title block closes it ---------- */
+/* ---------- phone: the sheet becomes one reading column; the title block closes it ---------- */
 @media screen {
   @container rsset (max-width: 759px) {
     .rs-set { padding: 0; background: none; }
-    .rs-pack:not([data-measure]), .rs-pack:not([data-measure])[data-fit] { --body: 15px; --small: 13px; --label: 12px; --title: 16px; --h1: 21px; --lh: 1.45; --sp: 1; }
+    .rs-pack:not([data-measure]) { --body: 15px; --small: 13px; --label: 12px; --title: 16px; --h1: 21px; --lh: 1.45;
+      --g1: 3px; --g2: 5px; --g3: 9px; --g4: 13px; --g5: 20px; --g6: 28px; }
     .rs-pack:not([data-measure]) .rs-sheet { width: auto; height: auto; padding: 0 2px; box-shadow: none; zoom: 1; background: none; }
-    .rs-pack:not([data-measure]) .rs-sheet + .rs-sheet { margin-top: 0; }
     .rs-pack:not([data-measure]) .rs-frame { border: 0; height: auto; display: block; }
     .rs-pack:not([data-measure]) .rs-field { display: block; padding: 6px 0 0; overflow: visible; }
     .rs-pack:not([data-measure]) .rs-field > .rs-sp { display: none; }
-    .rs-pack:not([data-measure]) .rs-mast { display: block; }
-    .rs-pack:not([data-measure]) .rs-sched { margin-top: 20px; }
-    .rs-pack:not([data-measure]) .rs-checks { flex-wrap: wrap; gap: 8px 18px; }
-    .rs-pack:not([data-measure]) .rs-stages { margin-top: 28px; }
     /* the stage line turns vertical: same marks, top to bottom */
-    .rs-pack:not([data-measure]) .rs-line { grid-template-columns: 1fr; margin-top: 10px; }
+    .rs-pack:not([data-measure]) .rs-line { grid-template-columns: 1fr; margin-top: 12px; }
     .rs-pack:not([data-measure]) .rs-seg { padding: 0 0 0 26px; min-height: 34px; display: flex; align-items: center; }
     .rs-pack:not([data-measure]) .rs-seg::before { left: 7px; right: auto; top: 0; bottom: 0; width: 0; height: auto; border-top: 0; border-left: 1.5px dashed var(--rs-ink); }
     .rs-pack:not([data-measure]) .rs-seg.done::before { top: 0; border-top: 0; border-left: 2px solid var(--rs-screen); left: 6.75px; }
@@ -226,19 +213,16 @@
     .rs-pack:not([data-measure]) .rs-seg::after { left: 1px; top: 0; height: 0; width: 14px; border-left: 0; border-top: 1px solid var(--rs-ink); }
     .rs-pack:not([data-measure]) .rs-seg .rs-end { left: 1px; right: auto; top: auto; bottom: 0; height: 0; width: 14px; border-left: 0; border-top: 1px solid var(--rs-ink); }
     .rs-pack:not([data-measure]) .rs-seg-name { font-size: 14px; padding: 0; }
-    .rs-pack:not([data-measure]) .rs-here { left: auto; right: 0; bottom: auto; top: 50%; transform: translateY(-50%); margin: 0; flex-direction: row-reverse; }
-    .rs-pack:not([data-measure]) .rs-here svg { transform: rotate(90deg); }
-    /* one reading column: notes, then what is open, then meetings, whichever column the sheet put them in */
-    .rs-pack:not([data-measure]) .rs-cols { display: flex; flex-direction: column; margin-top: 34px; gap: 34px; }
+    /* one reading column: notes, then what is open, then the schedule, then meetings */
+    .rs-pack:not([data-measure]) .rs-cols { display: flex; flex-direction: column; margin-top: 30px; gap: 34px; }
     .rs-pack:not([data-measure]) .rs-col { display: contents; }
     .rs-pack:not([data-measure]) .rs-col > section + section { margin-top: 0; }
     .rs-pack:not([data-measure]) .rs-notes { order: 1; }
     .rs-pack:not([data-measure]) .rs-items { order: 2; }
-    .rs-pack:not([data-measure]) .rs-meet { order: 3; }
+    .rs-pack:not([data-measure]) .rs-sched { order: 3; }
+    .rs-pack:not([data-measure]) .rs-meet { order: 4; }
     .rs-pack:not([data-measure]) .rs-item.late { margin-top: calc(var(--g4) + 8px); }
     .rs-pack:not([data-measure]) .rs-log { margin-top: 34px; }
-    .rs-pack:not([data-measure]) .rs-tb { display: none; }
-    .rs-pack:not([data-measure]) .rs-sheet:last-child .rs-tb { display: grid; }
     .rs-pack:not([data-measure]) .rs-log table, .rs-pack:not([data-measure]) .rs-log tbody, .rs-pack:not([data-measure]) .rs-log tr,
     .rs-pack:not([data-measure]) .rs-log td { display: block; width: auto !important; }
     .rs-pack:not([data-measure]) .rs-log thead, .rs-pack:not([data-measure]) .rs-log colgroup { display: none; }
@@ -251,23 +235,24 @@
     .rs-pack:not([data-measure]) .rs-log .st b, .rs-pack:not([data-measure]) .rs-log .next b { display: inline; }
     .rs-pack:not([data-measure]) .rs-log .st span, .rs-pack:not([data-measure]) .rs-log .next span { display: inline; margin-left: 6px; }
     .rs-pack:not([data-measure]) .rs-log td.rs-empty { display: none; }
-    .rs-pack:not([data-measure]) .rs-tb { margin-top: 36px; height: auto; grid-template-columns: 1fr 1fr; grid-template-rows: none; border-top: 1pt solid var(--rs-ink); }
-    .rs-pack:not([data-measure]) .rs-tb > div { border-left: 0; border-bottom: 0.5pt solid var(--rs-rule); padding: 9px 0 10px; }
-    .rs-pack:not([data-measure]) .rs-tb-firm, .rs-pack:not([data-measure]) .rs-tb-proj, .rs-pack:not([data-measure]) .rs-tb .rs-tb-row,
-    .rs-pack:not([data-measure]) .rs-tb-by { grid-column: 1 / 3; grid-row: auto; }
-    .rs-pack:not([data-measure]) .rs-tb .rs-tb-firm { padding: 16px 0 12px; gap: 10px; }
-    .rs-pack:not([data-measure]) .rs-tb .rs-tb-row { border-top: 0; padding: 0; }
-    .rs-pack:not([data-measure]) .rs-tb-row > div { padding: 9px 0 10px; }
-    .rs-pack:not([data-measure]) .rs-tb-row > div + div { padding-left: 12px; }
-    .rs-pack:not([data-measure]) .rs-tb .rs-tb-by { border-bottom: 0; }
+    /* the title block closes the column, upright */
+    .rs-pack:not([data-measure]) .rs-tb { margin-top: 36px; border-left: 0; border-top: 1pt solid var(--rs-ink); display: block; }
+    .rs-pack:not([data-measure]) .rs-tb > div { border-top: 0; border-bottom: 0.5pt solid var(--rs-rule); padding: 10px 0; }
+    .rs-pack:not([data-measure]) .rs-tb-firm img { width: 150px; }
+    .rs-pack:not([data-measure]) .rs-tb .rs-tb-proj { writing-mode: horizontal-tb; transform: none; display: block; overflow: visible; }
+    .rs-pack:not([data-measure]) .rs-tb-name { padding: 0 0 8px; }
+    .rs-pack:not([data-measure]) .rs-tb-name .rs-no { margin: 4px 0 0; padding: 0; }
+    .rs-pack:not([data-measure]) .rs-tb .rs-tb-row { border-right: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .rs-pack:not([data-measure]) .rs-tb-row > div { padding: 8px 8px 0 0; }
+    .rs-pack:not([data-measure]) .rs-tb-row > div + div { border-inline-start: 0; }
     .rs-pack:not([data-measure]) .rs-tb-sheet { display: none; }
     .rs-pack:not([data-measure]) .rs-tb .rs-v span { display: inline; }
     .rs-pack:not([data-measure]) .rs-tb .rs-v span::before { content: "\00a0\00b7\00a0"; }
   }
 }
 
-/* ---------- print (Save as PDF): the page margin is the sheet's white edge; each sheet fills one page ---------- */
-@page { size: letter; margin: 0.3in; }
+/* ---------- print (Save as PDF): Letter landscape; the page margin is the sheet's white edge ---------- */
+@page { size: letter landscape; margin: 0.3in; }
 @media print {
   html, body { background: #fff !important; }
   .app-shell .app-header, .app-shell .shell-side, .app-shell .bottom-nav, .app-shell .drawer, .skip-link, .shell-banner,
@@ -277,9 +262,10 @@
   .rp-page { max-width: none; margin: 0; padding: 0; }
   .rs-set { container-type: normal; padding: 0; background: none; border-radius: 0; }
   .rs-proj + .rs-proj { margin-top: 0; }
-  .rs-sheet { width: 7.9in; height: calc(11in - 0.6in - 1px); padding: 0; margin: 0; box-shadow: none; zoom: 1; break-after: page; page-break-after: always; break-inside: avoid; }
+  .rs-sheet { width: calc(11in - 0.6in); height: calc(8.5in - 0.6in - 1px); padding: 0; margin: 0; box-shadow: none; zoom: 1; break-after: page; page-break-after: always; break-inside: avoid; }
   .rs-proj:last-child .rs-sheet:last-child { break-after: auto; page-break-after: auto; }
   a { color: inherit; text-decoration: none; }
+  .rs-docs a { text-decoration: underline; text-decoration-color: var(--rs-lime); }
 }
 
 /* a container query can't style the container itself: the phone reading column drops the drafting-table gray here */

@@ -18,7 +18,7 @@ export default function SheetFit() {
       const res = fitAll(document);
       if (set) {
         set.setAttribute('data-ready', '1');
-        set.setAttribute('data-fit-result', JSON.stringify(res.map((r) => ({ id: r.id, mode: r.mode, sheets: r.sheets, level: r.level, ok: r.ok, error: r.error }))));
+        set.setAttribute('data-fit-result', JSON.stringify(res.map((r) => ({ id: r.id, mode: r.mode, sheets: r.sheets, level: r.level, k: r.k, ok: r.ok, error: r.error }))));
       }
     };
     const fonts = typeof document !== 'undefined' ? document.fonts : null;
