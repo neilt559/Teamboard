@@ -125,6 +125,7 @@ function projectHtml(p, i, { reportDate, preparedBy }) {
     + (items.length ? h2('Attention Items', `${items.length} open${late ? `, ${late} late` : ''}`) + itemsHtml(items, reportDate) : '')
     + h2('Meetings ahead', meetings.length ? `Next ${meetings.length}` : '') + meetingsHtml(meetings, reportDate)
     + h2('Submittal & permit log', subs.length ? logCount(subs) : '') + logHtml(subs, reportDate)
+    + (p.report_note ? `<p style="margin:10px 0 0;font-size:12px;color:#8a8a8d;"><b style="color:${GRAY};">Notes:</b> ${esc(p.report_note)}</p>` : '')
     + `<p style="margin:18px 0 0;padding-top:8px;border-top:1px solid ${RULE};font-size:12.5px;color:${GRAY};">`
     + `${by ? `Prepared by ${by} &middot; ` : ''}Issued ${esc(fmtIssued(reportDate))} &middot; CAGE Civil Engineering &middot; cagecivil.com</p>`
     + '</div>';
@@ -185,7 +186,8 @@ function projectText(p, { reportDate, preparedBy }) {
       if (s.note) L.push(`  Notes: ${s.note}`);
     }
   } else L.push('No submittals.');
-  const by = [preparedBy?.name, preparedBy?.position, preparedBy?.email].filter(Boolean).join(', ');
+  if (p.report_note) L.push('', `Notes: ${p.report_note}`);
+  const by =[preparedBy?.name, preparedBy?.position, preparedBy?.email].filter(Boolean).join(', ');
   L.push('', `${by ? `Prepared by ${by} · ` : ''}Issued ${fmtIssued(reportDate)} · CAGE Civil Engineering · cagecivil.com`);
   return L.join('\n');
 }

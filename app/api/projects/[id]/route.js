@@ -3,7 +3,7 @@ import { projectAccess, requireVisibleProject, canManageProject, canMoveProject,
 import { guardedPatch, norm } from '@/lib/patch';
 import { moveTarget, deleteProject, PROJECT_NORM, currentStageFallbackSql, shapeProjectRow } from '@/lib/queries/project';
 import { ROSTER_LOCK_SQL, TEAM_MOVE_SELECT, teamMoveCtes } from '@/lib/rosters';
-import { STAGE_KEYS, SCHEDULE_KEYS, checkStages, stagesJson, parseStages, normReportLink } from '@/lib/projects';
+import { STAGE_KEYS, SCHEDULE_KEYS, checkStages, stagesJson, parseStages, normReportLink, normReportNote, REPORT_NOTE_MAX } from '@/lib/projects';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -30,10 +30,12 @@ const COLUMNS = {
   schedule_status: { type: 'text' },
   // The report's Egnyte folder link (2026-10-15): anyone who can see the project, base-compared like the notes.
   report_link: { type: 'text', text: true, norm: (v) => normReportLink(v) ?? '' },
+  // The report's foot note (2026-10-16): anyone who can see the project, base-compared like the notes.
+  report_note: { type: 'text', text: true, norm: (v) => normReportNote(v) ?? '' },
 };
 // Fields that need canManageProject (team_id: canMoveProject, below). Everything else: anyone who can see it.
 const MANAGE = ['name', 'archived', 'position', 'project_number', 'owner_company', 'jurisdiction', 'stages'];
-const TEXT = ['name', 'notes', 'project_number', 'owner_company', 'jurisdiction', 'report_link'];
+const TEXT = ['name', 'notes', 'project_number', 'owner_company', 'jurisdiction', 'report_link', 'report_note'];
 const REQUIRED = {
   name: 'A project needs a name.',
   project_number: 'A project needs a project number.',
@@ -68,6 +70,7 @@ export const PATCH = handle(async ({ viewer, params, body, now }) => {
   for (const [k, msg] of Object.entries(REQUIRED)) if (has(b, k) && !COLUMNS[k].norm(b[k])) throw bad(msg);
   if (has(b, 'position') && (b.position === null || b.position === '' || !Number.isFinite(Number(b.position)))) throw bad();
   if (has(b, 'report_link') && normReportLink(b.report_link) === null) throw bad('Paste a web link to the folder (https://…).');
+  if (has(b, 'report_note') && (typeof b.report_note !== 'string' || normReportNote(b.report_note) === null)) throw bad(`Keep the report note to ${REPORT_NOTE_MAX} characters.`);
   const patch = { ...b };
   const columns = { ...COLUMNS };
   const extra = [];                                          // more SET items: (bind) => 'col = <expr>'

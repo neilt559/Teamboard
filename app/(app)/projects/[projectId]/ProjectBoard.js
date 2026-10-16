@@ -15,6 +15,7 @@ import TaskTable from './TaskTable';
 import ArchivedTasks from './ArchivedTasks';
 import ProjectInfo from './ProjectInfo';
 import ReportLink from './ReportLink';
+import ReportNote from './ReportNote';
 import MembersPanel from './MembersPanel';
 import Submittals from './Submittals';
 import AttentionItems from './AttentionItems';
@@ -664,6 +665,9 @@ export default function ProjectBoard({ initial }) {
       <ProjectInfo rows={d.info} ctx={ctx} />
 
       <MembersPanel project={p} members={d.members} ro={ro} actions={actions} ask={ask} />
+
+      {/* Neil, 2026-10-16: the report's foot note, at the very bottom of the project page. */}
+      <ReportNote project={p} ro={ro} actions={actions} conflictUI={conflictUI} />
 
       {details && d.can.manage && !ro && (
         <ProjectDetailsDialog project={p} options={d.field_options} onSaved={detailsSaved} onClose={() => setDetails(false)} />

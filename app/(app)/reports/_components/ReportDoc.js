@@ -297,6 +297,8 @@ export default function ReportSheet({ project: p, reportDate, preparedBy }) {
                 </div>
                 <div className="rs-sp rs-sp-c" />
                 <Log subs={p.submittals || []} reportDate={reportDate} />
+                {/* Neil 2026-10-16: a small gray "Notes: ..." line across the foot, no header. */}
+                {p.report_note ? <p className="rs-foot-note"><b>Notes:</b> {p.report_note}</p> : null}
               </div>
               <TitleBlock p={p} reportDate={reportDate} by={preparedBy} />
             </div>

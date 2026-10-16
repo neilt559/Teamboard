@@ -143,6 +143,9 @@
 .rs-log thead th:first-child, .rs-log tbody td:first-child { border-left: 0; padding-left: 0; }
 .rs-log thead th:last-child, .rs-log tbody td:last-child { border-right: 0; padding-right: 0; }
 .rs-log td b { display: block; font-weight: 600; }
+/* the report note (2026-10-16): smaller than everything else in the field (capped below the fixed masthead type on a light week), light gray, no header */
+.rs-pack .rs-foot-note { margin-top: var(--g3); font: 400 min(calc(7.75pt * var(--k)), 9pt)/1.35 var(--rs-text); color: #8a8a8d; overflow-wrap: anywhere; }
+.rs-foot-note b { font-weight: 600; color: var(--rs-gray); }
 .rs-log td span { display: block; color: var(--rs-gray); }
 .rs-log .bic { font-weight: 600; }
 .rs-log tr.closed td, .rs-log tr.closed td b, .rs-log tr.closed td span { color: var(--rs-soft); }

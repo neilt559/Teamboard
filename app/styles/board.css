@@ -362,6 +362,9 @@ span.td-sub-title { display: block; padding: 7px 0; }
 .rl-input { flex: 1 1 auto; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: #fff; font-size: 13.5px; }
 .rl-input:focus { border-color: var(--lime-dark); outline: none; }
 .rl-ro { font-size: 13.5px; color: var(--ink); overflow-wrap: anywhere; }
+.rn-input { display: block; width: 100%; min-height: 52px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: #fff; font: inherit; font-size: 13.5px; line-height: 1.4; }
+.rn-input:focus { border-color: var(--lime-dark); outline: none; }
+.rn-ro { margin: 0; font-size: 13.5px; color: var(--ink); overflow-wrap: anywhere; }
 .info-old > summary { cursor: pointer; margin: 0; color: var(--ink-2); }
 .info-old[open] > summary { margin-bottom: 8px; }
 @media (max-width: 720px) {
@@ -369,6 +372,7 @@ span.td-sub-title { display: block; padding: 7px 0; }
   .rv-head .btn { min-height: 40px; }
   .rl-row { flex-wrap: wrap; }
   .rl-input { flex-basis: 100%; min-height: 44px; font-size: 16px; }
+  .rn-input { font-size: 16px; }
 }
 
 /* ---------- team page cards (Neil, 2026-10-15: three across, compact) ---------- */
