@@ -172,6 +172,13 @@ function AccountEditor({ u, me, lists, accounts, onPatch, onAfter, ask }) {
             <InlineText value={u.display_name || ''} placeholder={u.username} maxLength={80} label="Display name"
               onSave={(t, base) => save('name', { display_name: t.trim(), base: { display_name: base } })} />
           </Field>
+          <Field label="Full name (on owner reports)" htmlFor={id('fullname')} hint="Printed as “Prepared by” on reports. Empty uses the display name.">
+            <InlineText value={u.full_name || ''} placeholder={u.display_name || u.username} maxLength={120} label="Full name"
+              onSave={(t) => run('fullname', async () => {
+                const r = await api(`/api/users/${u.id}/full-name`, { method: 'PATCH', body: { full_name: t.trim() } });
+                onAfter({ ...u, full_name: r.full_name });
+              })} />
+          </Field>
           <Field label="Work email" htmlFor={id('email')} hint="Empty clears it (frees the address for its real owner).">
             <InlineText value={u.email || ''} placeholder="name@cagecivil.com" maxLength={254} label="Work email"
               onSave={(t, base) => save('email', { email: t.trim(), base: { email: base } })} />

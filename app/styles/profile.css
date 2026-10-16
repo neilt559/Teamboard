@@ -223,3 +223,9 @@
   .nt-dot { display: none; }
   .vp-modal .bk-photo-row .btn, .vp-modal .bk-link { min-height: 36px; }
 }
+
+/* "Name on owner reports" (2026-10-16) */
+.pf-fullname { margin-top: 18px; }
+.pf-fullname-row { display: flex; gap: 8px; max-width: 520px; }
+.pf-fullname-row .field { flex: 1 1 auto; min-width: 0; margin-top: 0; }
+.pf-sub { font-style: normal; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; }

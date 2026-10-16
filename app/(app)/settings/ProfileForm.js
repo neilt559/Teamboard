@@ -115,7 +115,7 @@ export default function ProfileForm({ viewer, data }) {
         <h2 className="pf-h">About you</h2>
         <div className="pf-grid">
           <div>
-            <label className="atm-label" htmlFor="pf-name">Name</label>
+            <label className="atm-label" htmlFor="pf-name">Name <i className="pf-sub">(what people see in TeamBoard)</i></label>
             <input id="pf-name" className="field" value={f.display_name} maxLength={80} autoComplete="name"
               onChange={(e) => set({ display_name: e.target.value })} />
           </div>

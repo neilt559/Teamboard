@@ -3,6 +3,7 @@ import { requirePageViewer, publicViewer } from '@/lib/viewer';
 import { loadSettings } from '@/lib/queries/profile';
 import { IconSettings, IconUser, IconFilter, IconCamera, IconKey, IconTag } from '@/app/icons';
 import ProfileForm from './ProfileForm';
+import FullNameSetting from './FullNameSetting';
 import CustomizeForm from './CustomizeForm';
 import PhotoSettings from './PhotoSettings';
 import SecuritySettings from './SecuritySettings';
@@ -55,7 +56,7 @@ export default async function SettingsPage({ searchParams }) {
         ))}
       </nav>
       <section className="set-panel">
-        {tab === 'profile' && <ProfileForm viewer={v} data={data} />}
+        {tab === 'profile' && <><ProfileForm viewer={v} data={data} /><FullNameSetting me={data.me} /></>}
         {tab === 'customize' && <CustomizeForm viewer={v} data={data} />}
         {tab === 'photo' && <PhotoSettings viewer={v} data={data} />}
         {tab === 'password' && <SecuritySettings viewer={v} devices={data.devices} />}
