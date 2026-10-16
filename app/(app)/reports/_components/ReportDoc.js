@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { IconAlert } from '@/app/icons';
 import { parseNotes } from '@/app/notes-parse';
 import { fmtDay, fmtDayYear, fmtHhmm, fmtIssued, fmtShort } from '@/app/_ui/project-format';
-import logo from '@/public/brand/cage-logo-horizontal.png';
+import logo from '@/public/brand/cage-logo-stacked.png';
 import { CLOUD_PAD_X, CLOUD_PAD_Y, CLOUD_STROKE, cloudBox, cloudPath } from './cloud';
 import { sheetName, sheetWeekTitle } from './report-model';
 
@@ -31,7 +31,7 @@ export function PendingReviewNotice({ projects, packet = false }) {
 
 // One project's owner report drawn as a sheet from a CAGE plan set, in landscape (Neil's mockup, 2026-10-16: "Status
 // Report Template.pdf"): a bordered Letter sheet turned sideways with the title block as a strip down the right edge
-// (logo + offices, the project turned to read up the sheet with its number, owner, jurisdiction and issue date, prepared
+// (the stacked logo and the website, the project turned to read up the sheet with its number, owner, jurisdiction and issue date, prepared
 // by, sheet 1 of 1). The field: the masthead; two columns (the week's Status Report with the meetings ahead under it;
 // the ONE "Attention Items" list with the schedule under it: "Status: Ahead | On Track | Behind" and the stage line);
 // the submittal & permit log across the foot. No abbreviations block and no legend.
@@ -41,7 +41,6 @@ export function PendingReviewNotice({ projects, packet = false }) {
 // finds the largest type scale (--k) at which everything fits, so a light week reads large and a heavy week shrinks to
 // fit. The title block is its own column of the sheet, so content can never print over it.
 
-const OFFICES = [['Lisle IL', 'Chicago IL'], ['Chandler AZ', 'Asheville NC'], ['Charlotte NC', 'Lakewood CO'], ['Venice FL', 'cagecivil.com']];
 const nb = (s) => String(s ?? '').replace(/ /g, ' ');
 
 // The Status Report as the sheet's prose: paragraphs, and each header with the bullets under it as one block (blocks
@@ -241,7 +240,7 @@ export function TitleBlock({ p, reportDate, by }) {
       <div className="rs-tb-firm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logo.src} width={logo.width} height={logo.height} alt="CAGE Civil Engineering" />
-        <p>{OFFICES.map(([a, b], i) => <span key={i}>{nb(a)} · {nb(b)}</span>)}</p>
+        <p className="rs-tb-web">cagecivil.com</p>
       </div>
       <div className="rs-tb-proj">
         <div className="rs-tb-name">
