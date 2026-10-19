@@ -1,12 +1,14 @@
 import { parseNotes } from '@/app/notes-parse';
 import { scheduleOf } from '@/lib/projects';
-import { fmtDay, fmtHhmm, fmtShort, fmtYmd } from '@/app/_ui/project-format';
-import { sheetName, sheetWeekTitle, itemStatus, subDetail, stageCount } from './report-model';
+import { fmtDay, fmtHhmm, fmtShort } from '@/app/_ui/project-format';
+import { sheetName, sheetWeekTitle, itemStatus, subDetail, stageCount, proseRows, nextLine, longDate } from './report-model';
 
-// "Copy for email" (design-amendments A6.6, A15): the report(s) as rich, email-safe HTML laid out like the standard
-// report (ReportDoc.js): the CAGE letterhead with the logo, the project information box, the schedule summary and
-// stage track, numbered sections with shaded tables, red late items, and the footer. Tables and inline styles only,
-// so it pastes into Outlook and Gmail with the formatting; a plain-text version goes on the clipboard too.
+// "Copy for email" (design-amendments A6.6, A15): the report(s) as rich, email-safe HTML laid out like the clean
+// letter-style report (ReportDoc.js): the letterhead line with the CAGE logo, the project as a big title, then rows
+// split by thin rules with a label column on the left and the content on the right (schedule and stage, the week's
+// status, Attention Items with late ones in red, submittals & permits, upcoming meetings), the notes line and the
+// footer. Tables and inline styles only, so it pastes into Outlook and Gmail with the formatting; Georgia for the
+// body, the system sans for labels. A plain-text version goes on the clipboard too.
 // Built ONLY from lib/queries/reports.js report objects (the same ones the page renders), never from anything else on
 // the page, so no task, member, info row or minutes text can reach an owner.
 //   reportEmail(reports, { reportDate, owner, preparedBy, logoUrl }) -> { html, text }
@@ -14,138 +16,114 @@ import { sheetName, sheetWeekTitle, itemStatus, subDetail, stageCount } from './
 
 const INK = '#1F1F21';
 const GRAY = '#58585A';
-const SOFT = '#6C6C6F';
-const RULE = '#D4D4D7';
-const BAND = '#F3F3F5';
-const LIME = '#C2D02E';
+const SOFT = '#707073';
+const RULE = '#CFCFD2';
+const HAIR = '#E3E3E6';
+const RED = '#A63A1F';
 const GREEN = '#2E7D32';
-const RED = '#B42318';
-const RED_SOFT = '#FDECEA';
-const FONT = "Barlow,'Segoe UI',Calibri,Helvetica,Arial,sans-serif";
-const COND = "'Barlow Condensed','Arial Narrow',Arial,sans-serif";
+const SANS = "Barlow,'Segoe UI',Calibri,Helvetica,Arial,sans-serif";
+const SERIF = "Georgia,'Times New Roman',serif";
+const LABEL_W = '30%';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const TABLE = 'role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;';
-const PILL = { ahead: [GREEN, '#ffffff'], on_track: [LIME, INK], behind: [RED, '#ffffff'] };
+const SCHED_COLOR = { ahead: GREEN, behind: RED };
 
 // ---------------------------------------------------------------------------------------------------------- HTML
 
+// One section: a thin ink rule, then a label cell and a content cell.
+const row = (label, content, { rule = true, top = 18 } = {}) => `<table ${TABLE}margin-top:${top}px;${rule ? `border-top:1px solid ${INK};` : ''}"><tr>`
+  + `<td valign="top" width="${LABEL_W}" style="width:${LABEL_W};padding:${rule ? 12 : 0}px 18px 0 0;font:400 13px/1.4 ${SANS};color:${GRAY};">${label}</td>`
+  + `<td valign="top" style="padding:${rule ? 12 : 0}px 0 0;font:400 14px/1.5 ${SERIF};color:${INK};">${content}</td></tr></table>`;
+const k = (t) => `<div style="font:500 12px/1.3 ${SANS};color:${GRAY};">${esc(t)}</div>`;
+const h2 = (t) => `<div style="font:600 16px/1.25 ${SANS};color:${INK};">${esc(t)}</div>`;
+const sub = (t) => `<div style="margin-top:3px;font:400 12px/1.4 ${SANS};color:${GRAY};">${esc(t)}</div>`;
+const big = (t, color = INK) => `<div style="margin-top:2px;font:600 20px/1.2 ${SANS};color:${color};">${esc(t)}</div>`;
+
 function letterhead(reportDate, logoUrl) {
   const logo = logoUrl
-    ? `<img src="${esc(logoUrl)}" width="200" alt="CAGE Civil Engineering" style="display:block;width:200px;max-width:200px;height:auto;border:0;">`
-    : `<span style="font:700 22px/1 ${COND};color:${GRAY};letter-spacing:.04em;">CAGE</span> <span style="font:600 13px/1 ${FONT};color:${SOFT};">Civil Engineering</span>`;
-  return `<table ${TABLE}border-bottom:4px solid ${LIME};"><tr>`
-    + `<td valign="bottom" style="padding:0 0 12px;">${logo}</td>`
-    + `<td valign="bottom" align="right" style="padding:0 0 12px;text-align:right;">`
-    + `<div style="font:700 22px/1.05 ${COND};letter-spacing:.03em;text-transform:uppercase;color:${GRAY};">Project Status Report</div>`
-    + `<div style="font:400 14px/1.4 ${FONT};color:${SOFT};margin-top:3px;">${esc(fmtYmd(reportDate, { long: true }))}</div></td></tr></table>`;
+    ? `<img src="${esc(logoUrl)}" width="140" alt="CAGE Civil Engineering" style="display:block;width:140px;max-width:140px;height:auto;border:0;">`
+    : `<b style="font:700 20px/1 ${SANS};color:${GRAY};">CAGE</b>`;
+  return `<table ${TABLE}"><tr>`
+    + `<td valign="middle" width="${LABEL_W}" style="width:${LABEL_W};padding:0 18px 0 0;">${logo}</td>`
+    + `<td valign="middle" style="font:600 14px/1.2 ${SANS};color:${INK};">Project Status Report</td>`
+    + `<td valign="middle" align="right" style="text-align:right;font:400 14px/1.2 ${SANS};color:${GRAY};white-space:nowrap;">${esc(longDate(reportDate))}</td></tr></table>`;
 }
 
-function infoBox(p, reportDate, by) {
-  const th = (t) => `<td width="16%" style="width:16%;padding:7px 10px;border:1px solid ${RULE};background:${BAND};font:600 11px/1.3 ${FONT};color:${GRAY};text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;">${esc(t)}</td>`;
-  const td = (h, bold) => `<td width="34%" style="width:34%;padding:7px 10px;border:1px solid ${RULE};font:${bold ? 700 : 400} 14px/1.35 ${FONT};color:${INK};">${h}</td>`;
-  const byHtml = `${esc(by?.name || '')}${by?.position ? `<span style="color:${SOFT};">, ${esc(by.position)}</span>` : ''}`;
-  return `<table ${TABLE}margin-top:16px;border:1px solid ${RULE};">`
-    + `<tr>${th('Project')}${td(esc(sheetName(p)), true)}${th('Project No.')}${td(esc(p.project_number || '–'))}</tr>`
-    + `<tr>${th('Owner')}${td(esc(p.owner_company || '–'))}${th('Jurisdiction')}${td(esc(p.jurisdiction || '–'))}</tr>`
-    + `<tr>${th('Prepared by')}${td(byHtml)}${th('Report date')}${td(esc(fmtYmd(reportDate, { long: true })))}</tr></table>`;
+function titleRow(p) {
+  const forLine = [p.owner_company ? `For ${p.owner_company}` : '', p.jurisdiction].filter(Boolean).join(' · ');
+  return row(p.project_number ? `No. ${esc(p.project_number)}` : '',
+    `<div style="font:700 36px/1.05 ${SANS};letter-spacing:-0.5px;color:${INK};">${esc(sheetName(p))}</div>`
+    + (forLine ? `<div style="margin-top:6px;font:400 18px/1.3 ${SERIF};color:${GRAY};">${esc(forLine)}</div>` : ''),
+  { rule: false, top: 30 });
 }
 
-function stagesHtml(p) {
-  if (!p.steps?.length) return `<span style="color:${SOFT};font-style:italic;">No stages set</span>`;
-  return p.steps.map((s) => {
-    if (s.state === 'current') return `<span style="display:inline-block;margin:2px 0;padding:3px 10px;border-radius:12px;background:${LIME};border:1px solid ${INK};color:${INK};font-weight:700;">&#9679; ${esc(s.label)}</span>`;
-    if (s.state === 'done') return `<span style="display:inline-block;margin:2px 0;padding:3px 10px;border-radius:12px;background:${GRAY};color:#ffffff;">&#10003; ${esc(s.label)}</span>`;
-    return `<span style="display:inline-block;margin:2px 0;padding:3px 10px;border-radius:12px;border:1px solid ${RULE};color:${SOFT};">${esc(s.label)}</span>`;
-  }).join(`<span style="color:${RULE};"> &#8212; </span>`);
-}
-
-function summary(p) {
-  const items = p.attention || [];
-  const late = items.filter((a) => a.late).length;
+function summaryRow(p) {
   const s = scheduleOf(p.schedule_status);
-  const [bg, fg] = PILL[p.schedule_status] || ['#ECECEE', GRAY];
   const cur = (p.steps || []).find((x) => x.state === 'current');
-  const k = (t) => `<div style="font:600 11px/1.3 ${FONT};color:${GRAY};text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">${esc(t)}</div>`;
-  const cell = (inner, last) => `<td valign="top" width="33%" style="width:33%;padding:10px 12px;${last ? '' : `border-right:1px solid ${RULE};`}">${inner}</td>`;
-  return `<table ${TABLE}margin-top:12px;border:1px solid ${RULE};"><tr>`
-    + cell(`${k('Schedule')}<span style="display:inline-block;padding:3px 14px;border-radius:14px;background:${bg};color:${fg};font:700 14px/1.3 ${FONT};">${esc(s ? s.label : 'Not set')}</span>`)
-    + cell(`${k('Current stage')}<div style="font:600 15px/1.3 ${FONT};color:${INK};">${esc(cur ? `${cur.label} (${stageCount(p)})` : 'Not set')}</div>`)
-    + cell(`${k('Open items')}<div style="font:600 15px/1.3 ${FONT};color:${INK};">${items.length}${late ? ` <span style="color:${RED};font-weight:700;">&middot; ${late} late</span>` : ''}</div>`, true)
-    + `</tr><tr><td colspan="3" style="padding:10px 12px;border-top:1px solid ${RULE};font:400 13px/1.6 ${FONT};">${stagesHtml(p)}</td></tr></table>`;
+  return row(k('Schedule') + big(s ? s.label : 'Not set', s ? SCHED_COLOR[p.schedule_status] || INK : SOFT),
+    k(cur ? `Stage ${stageCount(p)}` : 'Stage') + big(cur ? cur.label : 'Not set', cur ? INK : SOFT), { top: 26 });
 }
 
-const h2 = (n, title, sub = '') => `<table ${TABLE}margin:24px 0 8px;"><tr>`
-  + `<td style="padding:0 0 5px;border-bottom:2px solid ${GRAY};">`
-  + `<span style="display:inline-block;min-width:20px;padding:1px 6px;border-radius:4px;background:${GRAY};color:#ffffff;font:700 14px/1.3 ${COND};text-align:center;">${n}</span>`
-  + `&nbsp; <span style="font:700 17px/1.2 ${COND};letter-spacing:.03em;text-transform:uppercase;color:${GRAY};">${esc(title)}</span></td>`
-  + `<td align="right" style="padding:0 0 5px;border-bottom:2px solid ${GRAY};font:500 13px/1.2 ${FONT};color:${SOFT};white-space:nowrap;text-align:right;">${esc(sub)}</td></tr></table>`;
+const bulletsHtml = (bullets) => bullets.map((b) => `<div style="margin:0 0 4px ${b.level * 18}px;padding-left:16px;text-indent:-16px;"><span style="color:${SOFT};">&ndash;</span>&nbsp;&nbsp;${esc(b.text)}</div>`).join('');
+const rowBody = (r, lede = false) => r.paras.map((t, j) => `<div style="margin:0 0 7px;${lede && j === 0 ? 'font-size:17px;line-height:1.45;' : ''}">${esc(t)}</div>`).join('') + bulletsHtml(r.bullets);
 
-function notesHtml(text) {
-  if (!String(text || '').trim()) return `<p style="margin:0;color:${SOFT};font-style:italic;">No status report this week.</p>`;
-  return parseNotes(text).map((b) => {
-    if (b.type === 'gap') return '';
-    if (b.type === 'title' || b.type === 'header') return `<p style="margin:12px 0 3px;font-weight:700;color:${INK};">${esc(b.text)}</p>`;
-    if (b.type === 'bullet') return `<p style="margin:3px 0 3px ${16 + b.level * 18}px;"><span style="color:${GRAY};">&#8226;</span>&nbsp; ${esc(b.text)}</p>`;
-    return `<p style="margin:0 0 7px;">${esc(b.text)}</p>`;
-  }).join('');
+function notesRows(p, by) {
+  const rows = proseRows(p.status_body ?? p.status_report);
+  const first = rows[0] && !rows[0].head ? rows[0] : null;
+  const rest = first ? rows.slice(1) : rows;
+  const label = k('Status update') + h2(sheetWeekTitle(p)) + (by?.name ? sub(`Notes from ${by.name}`) : '');
+  const body = first ? rowBody(first, true) : rows.length ? '' : `<div style="color:${SOFT};font-style:italic;">No status report this week.</div>`;
+  return row(label, body) + rest.map((r) => row(esc(r.head || ''), rowBody(r), { rule: false, top: 8 })).join('');
 }
 
-const head = (cols) => `<tr>${cols.map(([t, w]) => `<td${w ? ` width="${w}"` : ''} style="${w ? `width:${w};` : ''}padding:7px 9px;background:${GRAY};color:#ffffff;font:600 12px/1.25 ${FONT};">${esc(t)}</td>`).join('')}</tr>`;
-const cell = (h, { bg = '', color = INK, bold = false, first = false, nowrap = false } = {}) => `<td valign="top" style="padding:7px 9px;border-bottom:1px solid ${RULE};`
-  + `${bg ? `background:${bg};` : ''}${first && bg === RED_SOFT ? `border-left:3px solid ${RED};` : ''}font:${bold ? 600 : 400} 13px/1.35 ${FONT};color:${color};${nowrap ? 'white-space:nowrap;' : ''}">${h}</td>`;
-const two = (a, b) => `${a ? `<div style="font-weight:600;">${esc(a)}</div>` : ''}${b ? `<div style="color:${SOFT};font-size:12px;">${esc(b)}</div>` : ''}`;
-const zebra = (i) => (i % 2 ? '#FAFAFB' : '');
+function itemsRow(items, ref) {
+  const late = items.filter((a) => a.late).length;
+  const list = items.map((a) => `<div style="margin:0 0 9px;">${a.late ? `<span style="color:${RED};">&#9632;</span>&nbsp;` : ''}`
+    + `<b>${esc(a.item)}</b>${a.from_party ? ` from ${esc(a.from_party)}` : ''}${a.need_by ? `, needed by ${esc(fmtShort(a.need_by, ref))}.` : `. <span style="color:${SOFT};">No date set yet.</span>`}`
+    + `${a.late ? ` <b style="color:${RED};">${esc(itemStatus(a))}</b>` : ''}</div>`).join('');
+  return row(h2('Attention Items') + sub(`${items.length} open${late ? `, ${late} late` : ''}`), list);
+}
 
-function itemsHtml(items, ref) {
-  return `<table ${TABLE}">${head([['#', '5%'], ['Item needed', '45%'], ['From', '22%'], ['Needed by', '13%'], ['Status', '15%']])}`
-    + items.map((a, i) => {
-      const bg = a.late ? RED_SOFT : zebra(i);
-      return `<tr>${cell(String(i + 1), { bg, color: SOFT, first: true })}${cell(esc(a.item), { bg, bold: true })}${cell(esc(a.from_party || '–'), { bg })}`
-        + `${cell(esc(a.need_by ? fmtShort(a.need_by, ref) : '–'), { bg, nowrap: true })}`
-        + `${cell(esc(itemStatus(a)), { bg, color: a.late ? RED : SOFT, bold: a.late })}</tr>`;
+function logRow(subs, ref) {
+  if (!subs.length) return row(h2('Submittals & Permits'), `<div style="color:${SOFT};font-style:italic;">No submittals.</div>`);
+  const th = (t, w) => `<td width="${w}" style="width:${w};padding:0 8px 6px 0;border-bottom:1px solid ${RULE};font:400 12px/1.3 ${SANS};color:${GRAY};">${esc(t)}</td>`;
+  const td = (h, closed, extra = '') => `<td valign="top" style="padding:8px 8px 9px 0;border-bottom:1px solid ${HAIR};font:400 14px/1.35 ${SERIF};color:${closed ? SOFT : INK};${extra}">${h}</td>`;
+  const strong = (t, closed) => `<div style="font:${closed ? 400 : 600} 13px/1.35 ${SANS};color:${closed ? SOFT : INK};">${esc(t)}</div>`;
+  const table = `<table ${TABLE}"><tr>${th('With', '12%')}${th('Agency and submittal', '36%')}${th('Where it stands', '31%')}${th('Notes', '21%')}</tr>`
+    + subs.map((s) => {
+      const c = s.closed;
+      const detail = subDetail(s, ref);
+      const next = nextLine(s, ref);
+      return `<tr>${td(c ? '' : `<span style="font:600 13px/1.35 ${SANS};">${esc(s.ball || '')}</span>`, c)}`
+        + `${td(strong(s.agency || 'Agency not set', c) + (s.title ? `<div>${esc(s.title)}</div>` : ''), c)}`
+        + `${td(strong(s.status_label, c) + (next && !c ? `<div style="font-style:italic;">${esc(next)}</div>` : '') + (detail ? `<div style="margin-top:2px;font:400 11px/1.35 ${SANS};color:${SOFT};">${esc(detail)}</div>` : ''), c)}`
+        + `${td(esc(s.note || ''), c, `font-size:13px;color:${GRAY};`)}</tr>`;
     }).join('') + '</table>';
+  return row(h2('Submittals & Permits') + sub('In order of what happens next. “With” is whoever has the next move.'), table);
 }
 
-function logHtml(subs, ref) {
-  if (!subs.length) return `<p style="margin:0;color:${SOFT};font-style:italic;">No submittals.</p>`;
-  return `<table ${TABLE}">${head([['Agency / submittal', '30%'], ['Status', '20%'], ['Next date', '16%'], ['Ball in court', '12%'], ['Notes', '22%']])}`
-    + subs.map((s, i) => {
-      const bg = zebra(i);
-      const color = s.closed ? SOFT : INK;
-      return `<tr>${cell(two(s.agency || 'Agency not set', s.title), { bg, color })}${cell(two(s.status_label, subDetail(s, ref)), { bg, color })}`
-        + `${cell(s.next ? two(fmtShort(s.next, ref), s.next_label) : '–', { bg, color, nowrap: true })}`
-        + `${cell(esc(s.ball || '–'), { bg, color })}${cell(esc(s.note || ''), { bg, color })}</tr>`;
-    }).join('') + '</table>';
-}
-
-function meetingsHtml(meetings, ref) {
-  if (!meetings.length) return `<p style="margin:0;color:${SOFT};font-style:italic;">No meetings scheduled.</p>`;
-  return `<table ${TABLE}">${head([['Date', '20%'], ['Time', '14%'], ['Meeting', '40%'], ['Location', '26%']])}`
-    + meetings.map((m, i) => {
-      const bg = zebra(i);
-      return `<tr>${cell(esc(fmtDay(m.meeting_date, ref)), { bg, bold: true, nowrap: true })}${cell(esc(m.meeting_time ? fmtHhmm(m.meeting_time) : '–'), { bg, nowrap: true })}`
-        + `${cell(esc(m.title), { bg })}${cell(esc(m.location || '–'), { bg })}</tr>`;
-    }).join('') + '</table>';
+function meetingsRow(meetings, ref) {
+  const body = meetings.length
+    ? `<table ${TABLE}">${meetings.map((m) => `<tr><td valign="top" width="30%" style="width:30%;padding:0 12px 8px 0;font:400 13px/1.4 ${SANS};color:${GRAY};">`
+      + `<div style="font-weight:600;color:${INK};">${esc(fmtDay(m.meeting_date, ref))}</div>${m.meeting_time ? esc(fmtHhmm(m.meeting_time)) : ''}</td>`
+      + `<td valign="top" style="padding:0 0 8px;font:400 14px/1.4 ${SERIF};color:${INK};">${esc(m.title)}${m.location ? `<div style="font-size:13px;color:${GRAY};">${esc(m.location)}</div>` : ''}</td></tr>`).join('')}</table>`
+    : `<div style="color:${SOFT};font-style:italic;">No meetings scheduled.</div>`;
+  return row(h2('Upcoming Meetings'), body);
 }
 
 function projectHtml(p, i, { reportDate, preparedBy: by, logoUrl }) {
   const items = p.attention || [];
-  const late = items.filter((a) => a.late).length;
-  const subs = p.submittals || [];
-  let n = 0;
-  return `<div style="${i ? `margin:40px 0 0;padding-top:28px;border-top:3px solid ${GRAY};` : 'margin:0;'}">`
-    + letterhead(reportDate, logoUrl) + infoBox(p, reportDate, by) + summary(p)
-    + h2(++n, 'Status Update', sheetWeekTitle(p)) + notesHtml(p.status_body ?? p.status_report)
-    + (items.length ? h2(++n, 'Attention Items', `${items.length} open${late ? `, ${late} late` : ''}`) + itemsHtml(items, reportDate) : '')
-    + h2(++n, 'Submittals & Permits', subs.length ? `${subs.filter((s) => !s.closed).length} open` : '') + logHtml(subs, reportDate)
-    + h2(++n, 'Upcoming Meetings') + meetingsHtml(p.meetings || [], reportDate)
-    + (p.report_note ? `<p style="margin:14px 0 0;font:400 12px/1.4 ${FONT};color:#8a8a8d;"><b style="color:${GRAY};">Notes:</b> ${esc(p.report_note)}</p>` : '')
-    + (p.report_link ? `<p style="margin:10px 0 0;font:400 13px/1.4 ${FONT};color:${GRAY};">Project documents: <a href="${esc(p.report_link)}" style="color:${INK};font-weight:600;text-decoration:underline;">Open the Egnyte folder</a></p>` : '')
-    + `<table ${TABLE}margin-top:24px;border-top:1px solid ${RULE};"><tr>`
-    + `<td style="padding:8px 0 0;font:400 12px/1.4 ${FONT};color:${SOFT};"><b style="color:${GRAY};">CAGE Civil Engineering</b> &middot; cagecivil.com</td>`
-    + `<td align="right" style="padding:8px 0 0;font:400 12px/1.4 ${FONT};color:${SOFT};text-align:right;">${by?.name ? `Prepared by ${esc(by.name)}${by.email ? ` &middot; ${esc(by.email)}` : ''}` : ''}</td></tr></table>`
+  return `<div style="${i ? `margin:44px 0 0;padding-top:30px;border-top:3px double ${RULE};` : 'margin:0;'}">`
+    + letterhead(reportDate, logoUrl) + titleRow(p) + summaryRow(p) + notesRows(p, by)
+    + (items.length ? itemsRow(items, reportDate) : '')
+    + logRow(p.submittals || [], reportDate) + meetingsRow(p.meetings || [], reportDate)
+    + (p.report_note ? `<p style="margin:18px 0 0;padding-top:8px;border-top:1px solid ${HAIR};font:400 12px/1.4 ${SANS};color:#8a8a8d;"><b style="color:${GRAY};">Notes:</b> ${esc(p.report_note)}</p>` : '')
+    + (p.report_link ? `<p style="margin:8px 0 0;font:400 13px/1.4 ${SANS};color:${GRAY};">Project documents: <a href="${esc(p.report_link)}" style="color:${INK};font-weight:600;text-decoration:underline;">Open the Egnyte folder</a></p>` : '')
+    + `<table ${TABLE}margin-top:24px;border-top:1px solid ${INK};"><tr>`
+    + `<td style="padding:8px 0 0;font:400 12px/1.4 ${SANS};color:${GRAY};">${by?.name ? `Prepared by <b style="color:${INK};">${esc(by.name)}</b>${by.position ? `, ${esc(by.position)}` : ''}${by.email ? ` &middot; ${esc(by.email)}` : ''}` : ''}</td>`
+    + `<td align="right" style="padding:8px 0 0;font:400 12px/1.4 ${SANS};color:${GRAY};text-align:right;">CAGE Civil Engineering &middot; cagecivil.com</td></tr></table>`
     + '</div>';
 }
 
@@ -171,12 +149,11 @@ function projectText(p, { reportDate, preparedBy: by }) {
   const subs = p.submittals || [];
   const cur = (p.steps || []).find((s) => s.state === 'current');
   let n = 0;
-  const L = ['CAGE CIVIL ENGINEERING · PROJECT STATUS REPORT', fmtYmd(reportDate, { long: true }), ''];
+  const L = ['CAGE CIVIL ENGINEERING · PROJECT STATUS REPORT', longDate(reportDate), ''];
   L.push(`Project: ${sheetName(p)}${p.project_number ? ` (No. ${p.project_number})` : ''}`);
   L.push(`Owner: ${p.owner_company || '-'} · Jurisdiction: ${p.jurisdiction || '-'}`);
   if (by?.name) L.push(`Prepared by: ${[by.name, by.position].filter(Boolean).join(', ')}`);
-  L.push(`Schedule: ${scheduleOf(p.schedule_status)?.label || 'Not set'} · Current stage: ${cur ? `${cur.label} (${stageCount(p)})` : 'Not set'} · Open items: ${items.length}${late ? ` (${late} late)` : ''}`);
-  if (p.steps?.length) L.push(`Stages: ${p.steps.map((s) => (s.state === 'current' ? `[${s.label}]` : s.state === 'done' ? `${s.label} (complete)` : s.label)).join(' > ')}`);
+  L.push(`Schedule: ${scheduleOf(p.schedule_status)?.label || 'Not set'} · Stage${cur ? ` ${stageCount(p)}: ${cur.label}` : ': not set'}`);
   L.push('', `${++n}. STATUS UPDATE: ${sheetWeekTitle(p)}`, notesText(p.status_body ?? p.status_report));
   if (items.length) {
     L.push('', `${++n}. ATTENTION ITEMS (${items.length} open${late ? `, ${late} late` : ''})`);
@@ -214,10 +191,9 @@ export function reportEmail(reports, { reportDate, owner = '', preparedBy = null
   const list = reports || [];
   const ctx = { reportDate, preparedBy, logoUrl };
   const intro = owner
-    ? `<table ${TABLE}margin:0 0 22px;"><tr><td style="padding:10px 14px;background:${BAND};border-left:4px solid ${LIME};font:400 15px/1.4 ${FONT};color:${GRAY};">`
-      + `Weekly status for <b style="color:${INK};">${esc(owner)}</b>: ${esc(plural(list.length, 'active project'))}.</td></tr></table>`
+    ? `<p style="margin:0 0 26px;font:400 15px/1.4 ${SERIF};color:${GRAY};">Weekly status for <b style="color:${INK};">${esc(owner)}</b>: ${esc(plural(list.length, 'active project'))}.</p>`
     : '';
-  const html = `<div style="font-family:${FONT};font-size:14px;line-height:1.45;color:${INK};max-width:760px;">`
+  const html = `<div style="font-family:${SERIF};font-size:14px;line-height:1.5;color:${INK};max-width:760px;">`
     + intro + list.map((p, i) => projectHtml(p, i, ctx)).join('') + '</div>';
   const top = owner ? [`Weekly status for ${owner}: ${plural(list.length, 'active project')}.`, '', ''] : [];
   const text = [...top, list.map((p) => projectText(p, ctx)).join('\n\n\n')].join('\n');
