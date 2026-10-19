@@ -19,7 +19,7 @@ import { StatusChip } from './ChallengeCard';
 // mark is a button, and marking asks once before it counts. Today's square can be undone by the office (so a slip
 // can be fixed); admins can mark or undo any office's square.
 
-const LETTERS = ['B', 'I', 'N', 'G', 'O'];
+const LETTERS = ['C', 'A', 'G', 'E', 'O'];   // CAGEO: Neil's name for office bingo
 
 function Prize({ label, win, hint }) {
   return (
@@ -44,14 +44,14 @@ function Card({ c, o, today, winners, busy, onMark }) {
   const firstBingo = winners.bingo?.office_id === o.id;
   const firstCorners = winners.corners?.office_id === o.id;
   return (
-    <section className={`bg-card${o.mine ? ' is-mine' : ''}${o.can_mark ? ' can-mark' : ''}`} aria-label={`${o.name} bingo card`}>
+    <section className={`bg-card${o.mine ? ' is-mine' : ''}${o.can_mark ? ' can-mark' : ''}`} aria-label={`${o.name} CAGEO card`}>
       <header className="bg-card-head">
         <h2 className="bg-card-name"><IconBuilding size={16} /> {o.name}{o.mine && <span className="ch-you-tag">Your office</span>}</h2>
         <span className="bg-card-count"><b>{o.marks}</b> of {squares.length}</span>
       </header>
       {(o.bingo_pick_id || cornersDone) && (
         <div className="bg-card-badges">
-          {o.bingo_pick_id && <span className={`bg-badge${firstBingo ? ' is-first' : ''}`}>{firstBingo ? 'First bingo' : 'Bingo'}</span>}
+          {o.bingo_pick_id && <span className={`bg-badge${firstBingo ? ' is-first' : ''}`}>{firstBingo ? 'First CAGEO' : 'CAGEO'}</span>}
           {cornersDone && <span className={`bg-badge${firstCorners ? ' is-first' : ''}`}>{firstCorners ? 'Four corners winner' : 'Four corners'}</span>}
         </div>
       )}
@@ -165,7 +165,7 @@ export default function BingoView({ initial, viewer }) {
       const r = await api(`/api/culture/challenges/${c.id}/bingo`, { method: 'POST', body: { office_id: o.id, square } });
       setData((d) => ({ ...d, bingo: r.board }));
       const after = r.board.offices.find((x) => x.id === o.id);
-      const won = [r.board.winners.bingo?.office_id === o.id && !board.winners.bingo ? 'BINGO! First bingo' : null,
+      const won = [r.board.winners.bingo?.office_id === o.id && !board.winners.bingo ? 'CAGEO! First CAGEO' : null,
         r.board.winners.corners?.office_id === o.id && !board.winners.corners ? 'Four corners' : null].filter(Boolean);
       setToast({
         text: won.length ? `${won.join(' and ')} for ${o.name}!` : `Marked for ${o.name}: ${after?.marks ?? ''} of 25.`,
@@ -185,9 +185,9 @@ export default function BingoView({ initial, viewer }) {
     .sort((a, b) => (a.play_date < b.play_date ? 1 : a.play_date > b.play_date ? -1 : String(b.created_at).localeCompare(String(a.created_at))));
   return (
     <div className="ch-page ch-detail bg-page">
-      <Crumbs items={[{ label: 'Culture', href: '/culture' }, { label: 'Challenges', href: '/culture/challenges' }, { label: c.title || 'Bingo' }]} />
+      <Crumbs items={[{ label: 'Culture', href: '/culture' }, { label: 'Challenges', href: '/culture/challenges' }, { label: c.title || 'CAGEO' }]} />
       <div className="proj-head ch-head">
-        <h1 className="wi-h"><span className="bg-mark" aria-hidden="true">B</span> <span className="ch-title">{c.title || 'Office bingo'}</span></h1>
+        <h1 className="wi-h"><span className="bg-mark" aria-hidden="true">C</span> <span className="ch-title">{c.title || 'CAGEO'}</span></h1>
         <div className="spacer" />
         {data.can.manage && (
           <div className="ch-head-actions">
@@ -203,7 +203,7 @@ export default function BingoView({ initial, viewer }) {
       )}
       <div className="ch-chips">
         <StatusChip c={{ ...c, status: data.status }} today={today} />
-        <span className="ch-chip ch-chip-company">Office bingo</span>
+        <span className="ch-chip ch-chip-company">CAGEO</span>
         <span className="ch-chip ch-chip-dates"><IconCalendar size={12} /> {fmtRange(c.starts_on, c.ends_on)}</span>
       </div>
       {String(c.description || '').trim() && (
@@ -211,7 +211,7 @@ export default function BingoView({ initial, viewer }) {
       )}
 
       <div className="bg-prizes">
-        <Prize label="First bingo" win={board.winners.bingo} hint="Five in a row: across, down or diagonal." />
+        <Prize label="First CAGEO" win={board.winners.bingo} hint="Five in a row: across, down or diagonal." />
         <Prize label="Four corners" win={board.winners.corners} hint="All four corner squares." />
       </div>
 
@@ -235,7 +235,7 @@ export default function BingoView({ initial, viewer }) {
               ) : data.status === 'upcoming' ? (
                 <span>The card opens {fmtDay(c.starts_on, { weekday: true })}.</span>
               ) : (
-                <span>This bingo is over.</span>
+                <span>This CAGEO is over.</span>
               )}
             </p>
           );

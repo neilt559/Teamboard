@@ -40,10 +40,10 @@ function MyLine({ c }) {
 function FeaturedBingo({ c, today }) {
   return (
     <div className="ch-w-feature">
-      <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="ch-w-title">{c.title || 'Office bingo'}</Link>
+      <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="ch-w-title">{c.title || 'CAGEO'}</Link>
       <span className="ch-w-meta">
         {c.status === 'running' ? <span className="ch-live-dot" aria-hidden="true" /> : null}
-        {timeLabel(c, today)} · Office bingo
+        {timeLabel(c, today)} · CAGEO
       </span>
       <div className="ch-w-mine">
         <BingoMyLine c={c} />
@@ -178,7 +178,7 @@ export async function ChallengeHubCards({ viewer, now, part = 'all' } = {}) {
             <span className="ch-hub-actions">
               {c.can_log && <Link href={`/culture/challenges/${c.id}#log`} prefetch={false} className="btn btn-lime btn-sm wi"><IconCheck size={14} /> Log my stats</Link>}
               {c.can_mark && <Link href={`/culture/challenges/${c.id}#today`} prefetch={false} className="btn btn-lime btn-sm wi"><IconCheck size={14} /> Mark today’s square</Link>}
-              <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="btn btn-plain btn-sm">{c.kind === 'bingo' ? 'Bingo cards' : 'Leaderboards'}</Link>
+              <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="btn btn-plain btn-sm">{c.kind === 'bingo' ? 'CAGEO cards' : 'Leaderboards'}</Link>
             </span>
           </span>
         </section>

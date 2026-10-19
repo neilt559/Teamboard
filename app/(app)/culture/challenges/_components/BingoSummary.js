@@ -17,7 +17,7 @@ export function BingoOffices({ c, max = 4 }) {
           {o.mine && <span className="bg-sum-you">you</span>}
           <span className="bg-sum-bar" aria-hidden="true"><i style={{ width: `${Math.round((o.marks / CELLS) * 100)}%` }} /></span>
           <span className="bg-sum-n">{o.marks} of {CELLS}</span>
-          {o.bingo && <span className="bg-badge">Bingo</span>}
+          {o.bingo && <span className="bg-badge">CAGEO</span>}
         </li>
       ))}
     </ul>
@@ -32,7 +32,7 @@ export function BingoWinners({ c, short = false }) {
       {win && !short ? ` (${fmtDay(win.play_date)})` : ''}
     </span>
   );
-  return <span className="bg-sum-wins">{one('First bingo', w.bingo)}{one('Four corners', w.corners)}</span>;
+  return <span className="bg-sum-wins">{one('First CAGEO', w.bingo)}{one('Four corners', w.corners)}</span>;
 }
 
 // One line for the viewer: today's square for their office(s), or nothing when they aren't playing.

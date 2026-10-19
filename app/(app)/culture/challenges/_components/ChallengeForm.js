@@ -81,7 +81,7 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
       if (!f.squares_text.trim()) patch.squares_text = shuffle(DEFAULT_SQUARES).join('\n');
       if (!f.office_ids) patch.office_ids = idsKey(offices.filter((o) => o.geo_on && !o.archived).map((o) => o.id));
       if (!f.description.trim()) { patch.description = DEFAULT_RULES; setEditorKey((n) => n + 1); }
-      if (!f.title.trim()) patch.title = `${new Date(`${today}T12:00:00Z`).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' })} Office Bingo`;
+      if (!f.title.trim()) patch.title = `${new Date(`${today}T12:00:00Z`).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' })} CAGEO`;
       if (f.starts_on === defaults?.starts_on && f.ends_on === defaults?.ends_on && today) {
         patch.starts_on = today;
         patch.ends_on = monthRange(today).ends_on;
@@ -169,7 +169,7 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
   return (
     <div className="ch-page ch-form-page">
       <div className="proj-head">
-        <h1 className="wi-h"><IconMedal size={24} /> {isEdit ? (bingo ? 'Edit bingo' : 'Edit challenge') : 'New challenge'}</h1>
+        <h1 className="wi-h"><IconMedal size={24} /> {isEdit ? (bingo ? 'Edit CAGEO' : 'Edit challenge') : 'New challenge'}</h1>
       </div>
       <form className="ch-form ch-panel" onSubmit={(e) => { e.preventDefault(); send(); }} noValidate>
         {!isEdit && (
@@ -180,10 +180,10 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
                 <input type="radio" name="kind" value="stats" checked={!bingo} onChange={() => pickKind('stats')} /> Stats leaderboard
               </label>
               <label className={`ch-seg-opt${bingo ? ' on' : ''}`}>
-                <input type="radio" name="kind" value="bingo" checked={bingo} onChange={() => pickKind('bingo')} /> Office bingo
+                <input type="radio" name="kind" value="bingo" checked={bingo} onChange={() => pickKind('bingo')} /> CAGEO (office bingo)
               </label>
             </div>
-            {bingo && <span className="ch-hint">Offices share one 5×5 card and mark one square a day for what their GeoGuessr round earned (honor system). Prizes: first bingo and four corners.</span>}
+            {bingo && <span className="ch-hint">Offices share one 5×5 card and mark one square a day for what their GeoGuessr round earned (honor system). Prizes: first CAGEO (five in a row) and four corners.</span>}
           </fieldset>
         )}
         {!isEdit && !bingo && (
@@ -199,7 +199,7 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
         <label className="ch-field">
           <span className="ch-label">Title</span>
           <input className={`field ch-input${bad.title ? ' ch-bad' : ''}`} maxLength={LIMITS.title} value={f.title}
-            onChange={(e) => set('title', e.target.value)} placeholder={bingo ? 'October Office Bingo' : 'October Step Challenge'} />
+            onChange={(e) => set('title', e.target.value)} placeholder={bingo ? 'October CAGEO' : 'October Step Challenge'} />
           {bad.title && <span className="ch-field-err">{bad.title}</span>}
         </label>
         <div className="ch-field">
@@ -322,7 +322,7 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
         <div className="ch-form-actions">
           <Link href={isEdit ? `/culture/challenges/${challenge.id}` : '/culture/challenges'} prefetch={false} className="btn btn-plain">Cancel</Link>
           <button type="submit" className="btn btn-lime wi" disabled={busy || (isEdit && !changed.length)}>
-            <IconCheck size={15} /> {busy ? 'Saving…' : isEdit ? 'Save changes' : bingo ? 'Create bingo' : 'Create challenge'}
+            <IconCheck size={15} /> {busy ? 'Saving…' : isEdit ? 'Save changes' : bingo ? 'Create CAGEO' : 'Create challenge'}
           </button>
         </div>
       </form>
