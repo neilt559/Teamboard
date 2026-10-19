@@ -65,7 +65,7 @@ export default function ReportSheet({ project: p, reportDate, preparedBy: by }) 
     <article className="sr-doc rs-proj" data-report-project={p.id}>
       <header className="sr-head">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="sr-logo" src={logo.src} width={logo.width} height={logo.height} alt="CAGE Civil Engineering" />
+        <img className="sr-logo" src={logo.src} width={logo.width} height={logo.height} alt="CAGE Engineering" />
         <p className="sr-kind">Project Status Report</p>
         <p className="sr-date">{longDate(reportDate)}</p>
       </header>
@@ -131,13 +131,12 @@ export default function ReportSheet({ project: p, reportDate, preparedBy: by }) 
       <section className="sr-sec sr-row rs-log" aria-label="Submittals and permits">
         <div className="sr-l">
           <h2>Submittals &amp; Permits</h2>
-          {subs.length > 0 && <p className="sr-sub">In order of what happens next. “With” is whoever has the next move.</p>}
         </div>
         <div className="sr-r">
           {subs.length ? (
             <table className="sr-table">
-              <colgroup><col style={{ width: '12%' }} /><col style={{ width: '36%' }} /><col style={{ width: '31%' }} /><col style={{ width: '21%' }} /></colgroup>
-              <thead><tr><th scope="col">With</th><th scope="col">Agency and submittal</th><th scope="col">Where it stands</th><th scope="col">Notes</th></tr></thead>
+              <colgroup><col style={{ width: '12%' }} /><col style={{ width: '29%' }} /><col style={{ width: '27%' }} /><col style={{ width: '32%' }} /></colgroup>
+              <thead><tr><th scope="col">Ball in court</th><th scope="col">Agency and submittal</th><th scope="col">Where it stands</th><th scope="col">Notes</th></tr></thead>
               <tbody>
                 {subs.map((s) => {
                   const detail = subDetail(s, reportDate);
@@ -185,7 +184,7 @@ export default function ReportSheet({ project: p, reportDate, preparedBy: by }) 
 
       <footer className="sr-foot">
         <span>{by?.name ? <>Prepared by <b>{by.name}</b>{by.position ? `, ${by.position}` : ''}{by.email ? ` · ${by.email}` : ''}</> : null}</span>
-        <span>CAGE Civil Engineering · cagecivil.com</span>
+        <span>CAGE Engineering · cagecivil.com</span>
       </footer>
     </article>
   );

@@ -23,7 +23,7 @@ const RED = '#A63A1F';
 const GREEN = '#2E7D32';
 const SANS = "Barlow,'Segoe UI',Calibri,Helvetica,Arial,sans-serif";
 const SERIF = "Georgia,'Times New Roman',serif";
-const LABEL_W = '30%';
+const LABEL_W = '22%';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -43,7 +43,7 @@ const big = (t, color = INK) => `<div style="margin-top:2px;font:600 20px/1.2 ${
 
 function letterhead(reportDate, logoUrl) {
   const logo = logoUrl
-    ? `<img src="${esc(logoUrl)}" width="140" alt="CAGE Civil Engineering" style="display:block;width:140px;max-width:140px;height:auto;border:0;">`
+    ? `<img src="${esc(logoUrl)}" width="140" alt="CAGE Engineering" style="display:block;width:140px;max-width:140px;height:auto;border:0;">`
     : `<b style="font:700 20px/1 ${SANS};color:${GRAY};">CAGE</b>`;
   return `<table ${TABLE}"><tr>`
     + `<td valign="middle" width="${LABEL_W}" style="width:${LABEL_W};padding:0 18px 0 0;">${logo}</td>`
@@ -91,7 +91,7 @@ function logRow(subs, ref) {
   const th = (t, w) => `<td width="${w}" style="width:${w};padding:0 8px 6px 0;border-bottom:1px solid ${RULE};font:400 12px/1.3 ${SANS};color:${GRAY};">${esc(t)}</td>`;
   const td = (h, closed, extra = '') => `<td valign="top" style="padding:8px 8px 9px 0;border-bottom:1px solid ${HAIR};font:400 14px/1.35 ${SERIF};color:${closed ? SOFT : INK};${extra}">${h}</td>`;
   const strong = (t, closed) => `<div style="font:${closed ? 400 : 600} 13px/1.35 ${SANS};color:${closed ? SOFT : INK};">${esc(t)}</div>`;
-  const table = `<table ${TABLE}"><tr>${th('With', '12%')}${th('Agency and submittal', '36%')}${th('Where it stands', '31%')}${th('Notes', '21%')}</tr>`
+  const table = `<table ${TABLE}"><tr>${th('Ball in court', '12%')}${th('Agency and submittal', '29%')}${th('Where it stands', '27%')}${th('Notes', '32%')}</tr>`
     + subs.map((s) => {
       const c = s.closed;
       const detail = subDetail(s, ref);
@@ -101,7 +101,7 @@ function logRow(subs, ref) {
         + `${td(strong(s.status_label, c) + (next && !c ? `<div style="font-style:italic;">${esc(next)}</div>` : '') + (detail ? `<div style="margin-top:2px;font:400 11px/1.35 ${SANS};color:${SOFT};">${esc(detail)}</div>` : ''), c)}`
         + `${td(esc(s.note || ''), c, `font-size:13px;color:${GRAY};`)}</tr>`;
     }).join('') + '</table>';
-  return row(h2('Submittals & Permits') + sub('In order of what happens next. “With” is whoever has the next move.'), table);
+  return row(h2('Submittals & Permits'), table);
 }
 
 function meetingsRow(meetings, ref) {
@@ -123,7 +123,7 @@ function projectHtml(p, i, { reportDate, preparedBy: by, logoUrl }) {
     + (p.report_link ? `<p style="margin:8px 0 0;font:400 13px/1.4 ${SANS};color:${GRAY};">Project documents: <a href="${esc(p.report_link)}" style="color:${INK};font-weight:600;text-decoration:underline;">Open the Egnyte folder</a></p>` : '')
     + `<table ${TABLE}margin-top:24px;border-top:1px solid ${INK};"><tr>`
     + `<td style="padding:8px 0 0;font:400 12px/1.4 ${SANS};color:${GRAY};">${by?.name ? `Prepared by <b style="color:${INK};">${esc(by.name)}</b>${by.position ? `, ${esc(by.position)}` : ''}${by.email ? ` &middot; ${esc(by.email)}` : ''}` : ''}</td>`
-    + `<td align="right" style="padding:8px 0 0;font:400 12px/1.4 ${SANS};color:${GRAY};text-align:right;">CAGE Civil Engineering &middot; cagecivil.com</td></tr></table>`
+    + `<td align="right" style="padding:8px 0 0;font:400 12px/1.4 ${SANS};color:${GRAY};text-align:right;">CAGE Engineering &middot; cagecivil.com</td></tr></table>`
     + '</div>';
 }
 
@@ -149,7 +149,7 @@ function projectText(p, { reportDate, preparedBy: by }) {
   const subs = p.submittals || [];
   const cur = (p.steps || []).find((s) => s.state === 'current');
   let n = 0;
-  const L = ['CAGE CIVIL ENGINEERING · PROJECT STATUS REPORT', longDate(reportDate), ''];
+  const L = ['CAGE ENGINEERING · PROJECT STATUS REPORT', longDate(reportDate), ''];
   L.push(`Project: ${sheetName(p)}${p.project_number ? ` (No. ${p.project_number})` : ''}`);
   L.push(`Owner: ${p.owner_company || '-'} · Jurisdiction: ${p.jurisdiction || '-'}`);
   if (by?.name) L.push(`Prepared by: ${[by.name, by.position].filter(Boolean).join(', ')}`);
@@ -183,7 +183,7 @@ function projectText(p, { reportDate, preparedBy: by }) {
   } else L.push('No meetings scheduled.');
   if (p.report_note) L.push('', `Notes: ${p.report_note}`);
   if (p.report_link) L.push(`Project documents: ${p.report_link}`);
-  L.push('', `CAGE Civil Engineering · cagecivil.com${by?.name ? ` · Prepared by ${by.name}${by.email ? ` (${by.email})` : ''}` : ''}`);
+  L.push('', `CAGE Engineering · cagecivil.com${by?.name ? ` · Prepared by ${by.name}${by.email ? ` (${by.email})` : ''}` : ''}`);
   return L.join('\n');
 }
 

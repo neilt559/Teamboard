@@ -15,7 +15,7 @@
 .rs-set, .rs-set *, .rs-set *::before, .rs-set *::after { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
 
 .sr-doc {
-  width: 8.5in; max-width: 100%; margin: 0 auto; padding: 0.6in 0.7in 0.55in; background: #fff; color: var(--sr-ink);
+  width: 8.5in; max-width: 100%; margin: 0 auto; padding: 0.6in 0.6in 0.55in; background: #fff; color: var(--sr-ink);
   font: 400 10.5pt/1.5 var(--sr-serif); font-variant-numeric: lining-nums; text-align: left;
 }
 .sr-doc p, .sr-doc h1, .sr-doc h2, .sr-doc ul, .sr-doc ol { margin: 0; padding: 0; }
@@ -23,13 +23,13 @@
 .sr-none { color: var(--sr-soft); font-style: italic; }
 
 /* label column | content column */
-.sr-row { display: grid; grid-template-columns: 1.85in minmax(0, 1fr); column-gap: 0.3in; }
+.sr-row { display: grid; grid-template-columns: 1.3in minmax(0, 1fr); column-gap: 0.22in; }
 .sr-l { font-family: var(--sr-sans); min-width: 0; }
 .sr-r { min-width: 0; }
 
 /* ---------- letterhead ---------- */
-.sr-head { display: grid; grid-template-columns: 1.85in minmax(0, 1fr) auto; column-gap: 0.3in; align-items: center; }
-.sr-logo { width: 1.45in; height: auto; display: block; }
+.sr-head { display: grid; grid-template-columns: 1.3in minmax(0, 1fr) auto; column-gap: 0.22in; align-items: center; }
+.sr-logo { width: 1.25in; height: auto; display: block; }
 .sr-kind { font: 600 10.5pt/1.2 var(--sr-sans); color: var(--sr-ink); }
 .sr-date { font: 400 10.5pt/1.2 var(--sr-sans); color: var(--sr-gray); text-align: right; }
 
@@ -43,7 +43,8 @@
 .sr-sec { margin-top: 0.24in; padding-top: 0.14in; border-top: 1px solid var(--sr-ink); break-inside: avoid-page; }
 .sr-notes, .rs-log { break-inside: auto; }
 .sr-k { font: 500 9pt/1.3 var(--sr-sans); color: var(--sr-gray); }
-.sr-l h2 { font: 600 12.5pt/1.25 var(--sr-sans); color: var(--sr-ink); break-after: avoid; }
+.sr-l h2 { font: 600 12pt/1.25 var(--sr-sans); color: var(--sr-ink); break-after: avoid; text-wrap: balance; }
+.sr-l .sr-sub { text-wrap: balance; }
 .sr-sub { margin-top: 3px !important; font: 400 9pt/1.4 var(--sr-sans); color: var(--sr-gray); }
 .sr-big { margin-top: 2px !important; font: 600 15pt/1.2 var(--sr-sans); color: var(--sr-ink); }
 .sr-sched-behind { color: var(--sr-red); }
@@ -127,7 +128,7 @@
   .sr-table thead, .sr-table colgroup { display: none; }
   .sr-table tr { padding: 10px 0; border-bottom: 1px solid var(--sr-hair); }
   .sr-table td { border: 0; padding: 1px 0; }
-  .sr-table td.sr-with:not(:empty)::before { content: 'With '; font-weight: 400; color: var(--sr-gray); }
+  .sr-table td.sr-with:not(:empty)::before { content: 'Ball in court: '; font-weight: 400; color: var(--sr-gray); }
   .sr-meets li { display: block; }
 }
 
