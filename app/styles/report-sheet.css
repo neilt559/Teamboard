@@ -72,7 +72,7 @@
 .sr-late { color: var(--sr-red); font-weight: 700; }
 
 /* Submittals & Permits: a plain table, hairlines between rows */
-.sr-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.sr-table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }   /* globals.css gives every table min-width: 640px */
 .sr-table thead { display: table-header-group; }
 .sr-table th { padding: 0 8px 6px 0; background: none; border-bottom: 1px solid var(--sr-rule); font: 400 9pt/1.3 var(--sr-sans); color: var(--sr-gray); text-align: left; vertical-align: bottom; text-transform: none; letter-spacing: 0; }
 .sr-table td { padding: 8px 8px 9px 0; border-bottom: 1px solid var(--sr-hair); vertical-align: top; overflow-wrap: anywhere; line-height: 1.35; }
