@@ -21,6 +21,8 @@ import './styles/report-sheet.css';
 import './styles/project-strip.css';
 // Release 3 (K1): the monthly challenge pages, the Home challenge widget and the /culture challenge cards.
 import './styles/challenges.css';
+// Office bingo (2026-10-19): the bingo challenge page and its summary on the challenge cards.
+import './styles/bingo.css';
 
 export const metadata = {
   title: { default: 'TeamBoard', template: '%s · TeamBoard' },

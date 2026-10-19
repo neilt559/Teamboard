@@ -4,6 +4,7 @@ import { api as tbApi } from '@/app/_ui/api';
 import { byPos } from '@/app/_ui/tasks';
 import { IconAlert, IconGlobe } from '@/app/icons';
 import GeoPage from './geo-ui';
+import { canTouchOfficeStats } from '@/lib/policy';
 
 // GeoGuessr's data and handlers, kept exactly as they were on the old single page (design §2.3, §10(d)):
 // addGeo, deleteGeo (with its native confirm), joinGeo, createGeoOffice and bumpFiveK are copied verbatim from
@@ -25,7 +26,7 @@ const api = (path, opts) => tbApi(path, { quiet: true, ...opts });
 
 const visible = () => typeof document === 'undefined' || document.visibilityState === 'visible';
 
-export default function GeoClient({ initial }) {
+export default function GeoClient({ initial, rights = null }) {
   const [data, setData] = useState(initial);
   const [error, setError] = useState(null);
   const guard = useRef(0);
@@ -136,6 +137,7 @@ export default function GeoClient({ initial }) {
         onFiveK={bumpFiveK}
         onJoin={joinGeo}
         onCreate={createGeoOffice}
+        canEdit={(officeId) => canTouchOfficeStats(rights, officeId)}
       />
     </>
   );

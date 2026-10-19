@@ -14,3 +14,10 @@
 .geo-widget-meta { color: var(--muted); white-space: nowrap; margin-left: auto; }
 .geo-widget-go { flex: 0 0 auto; align-self: center; color: var(--muted); }
 .geo-widget:hover .geo-widget-go { color: var(--lime-dark); }
+
+/* Another office's column (Neil, 2026-10-19: only admins and the office's own people change its stats): the 5K
+   button stays gold but can't be pressed, and a note sits where the score form was. */
+.fivek-btn:disabled { cursor: default; filter: saturate(.85); }
+.fivek-btn:disabled:hover { filter: saturate(.85); }
+.fivek-btn:disabled:active { transform: none; box-shadow: inset 0 2px 0 rgba(255,255,255,.65), inset 0 -3px 0 rgba(0,0,0,.12), 0 5px 0 #8a6400, 0 10px 22px rgba(224,168,0,.35); }
+.geo-readonly { margin: 4px 0 12px; padding: 8px 12px; border-radius: 8px; background: #f6f6f7; color: var(--muted); font-size: 13px; }

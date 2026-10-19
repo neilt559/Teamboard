@@ -2,10 +2,12 @@ import { notFound } from 'next/navigation';
 import { requirePageViewer, publicViewer } from '@/lib/viewer';
 import { loadChallengePage } from '@/lib/queries/challenges';
 import ChallengeView from '../_components/ChallengeView';
+import BingoView from '../_components/BingoView';
 
 // /culture/challenges/[id]: one challenge (design §2.1, §10(a); agent K1): "Log my stats", my entries (edit and
 // delete my own until the end date + 3 days), my standing and the leaderboards (Individuals / Offices / Departments).
-// Organizers also edit or archive the challenge and see every entry. Everyone reads every challenge; an archived
+// Organizers also edit or archive the challenge and see every entry. An office bingo challenge gets the bingo
+// cards instead (BingoView). Everyone reads every challenge; an archived
 // one is the not-found page except for organizers.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -23,5 +25,6 @@ export default async function ChallengePage({ params }) {
   if (!/^[0-9]{1,18}$/.test(String(params.id))) notFound();
   const data = await loadChallengePage(viewer, params.id);
   if (!data) notFound();
+  if (data.challenge.kind === 'bingo') return <BingoView initial={data} viewer={publicViewer(viewer)} />;
   return <ChallengeView initial={data} viewer={publicViewer(viewer)} />;
 }

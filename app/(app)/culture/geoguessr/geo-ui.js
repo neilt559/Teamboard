@@ -2,7 +2,9 @@
 // GeoGuessr UI, copied verbatim from the old single page (app/_legacy/page.legacy.js:1622-1910; design §2.3,
 // §10(d)). Neil's rule: GeoGuessr stays exactly as it is. The ONE approved change: GeoTracker's default date
 // is the browser's local date (localISO(new Date())) instead of the UTC date, so it no longer pre-fills
-// tomorrow after 7-8 PM Eastern. Everything else below is byte-for-byte the old code.
+// tomorrow after 7-8 PM Eastern. The second (Neil, 2026-10-19: "everyone but admins can only touch their office's
+// stats"): GeoPage takes canEdit(officeId), and FiveKCounter / GeoTracker take readOnly, which hides the score form,
+// the deletes and the 5K taps for other offices. Everything else below is byte-for-byte the old code.
 // The handlers that feed these components live in GeoClient.js (also verbatim).
 import { useState, useRef } from 'react';
 import { burstConfetti } from '@/app/confetti';
@@ -10,7 +12,7 @@ import { IconGlobe, IconStar } from '@/app/icons';
 import { localISO } from '@/app/_ui/tasks';
 
 // Every GeoGuessr office side by side, each with its full tracker.
-function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJoin, onCreate }) {
+function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJoin, onCreate, canEdit = () => true }) {
   const [adding, setAdding] = useState(false);
   return (
     <>
@@ -25,11 +27,13 @@ function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJo
             <div className="section-head">
               <h2 className="geo-office-name">{o.name}</h2>
             </div>
-            <FiveKCounter count={Number(o.fivek) || 0} onChange={(delta) => onFiveK(o.id, delta)} />
+            <FiveKCounter count={Number(o.fivek) || 0} onChange={(delta) => onFiveK(o.id, delta)} readOnly={!canEdit(o.id)} />
             <GeoTracker
               scores={geo.filter((g) => String(g.office_id) === String(o.id))}
               onAdd={(score, date) => onAddGeo(o.id, score, date)}
               onDelete={onDeleteGeo}
+              readOnly={!canEdit(o.id)}
+              officeName={o.name}
             />
           </section>
         ))}
@@ -78,7 +82,7 @@ function AddGeoOfficeModal({ available, onJoin, onCreate, onClose }) {
 
 // Big celebratory tally of perfect 5,000-point guesses. Tap to add one (with a
 // little burst); "Undo one" takes it back if someone hits it by accident.
-function FiveKCounter({ count, onChange }) {
+function FiveKCounter({ count, onChange, readOnly = false }) {
   const [burst, setBurst] = useState(0);
   const btnRef = useRef(null);
   const hit = () => {
@@ -97,11 +101,11 @@ function FiveKCounter({ count, onChange }) {
   return (
     <div className="fivek">
       <div className="fivek-stage">
-        <button ref={btnRef} type="button" className="fivek-btn" onClick={hit} title="Nailed a 5,000? Tap to add one!">
+        <button ref={btnRef} type="button" className="fivek-btn" onClick={readOnly ? undefined : hit} disabled={readOnly} title={readOnly ? 'Only this office’s people can add its 5Ks' : 'Nailed a 5,000? Tap to add one!'}>
           <span className="fivek-shine" aria-hidden />
           <span className="fivek-top"><IconStar /> 5K Club <IconStar /></span>
           <span key={burst} className={`fivek-count${burst ? ' pop' : ''}`}>{count.toLocaleString()}</span>
-          <span className="fivek-sub">perfect 5,000s — tap when you nail one!</span>
+          <span className="fivek-sub">{readOnly ? 'perfect 5,000s' : 'perfect 5,000s — tap when you nail one!'}</span>
         </button>
         {burst > 0 && (
           <div key={burst} className="fivek-burst" aria-hidden>
@@ -111,9 +115,9 @@ function FiveKCounter({ count, onChange }) {
           </div>
         )}
       </div>
-      <div className="fivek-foot">
+      {!readOnly && <div className="fivek-foot">
         <button type="button" className="fivek-undo" onClick={() => onChange(-1)} disabled={count <= 0} title="Pressed it by accident? Take one back">− Undo one</button>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -183,7 +187,7 @@ function monthlyAverages(scores) {
   return Object.keys(months).sort().map((k) => ({ id: 'm' + k, score: Math.round(months[k].reduce((a, b) => a + b, 0) / months[k].length), score_date: k }));
 }
 
-function GeoTracker({ scores, onAdd, onDelete }) {
+function GeoTracker({ scores, onAdd, onDelete, readOnly = false, officeName = '' }) {
   const today = localISO(new Date());
   const [date, setDate] = useState(today);
   const [val, setVal] = useState('');
@@ -196,11 +200,11 @@ function GeoTracker({ scores, onAdd, onDelete }) {
   const fmt = (v) => (v == null ? '—' : Math.round(v).toLocaleString());
   return (
     <>
-      <div className="geo-add">
+      {readOnly ? <p className="geo-readonly">Only {officeName || 'this office'}’s people (and admins) add {officeName || 'its'} scores.</p> : <div className="geo-add">
         <input type="date" className="date-input" value={date} onChange={(e) => setDate(e.target.value)} />
         <input type="number" className="geo-input" placeholder="Score" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
         <button className="btn btn-ink btn-sm" onClick={submit}>+ Add</button>
-      </div>
+      </div>}
       <div className="geo-chart-title">Daily scores</div>
       <GeoChart data={sorted} />
       <div className="geo-chart-title">Weekly average <span>(Mon–Fri)</span></div>
@@ -233,7 +237,7 @@ function GeoTracker({ scores, onAdd, onDelete }) {
                 <div key={s.id} className="geo-row">
                   <span className="geo-date">{s.score_date || '—'}</span>
                   <span className="geo-score">{Number(s.score).toLocaleString()}</span>
-                  <button className="row-x" title="Delete" onClick={() => onDelete(s.id)}>×</button>
+                  {!readOnly && <button className="row-x" title="Delete" onClick={() => onDelete(s.id)}>×</button>}
                 </div>
               ))}
             </div>

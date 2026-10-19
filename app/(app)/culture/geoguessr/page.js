@@ -13,7 +13,9 @@ export const maxDuration = 60;
 export const metadata = { title: 'GeoGuessr' };
 
 export default async function GeoGuessrPage() {
-  await requirePageViewer();
+  const viewer = await requirePageViewer();
+  // Who may change which office's scores and 5Ks (Neil, 2026-10-19): admins any, everyone else their own offices.
+  const rights = { is_admin: !!viewer.is_admin, office_ids: (viewer.office_ids || []).map(String) };
   let data;
   try {
     data = await loadGeo();
@@ -21,6 +23,7 @@ export default async function GeoGuessrPage() {
     throw tagUpdating(e);
   }
   // .geo-route only scopes the shell's phone and disabled-button rules away from GeoGuessr (app/styles/shell.css),
-  // so it looks exactly as it did; GeoClient and geo-ui.js are unchanged.
-  return <div className="geo-route"><GeoClient initial={data} /></div>;
+  // so it looks exactly as it did. The one change since (Neil, 2026-10-19): other offices' columns are read-only
+// unless you're an admin (rights -> GeoPage canEdit).
+  return <div className="geo-route"><GeoClient initial={data} rights={rights} /></div>;
 }

@@ -1,5 +1,6 @@
 import { handle, bad, notFound, parseId } from '@/lib/http';
 import { query } from '@/lib/db';
+import { requireOfficeStats } from '@/lib/office-stats';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -8,12 +9,14 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 // Bump an office's 5K counter by +1 or -1 (design §8.2, §10(d), rule 8). Done as a single atomic UPDATE so
-// simultaneous taps from different people all count; never goes below zero. Anyone signed in, any office.
+// simultaneous taps from different people all count; never goes below zero. Admins for any office, everyone else
+// for their own offices only (Neil, 2026-10-19).
 // Body { office_id, delta }: a negative delta is -1, anything else +1. Answers { id, fivek } as before.
-export const POST = handle(async ({ body }) => {
+export const POST = handle(async ({ viewer, body }) => {
   const { office_id, delta } = await body();
   if (!office_id) throw bad('office_id required');
   const officeId = parseId(office_id);
+  await requireOfficeStats(viewer, officeId);
   const d = Number(delta) < 0 ? -1 : 1;
   const r = await query(
     `UPDATE offices SET fivek = GREATEST(0, fivek + $1::int)

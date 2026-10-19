@@ -1,0 +1,151 @@
+/* Office bingo (Neil, 2026-10-19): the bingo challenge page (BingoView) and the bingo lines on the challenge cards
+   (BingoSummary). Brand ink #5B5859 and lime #CBCE00; a marked square gets a translucent lime "dauber" stamp with
+   the day it was marked. Phone (<= 720 px): the cards stack, squares shrink their type, 44 px tap targets. Every
+   class is bg-*. */
+
+.bg-mark {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--ink); color: var(--lime); font: 700 17px/1 'Barlow Condensed', sans-serif;
+  box-shadow: inset 0 0 0 3px #fff, 0 0 0 1px var(--ink);
+}
+
+/* ---------- prizes ---------- */
+.bg-prizes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 12px; }
+.bg-prize {
+  display: flex; align-items: center; gap: 12px; min-width: 0; padding: 11px 14px; border-radius: 12px;
+  background: var(--panel); border: 1px dashed #cfcfd1;
+}
+.bg-prize-icon { flex: 0 0 auto; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: #f1f1f2; color: var(--muted); }
+.bg-prize-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bg-prize-label { font: 700 13px/1.1 'Barlow Condensed', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+.bg-prize-who { font-size: 13.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.bg-prize-who b { color: var(--ink); font-size: 15px; }
+.bg-prize.is-won { border: 1px solid #e4c75a; background: #fffbea; box-shadow: inset 4px 0 0 #e0a800; }
+.bg-prize.is-won .bg-prize-icon { background: #fff1bf; color: #b88400; }
+
+/* ---------- today ---------- */
+.bg-today { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+.bg-today-line {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin: 0; padding: 10px 14px; border-radius: 10px;
+  background: #fafbea; border: 1px solid #e3e4b8; color: var(--ink); font-size: 14px;
+}
+.bg-today-line.is-done { background: #fff; border-color: var(--line); color: var(--ink-2); }
+.bg-today-line.is-done .icon { color: var(--lime-dark); }
+.bg-today-line.muted { background: #f6f6f7; border-color: var(--line); color: var(--muted); }
+.bg-today-undo { margin-left: auto; }
+
+/* ---------- the cards ---------- */
+.bg-cards { display: grid; gap: 14px; margin: 0 0 14px; align-items: start; }
+.bg-cards-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bg-cards-3 { grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); }
+.bg-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-width: 0; }
+.bg-card.is-mine { border-color: #d6d7a0; box-shadow: 0 0 0 1px #e9eac4; }
+.bg-card-head { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+.bg-card-name { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 17px; color: var(--ink); min-width: 0; }
+.bg-card-name .icon { color: var(--muted); flex: 0 0 auto; }
+.bg-card-count { margin-left: auto; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.bg-card-count b { color: var(--ink); font-size: 16px; }
+.bg-card-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 10px; }
+.bg-badge {
+  display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; background: #f6f7e4; color: #6f7100;
+  font: 700 12.5px/1.2 'Barlow Condensed', sans-serif; letter-spacing: .07em; text-transform: uppercase; box-shadow: inset 0 0 0 1px #d6d7a0;
+}
+.bg-badge.is-first { background: #e0a800; color: #fff; box-shadow: none; }
+
+.bg-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.bg-letter {
+  display: grid; place-items: center; height: 34px; border-radius: 8px 8px 3px 3px; background: var(--ink); color: var(--lime);
+  font: 700 22px/1 'Barlow Condensed', sans-serif; letter-spacing: .02em;
+}
+.bg-sq {
+  position: relative; display: flex; align-items: center; justify-content: center; min-height: 92px; min-width: 0;
+  padding: 6px 5px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
+  font: 600 12.5px/1.2 'Barlow', sans-serif; text-align: center; overflow-wrap: anywhere; hyphens: auto; overflow: hidden;
+}
+.bg-sq-text { position: relative; z-index: 1; }
+.bg-sq.is-open { cursor: pointer; border-color: #d7d8b0; transition: background .12s, border-color .12s, transform .08s; }
+.bg-sq.is-open:hover { background: #fafbea; border-color: var(--lime-dark); }
+.bg-sq.is-open:active { transform: scale(.97); }
+.bg-sq.is-open:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(203, 206, 0, .5); }
+.bg-sq.is-open:disabled { cursor: progress; }
+
+/* the four corners carry a small notch (gold once an office has all four) */
+.bg-sq.is-corner::before { content: ''; position: absolute; width: 0; height: 0; border-style: solid; z-index: 0; }
+.bg-sq.is-corner[data-square="0"]::before { top: 0; left: 0; border-width: 11px 11px 0 0; border-color: #d4d4d6 transparent transparent transparent; }
+.bg-sq.is-corner[data-square="4"]::before { top: 0; right: 0; border-width: 0 11px 11px 0; border-color: transparent #d4d4d6 transparent transparent; }
+.bg-sq.is-corner[data-square="20"]::before { bottom: 0; left: 0; border-width: 11px 0 0 11px; border-color: transparent transparent transparent #d4d4d6; }
+.bg-sq.is-corner[data-square="24"]::before { bottom: 0; right: 0; border-width: 0 0 11px 11px; border-color: transparent transparent #d4d4d6 transparent; }
+.bg-sq.in-corners[data-square="0"]::before { border-top-color: #e0a800; }
+.bg-sq.in-corners[data-square="4"]::before { border-right-color: #e0a800; }
+.bg-sq.in-corners[data-square="20"]::before { border-left-color: #e0a800; }
+.bg-sq.in-corners[data-square="24"]::before { border-bottom-color: #e0a800; }
+
+/* a marked square: the dauber stamp, with the day it was marked */
+.bg-sq.is-marked { padding-bottom: 20px; }
+.bg-dab {
+  position: absolute; left: 50%; top: 50%; z-index: 0; width: 84%; max-width: 86px; aspect-ratio: 1 / 1; max-height: 90%;
+  transform: translate(-50%, -50%) rotate(-8deg); border-radius: 50% 47% 52% 49%;
+  background: radial-gradient(circle at 42% 38%, rgba(214, 217, 40, .62), rgba(203, 206, 0, .5) 58%, rgba(179, 182, 0, .58) 100%);
+  box-shadow: 0 0 0 1.5px rgba(179, 182, 0, .35);
+}
+.bg-day {
+  position: absolute; left: 50%; bottom: 4px; z-index: 2; transform: translateX(-50%); padding: 1px 6px; border-radius: 999px;
+  background: var(--ink); color: #fff; font: 700 10.5px/1.3 'Barlow Condensed', sans-serif; letter-spacing: .04em; white-space: nowrap;
+}
+.bg-sq.is-today .bg-dab { box-shadow: 0 0 0 2px var(--ink); }
+.bg-sq.is-today .bg-day { background: var(--lime); color: var(--on-lime); }
+.bg-sq.in-line { border-color: #c9cb5a; background: #fbfbe9; }
+.bg-sq.in-bingo { border: 2px solid #e0a800; background: #fffbea; }
+
+/* ---------- history ---------- */
+.bg-history { margin: 0 0 14px; }
+.bg-history summary { cursor: pointer; margin: 0; }
+.bg-history[open] summary { margin-bottom: 10px; }
+.bg-hist { list-style: none; margin: 0; padding: 0; }
+.bg-hist-row {
+  display: grid; grid-template-columns: 112px 110px minmax(0, 1fr) auto auto; align-items: center; gap: 4px 10px;
+  padding: 7px 2px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink-2);
+}
+.bg-hist-row:first-child { border-top: none; }
+.bg-hist-date { color: var(--muted); white-space: nowrap; }
+.bg-hist-office { font-weight: 700; color: var(--ink); }
+.bg-hist-sq { overflow-wrap: anywhere; }
+.bg-hist-who { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+
+/* ---------- on the challenge cards, Home and /culture ---------- */
+.bg-sum { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; width: 100%; }
+.bg-sum-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); min-width: 0; }
+.bg-sum-name { flex: 0 1 auto; font-weight: 700; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bg-sum-bar { flex: 1 1 60px; max-width: 160px; height: 7px; border-radius: 99px; background: #ececec; overflow: hidden; }
+.bg-sum-bar i { display: block; height: 100%; border-radius: inherit; background: var(--lime); }
+.bg-sum-n { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.bg-sum-row .bg-badge { font-size: 11px; padding: 1px 7px; }
+.bg-sum-you { font-weight: 600; color: var(--muted); font-size: 12px; }
+.bg-sum-wins { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); }
+.bg-sum-win { display: inline-flex; align-items: center; gap: 5px; }
+.bg-sum-win .icon { color: #b88400; }
+.bg-sum-win.is-open .icon { color: var(--muted); }
+
+/* ---------- phone ---------- */
+@media (max-width: 720px) {
+  .bg-prizes { grid-template-columns: 1fr; gap: 8px; }
+  .bg-cards-2, .bg-cards-3 { grid-template-columns: 1fr; }
+  .bg-card { padding: 10px; border-radius: 12px; }
+  .bg-grid { gap: 3px; }
+  .bg-letter { height: 28px; font-size: 19px; }
+  .bg-sq { min-height: 66px; padding: 4px 2px; font-size: 10.5px; line-height: 1.15; border-radius: 5px; }
+  .bg-sq.is-marked { padding-bottom: 16px; }
+  .bg-day { font-size: 9.5px; padding: 0 4px; bottom: 2px; }
+  .bg-today-undo { min-height: 44px; }
+  .bg-hist-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .bg-hist-row .btn { min-height: 44px; }
+}
+
+/* ---------- the setup form ---------- */
+.bg-form-offices .ch-opt { font-weight: 500; }
+.bg-form-squares { min-height: 220px; font-size: 13.5px; line-height: 1.5; resize: vertical; }
+.bg-form-preview { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; margin-top: 8px; max-width: 520px; }
+.bg-form-cell {
+  display: flex; align-items: center; justify-content: center; min-height: 52px; padding: 3px; border: 1px solid var(--line);
+  border-radius: 5px; background: #fff; font-size: 10.5px; line-height: 1.15; text-align: center; color: var(--ink-2); overflow-wrap: anywhere;
+}
