@@ -9,10 +9,10 @@ import { ScheduleBadge } from '@/app/_ui/project-status';
 import { fmtYmd } from '@/app/_ui/project-format';
 import ReportSheet, { PendingReviewNotice } from '../_components/ReportDoc';
 import ReportActions from '../_components/ReportActions';
-import SheetFit from '../_components/SheetFit';
+import ReportReady from '../_components/ReportReady';
 import { reportSig } from '../_components/report-model';
 
-// /reports/owner?name=<owner> (design-amendments A6.7, A11): one printable packet for an owner company: one sheet
+// /reports/owner?name=<owner> (design-amendments A6.7, A15): one printable packet for an owner company: one report
 // per project (each active project the viewer can see with that owner, drawn like the single report: ReportDoc.js,
 // report-sheet.css), with Save as PDF and Copy for email. The overview above the sheets (owner, report date, the
 // projects in it) is screen only: the packet prints as sheets alone. A blank name is a 404; an
@@ -51,7 +51,7 @@ export default async function OwnerPacketPage({ searchParams }) {
         <div className="rp-paper rp-cover">
           <p className="rp-cover-k">Weekly packet for</p>
           <h1 className="rp-cover-owner">{data.owner}</h1>
-          <p className="rp-cover-n">{n} active {n === 1 ? 'project' : 'projects'} · {fmtYmd(data.report_date, { long: true })} · one sheet per project</p>
+          <p className="rp-cover-n">{n} active {n === 1 ? 'project' : 'projects'} · {fmtYmd(data.report_date, { long: true })} · one report per project</p>
           {n > 0 ? (
             <ol className="rp-toc">
               {data.projects.map((p) => (
@@ -74,7 +74,7 @@ export default async function OwnerPacketPage({ searchParams }) {
           ))}
         </div>
       )}
-      {n > 0 && <SheetFit key={reportSig([data.projects, data.prepared_by, data.report_date])} />}
+      {n > 0 && <ReportReady key={reportSig([data.projects, data.prepared_by, data.report_date])} />}
     </div>
   );
 }

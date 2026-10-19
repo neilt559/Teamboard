@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { IconCheck, IconFile, IconPaperclip } from '@/app/icons';
 import { reportEmail } from './report-email';
+import logo from '@/public/brand/cage-logo-horizontal.png';
 
 // The report pages' buttons (design-amendments A6.6, A6.7), hidden when printing: Back, Copy for email
 // (ClipboardItem with text/html + text/plain, so it pastes formatted into Outlook or Gmail; falls back to plain
@@ -48,7 +49,9 @@ export default function ReportActions({ reports, reportDate, owner = '', prepare
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const copy = async () => {
-    const { html, text } = reportEmail(reports, { reportDate, owner, preparedBy });
+    // The logo is a public /_next/static file, so the pasted email can load it without a sign-in.
+    const logoUrl = new URL(logo.src, window.location.origin).href;
+    const { html, text } = reportEmail(reports, { reportDate, owner, preparedBy, logoUrl });
     const r = await copyReport(html, text);
     setState(r || 'fail');
     if (timer.current) clearTimeout(timer.current);

@@ -6,11 +6,11 @@ import { loadProjectReport } from '@/lib/queries/reports';
 import Crumbs from '@/app/_ui/Crumbs';
 import ReportSheet, { PendingReviewNotice } from '../../../reports/_components/ReportDoc';
 import ReportActions from '../../../reports/_components/ReportActions';
-import SheetFit from '../../../reports/_components/SheetFit';
+import ReportReady from '../../../reports/_components/ReportReady';
 import { reportSig } from '../../../reports/_components/report-model';
 
 // /projects/[projectId]/report (design-amendments A6.6, A11): the project's status report for its owner, drawn as a
-// sheet from a CAGE plan set (ReportDoc.js; report-sheet.css: Letter, one sheet for typical content, the app's chrome
+// standard business report (ReportDoc.js; report-sheet.css: portrait Letter, flowing onto more pages if needed; the app's chrome
 // hidden in print) with Save as PDF and Copy for email. "Prepared by" in the title block is the viewer.
 // Same visibility as the project (tb_can_see_project in the loader): anything else is the same 404 as a missing
 // project. Built only from lib/queries/reports.js loadProjectReport (report-safe columns): never tasks,
@@ -49,7 +49,7 @@ export default async function ProjectReportPage({ params }) {
       <div className="rs-set">
         <ReportSheet project={p} reportDate={data.report_date} preparedBy={data.prepared_by} />
       </div>
-      <SheetFit key={reportSig([p, data.prepared_by, data.report_date])} />
+      <ReportReady key={reportSig([p, data.prepared_by, data.report_date])} />
     </div>
   );
 }
