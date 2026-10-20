@@ -1,5 +1,7 @@
 import { requirePageViewer, publicViewer } from '@/lib/viewer';
 import { loadNav } from '@/lib/queries/nav';
+import { loadBracketSummary } from '@/lib/queries/brackets';
+import { nowFromRequestContext } from '@/lib/clock';
 import AppShell from '@/app/_ui/AppShell';
 
 // Every signed-in page (design §2.1). The guard here covers the first load only: layouts don't re-render on
@@ -27,6 +29,21 @@ function Updating() {
   );
 }
 
+// The Culture tab's dot (Neil, 2026-10-20: "every day the new culture bracket opens up lets give a small
+// notification"): how many matchups of the bracket's open round the viewer hasn't voted in yet. A new round each day
+// lights it again; voting clears it. The same cached loader as the Home bracket card, so they always agree. Never
+// breaks a page: on any error it is 0.
+async function bracketTodo(viewer) {
+  try {
+    const s = await loadBracketSummary(viewer, nowFromRequestContext());
+    if (!s || s.open_round == null || s.current?.champion_id) return 0;
+    return Math.max(0, (s.open_votable || 0) - (s.my_open_votes || 0));
+  } catch (e) {
+    console.error('[bracket-dot]', e?.message);
+    return 0;
+  }
+}
+
 export default async function AppLayout({ children }) {
   let viewer;
   let nav;
@@ -37,5 +54,5 @@ export default async function AppLayout({ children }) {
     if (UPDATING_CODES.has(e?.code)) return <Updating />;
     throw e;
   }
-  return <AppShell viewer={publicViewer(viewer)} nav={nav}>{children}</AppShell>;
+  return <AppShell viewer={publicViewer(viewer)} nav={{ ...nav, bracket_todo: await bracketTodo(viewer) }}>{children}</AppShell>;
 }

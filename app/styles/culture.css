@@ -90,3 +90,8 @@ a.bk-past-open { text-decoration: none; }
 .ba-empty { margin: 4px 0; font-size: 13px; color: var(--muted); }
 .ba-ok { background: #eef7e9; color: #237a3b; border-radius: 8px; padding: 8px 11px; font-size: 13px; margin: 10px 0; }
 @media (max-width: 720px) { .ba-row .btn { min-height: 44px; } }
+
+/* The open bracket round is waiting for your vote (Neil, 2026-10-20): a dot on the Culture tab, a tag on the Home card. */
+.tab-dot { display: inline-block; width: 8px; height: 8px; margin-left: 5px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 2px var(--ink); vertical-align: 6px; flex: 0 0 auto; }
+.bn-icon .tab-dot { position: absolute; top: -1px; right: -5px; margin: 0; box-shadow: 0 0 0 2px #fff; }
+.bw-new { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--lime); color: var(--on-lime); font-size: 11px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; vertical-align: 2px; }

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { TABS, tabFor, unreadCount, Badge } from './Header';
+import { TABS, tabFor, unreadCount, Badge, BracketDot } from './Header';
 
 // Phone tab bar (<= 720 px, design §2.2): fixed, 58 px plus the safe-area inset. Active item = lime underline.
 // All tasks and People are in the drawer. "Posts" (the Suggestions/Announcements boards, design-amendments A10.4)
@@ -22,7 +22,7 @@ export default function BottomNav({ nav, pathname }) {
           aria-current={active === key ? 'page' : undefined}
           title={short ? label : undefined}
         >
-          <span className="bn-icon"><Icon size={20} />{key === 'posts' && <Badge n={unread} label="unread" />}</span>
+          <span className="bn-icon"><Icon size={20} />{key === 'posts' && <Badge n={unread} label="unread" />}{key === 'culture' && <BracketDot n={nav?.bracket_todo} />}</span>
           <span className="bn-label">{short || label}</span>
         </Link>
       ))}

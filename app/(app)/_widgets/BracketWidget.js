@@ -52,7 +52,7 @@ export function BracketCard({ summary }) {
     <Link href="/culture/brackets" prefetch={false} className="home-card bracket-widget">
       <span className="home-card-icon"><IconTrophy size={22} /></span>
       <span className="home-card-main">
-        <span className="home-card-name">{l.title}</span>
+        <span className="home-card-name">{l.title}{l.todo && <span className="bw-new">Vote</span>}</span>
         {l.champ && <span className="bw-champ"><IconTrophy size={13} /> Champion: <b>{l.champ}</b></span>}
         {l.live && <span className="bw-live"><span className="bk-rs-dot" aria-hidden="true" /> <span>{l.live}</span></span>}
         {l.mine && <span className={`bw-mine${l.todo ? ' todo' : ''}`}>{l.mine}</span>}

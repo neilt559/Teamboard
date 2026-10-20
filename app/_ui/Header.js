@@ -47,6 +47,11 @@ export function unreadCount(nav) {
   if (u && typeof u.total === 'number') return u.total;
   return 0;
 }
+// A small lime dot on the Culture tab while the open bracket round has matchups the viewer hasn't voted in.
+export const BracketDot = ({ n }) => (n > 0
+  ? <span className="tab-dot" title={`${n} bracket matchup${n === 1 ? '' : 's'} waiting for your vote`} aria-label={`${n} bracket matchup${n === 1 ? '' : 's'} waiting for your vote`} />
+  : null);
+
 export const Badge = ({ n, label }) => (n > 0 ? <span className="tab-badge" aria-label={label ? `${n} ${label}` : undefined}>{n > 99 ? '99+' : n}</span> : null);
 
 function UserMenu({ viewer, nav, pathname }) {
@@ -202,6 +207,7 @@ export default function Header({ viewer, nav, pathname, drawerOpen, onMenu }) {
           >
             <Icon size={16} /> {label}
             {key === 'posts' && <Badge n={unread} label="unread" />}
+            {key === 'culture' && <BracketDot n={nav?.bracket_todo} />}
           </Link>
         ))}
       </nav>
