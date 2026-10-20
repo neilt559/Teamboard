@@ -5,6 +5,7 @@ import { isOrganizer } from '@/lib/policy';
 import { chicagoToday } from '@/lib/time';
 import { monthRange } from '@/lib/challenges';
 import { listChallengeOffices } from '@/lib/queries/challenges';
+import { listCookChoices } from '@/lib/queries/chili';
 import { IconMedal } from '@/app/icons';
 import ChallengeForm from '../_components/ChallengeForm';
 
@@ -35,6 +36,6 @@ export default async function NewChallengePage() {
     );
   }
   const today = chicagoToday(nowFromRequestContext());
-  const offices = await listChallengeOffices();
-  return <ChallengeForm mode="new" defaults={monthRange(today)} offices={offices} today={today} />;
+  const [offices, cooks] = await Promise.all([listChallengeOffices(), listCookChoices()]);
+  return <ChallengeForm mode="new" defaults={monthRange(today)} offices={offices} today={today} cooks={cooks} homeOfficeId={viewer.office_id || ''} />;
 }

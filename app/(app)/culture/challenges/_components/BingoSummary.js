@@ -1,6 +1,7 @@
 import { IconTrophy } from '@/app/icons';
 import { fmtDay } from '@/lib/challenges';
 import { CELLS } from '@/lib/bingo';
+import { fmtAvg } from '@/lib/chili';
 
 // An office bingo challenge on the cards (the challenge list, Home's challenge widget, the /culture cards): each
 // playing office's marked squares as a bar, then the two prizes. A plain module (no hooks), so server pages render
@@ -43,6 +44,29 @@ export function BingoMyLine({ c }) {
   return (
     <span className="ch-w-me">
       {mine.map((o) => `${o.name}: ${o.picked_today ? 'today’s square is marked' : 'today’s square is open'}`).join(' · ')}
+    </span>
+  );
+}
+
+// A chili cook-off on the cards: before the reveal the next chili and the viewer's progress (never a score); after
+// it, the winner with the average.
+export function ChiliLine({ c, short = false }) {
+  const z = c.chili || {};
+  if (z.revealed) {
+    const w = z.winners || [];
+    return (
+      <span className="bg-sum-wins">
+        <span className={`bg-sum-win${w.length ? '' : ' is-open'}`}>
+          <IconTrophy size={13} /> {w.length ? <>Winner: <b>{w.map((x) => x.cook_name).join(' and ')}</b>{short ? '' : ` (${fmtAvg(w[0].average)} average)`}</> : 'No ratings'}
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span className="ch-w-me">
+      {z.next_week_of ? `Next chili: week of ${fmtDay(z.next_week_of)}` : 'Every chili is in'}
+      {z.total ? ` · You’ve rated ${z.my_rated} of ${z.total}` : ''}
+      {short ? '' : ' · Results stay secret until the end'}
     </span>
   );
 }

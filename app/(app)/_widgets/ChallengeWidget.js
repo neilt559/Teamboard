@@ -6,7 +6,7 @@ import { fmtDay, fmtRange, fmtScore, metricLine, timeLabel } from '@/lib/challen
 import { IconMedal, IconBuilding, IconChevronRight, IconCheck, IconPlus } from '@/app/icons';
 import { Medal } from '../culture/challenges/_components/Medal';
 import { TopRow } from '../culture/challenges/_components/ChallengeCard';
-import { BingoMyLine, BingoOffices, BingoWinners } from '../culture/challenges/_components/BingoSummary';
+import { BingoMyLine, BingoOffices, BingoWinners, ChiliLine } from '../culture/challenges/_components/BingoSummary';
 
 // Home dashboard widget 'challenge' (design §2.1 "this month's challenge", §10(a), §11; agent K1) and the
 // challenge cards on /culture. Async Server Components that load their own data (one cached loader per request):
@@ -57,8 +57,28 @@ function FeaturedBingo({ c, today }) {
   );
 }
 
+// Chili cook-off: the next chili, the viewer's progress, a button to rate; after the reveal the winner.
+function FeaturedChili({ c, today }) {
+  return (
+    <div className="ch-w-feature">
+      <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="ch-w-title">{c.title || 'Chili cook-off'}</Link>
+      <span className="ch-w-meta">
+        {c.status === 'running' ? <span className="ch-live-dot" aria-hidden="true" /> : null}
+        {timeLabel(c, today)} · Chili cook-off
+      </span>
+      <div className="ch-w-mine">
+        <ChiliLine c={c} />
+        {c.can_rate && (
+          <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="btn btn-lime btn-sm wi ch-w-log"><IconCheck size={14} /> Rate the chili</Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Featured({ c, viewerId, today }) {
   if (c.kind === 'bingo') return <FeaturedBingo c={c} today={today} />;
+  if (c.kind === 'chili') return <FeaturedChili c={c} today={today} />;
   return (
     <div className="ch-w-feature">
       <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="ch-w-title">{c.title || 'This month’s challenge'}</Link>
@@ -94,6 +114,7 @@ function OtherRow({ c }) {
           <span className="wl-meta">
             {c.office_id ? `${c.office_name} office · ` : ''}{timeLabel(c, c._today)}
             {c.kind === 'bingo' ? ` · ${(c.bingo?.offices || []).map((o) => `${o.name} ${o.marks}`).join(', ')}`
+              : c.kind === 'chili' ? (c.chili?.revealed ? ` · Winner: ${(c.chili.winners || []).map((w) => w.cook_name).join(' and ') || 'none'}` : ` · You’ve rated ${c.chili?.my_rated || 0} of ${c.chili?.total || 0}`)
               : c.me?.score != null ? ` · You: ${fmtScore(c, c.me.score)}${c.me.rank ? ` (#${c.me.rank})` : ''}` : lead ? ` · Leading: ${lead.name}` : ''}
           </span>
         </span>
@@ -108,7 +129,7 @@ export default async function ChallengeWidget({ viewer, now } = {}) {
   const main = s.featured || s.others[0] || null;
   const rest = s.others.filter((c) => c !== main).map((c) => ({ ...c, _today: s.today }));
   const last = s.recent[0] || null;
-  const lastWinners = last && last.kind !== 'bingo' ? (last.top || []).filter((r) => r.rank === 1) : [];
+  const lastWinners = last && last.kind === 'stats' ? (last.top || []).filter((r) => r.rank === 1) : [];
   return (
     <section className="widget ch-widget" aria-labelledby="w-challenge">
       <div className="widget-head">
@@ -165,7 +186,7 @@ export async function ChallengeHubCards({ viewer, now, part = 'all' } = {}) {
                 <BingoOffices c={c} />
                 <BingoWinners c={c} short />
               </>
-            ) : (
+            ) : c.kind === 'chili' ? <ChiliLine c={c} short /> : (
               <>
                 <MyLine c={c} />
                 {c.top?.length > 0 && (
@@ -178,7 +199,8 @@ export async function ChallengeHubCards({ viewer, now, part = 'all' } = {}) {
             <span className="ch-hub-actions">
               {c.can_log && <Link href={`/culture/challenges/${c.id}#log`} prefetch={false} className="btn btn-lime btn-sm wi"><IconCheck size={14} /> Log my stats</Link>}
               {c.can_mark && <Link href={`/culture/challenges/${c.id}#today`} prefetch={false} className="btn btn-lime btn-sm wi"><IconCheck size={14} /> Mark today’s square</Link>}
-              <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="btn btn-plain btn-sm">{c.kind === 'bingo' ? 'CAGEO cards' : 'Leaderboards'}</Link>
+              {c.can_rate && <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="btn btn-lime btn-sm wi"><IconCheck size={14} /> Rate the chili</Link>}
+              <Link href={`/culture/challenges/${c.id}`} prefetch={false} className="btn btn-plain btn-sm">{c.kind === 'bingo' ? 'CAGEO cards' : c.kind === 'chili' ? 'Open the cook-off' : 'Leaderboards'}</Link>
             </span>
           </span>
         </section>
@@ -211,6 +233,7 @@ export async function ChallengeHubCards({ viewer, now, part = 'all' } = {}) {
                       <span className="ch-past-meta">
                         {fmtRange(c.starts_on, c.ends_on)}
                         {c.kind === 'bingo' ? <> · <BingoWinners c={c} short /></>
+                          : c.kind === 'chili' ? <> · <ChiliLine c={c} short /></>
                           : w.length ? <> · <Medal rank={1} size={15} /> {w.map((x) => x.name).join(', ')} ({fmtScore(c, w[0].score)})</> : ' · no entries'}
                       </span>
                     </Link>

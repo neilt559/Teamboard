@@ -8,6 +8,7 @@ import { NotesEditor } from '@/app/notes-format';
 import { IconMedal, IconCheck, IconAlert } from '@/app/icons';
 import { AGGREGATIONS, GROUP_RANKS, LIMITS, MAX_RANGE_DAYS, fmtRange, monthRange } from '@/lib/challenges';
 import { CELLS, DEFAULT_RULES, DEFAULT_SQUARES, SQUARE_MAX, shuffle } from '@/lib/bingo';
+import { DEFAULT_RULES as CHILI_RULES, datesFor, isYmd, MAX_CHILIS } from '@/lib/chili';
 import { addDays, daysBetween } from '@/lib/time';
 
 // New / edit challenge (design §10(a) "Configuration"; organizers). A draft editor (design §7.4): the base is
@@ -28,24 +29,31 @@ const FIELDS = [...TEXT, 'aggregation', 'higher_is_better', 'group_rank', 'start
 const LABELS = { title: 'Title', description: 'Description', metric_label: 'What people log', unit: 'Unit' };
 
 const BINGO_FIELDS = ['squares_text', 'office_ids'];
+const CHILI_FIELDS = ['chilis_key'];
+// A chili row's identity for change detection (what is saved: the week, the cook).
+const chiliKey = (rows) => JSON.stringify((rows || []).map((r) => [r.id || '', r.week_of || '', r.cook_user_id || '', r.cook_user_id ? '' : (r.cook_name || '').trim()]));
+let rowSeq = 0;
+const newRow = (x = {}) => ({ key: `r${++rowSeq}`, id: '', week_of: '', cook_user_id: '', cook_name: '', other: false, ...x });
 const squareLines = (text) => String(text || '').split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
 const idsKey = (ids) => [...ids].map(String).sort().join(',');
 
-const fromChallenge = (c, offices) => ({
+const fromChallenge = (c, offices, schedule = []) => ({
   title: c.title || '', description: c.description || '', metric_label: c.metric_label || 'Points', unit: c.unit || '',
   aggregation: c.aggregation || 'sum', higher_is_better: c.higher_is_better !== false, group_rank: c.group_rank || 'avg',
   starts_on: c.starts_on, ends_on: c.ends_on, office_id: c.office_id ? String(c.office_id) : '',
-  kind: c.kind === 'bingo' ? 'bingo' : 'stats',
+  kind: c.kind === 'bingo' || c.kind === 'chili' ? c.kind : 'stats',
   squares_text: (c.squares || []).join('\n'),
   office_ids: idsKey(offices.filter((o) => o.playing).map((o) => o.id)),
+  chilis: schedule.map((x) => newRow({ id: x.id, week_of: x.week_of, cook_user_id: x.cook_user_id, cook_name: x.cook_name, other: !x.cook_user_id, count: x.count })),
+  chilis_key: chiliKey(schedule),
 });
 
-export default function ChallengeForm({ mode, challenge = null, defaults = null, offices = [], today }) {
+export default function ChallengeForm({ mode, challenge = null, defaults = null, offices = [], today, cooks = [], schedule = [], homeOfficeId = '' }) {
   const router = useRouter();
-  const start = challenge ? fromChallenge(challenge, offices) : {
+  const start = challenge ? fromChallenge(challenge, offices, schedule) : {
     title: '', description: '', metric_label: 'Miles', unit: 'mi', aggregation: 'sum', higher_is_better: true, group_rank: 'avg',
     starts_on: defaults?.starts_on, ends_on: defaults?.ends_on, office_id: '',
-    kind: 'stats', squares_text: '', office_ids: '',
+    kind: 'stats', squares_text: '', office_ids: '', chilis: [], chilis_key: '[]',
   };
   const [base, setBase] = useState(start);          // frozen when the form opened (edit)
   const [f, setF] = useState(start);
@@ -63,7 +71,16 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
   const set = (k, v) => setMany({ [k]: v });
   const isEdit = mode === 'edit';
   const bingo = f.kind === 'bingo';
-  const changed = [...FIELDS, ...(bingo ? BINGO_FIELDS : [])].filter((k) => f[k] !== base[k]);
+  const chili = f.kind === 'chili';
+  const stats = !bingo && !chili;
+  const changed = [...FIELDS, ...(bingo ? BINGO_FIELDS : []), ...(chili ? CHILI_FIELDS : [])].filter((k) => f[k] !== base[k]);
+  // The chili schedule: every change re-derives the dates (first chili's Monday to the last chili's Friday).
+  const setChiliRows = (rows) => {
+    const span = datesFor(rows.map((r) => r.week_of).filter(isYmd));
+    setMany({ chilis: rows, chilis_key: chiliKey(rows), ...(span || {}) });
+    setBad((b) => (b.chilis ? { ...b, chilis: undefined } : b));
+  };
+  const editRow = (key, patch) => setChiliRows(f.chilis.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const squares = squareLines(f.squares_text);
   const marked = offices.some((o) => o.marked);          // an office has marked a square: the order is set
   const playing = new Set(f.office_ids ? f.office_ids.split(',') : []);
@@ -76,6 +93,15 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
   // through the end of the month; switching back leaves what was typed.
   const pickKind = (kind) => {
     if (kind === f.kind) return;
+    if (kind === 'chili') {
+      const patch = { kind };
+      if (!f.title.trim()) patch.title = 'Chili Cook-Off';
+      if (!f.description.trim()) { patch.description = CHILI_RULES; setEditorKey((n) => n + 1); }
+      if (!f.office_id && homeOfficeId) patch.office_id = String(homeOfficeId);
+      setMany(patch);
+      if (!f.chilis.length) setChiliRows([newRow()]);
+      return;
+    }
     if (kind === 'bingo') {
       const patch = { kind };
       if (!f.squares_text.trim()) patch.squares_text = shuffle(DEFAULT_SQUARES).join('\n');
@@ -102,6 +128,11 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
     if (!f.ends_on) b.ends_on = 'Pick the end date.';
     if (f.starts_on && f.ends_on && f.ends_on < f.starts_on) b.ends_on = 'The end date can’t be before the start date.';
     else if (f.starts_on && f.ends_on && daysBetween(f.starts_on, f.ends_on) + 1 > MAX_RANGE_DAYS) b.ends_on = 'A challenge can run for a year at most.';
+    if (chili) {
+      if (!f.chilis.length) b.chilis = 'Add at least one chili week.';
+      else if (f.chilis.some((r) => !isYmd(r.week_of))) b.chilis = 'Pick the week for every chili.';
+      else if (f.chilis.some((r) => !r.cook_user_id && !(r.cook_name || '').trim())) b.chilis = 'Pick or type the cook for every chili.';
+    }
     if (bingo) {
       if (squares.length !== CELLS) b.squares_text = `The card needs exactly ${CELLS} squares, one per line (it has ${squares.length}).`;
       else if (squares.some((q) => q.length > SQUARE_MAX)) b.squares_text = `Keep each square to ${SQUARE_MAX} characters.`;
@@ -118,9 +149,12 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
     try {
       if (!isEdit) {
         const { squares_text, office_ids, ...rest } = f;   // eslint-disable-line no-unused-vars
+        const chiliBody = () => f.chilis.map((r) => ({ week_of: r.week_of, cook_user_id: r.cook_user_id || null, cook_name: r.cook_user_id ? '' : r.cook_name }));
         const body = bingo
           ? { kind: 'bingo', title: f.title, description: f.description, starts_on: f.starts_on, ends_on: f.ends_on, squares, office_ids: [...playing] }
-          : { ...rest, kind: 'stats', office_id: f.office_id || null };
+          : chili
+            ? { kind: 'chili', title: f.title, description: f.description, starts_on: f.starts_on, ends_on: f.ends_on, office_id: f.office_id || null, chilis: chiliBody() }
+            : { ...rest, kind: 'stats', office_id: f.office_id || null };
         const r = await api('/api/culture/challenges', { method: 'POST', body });
         router.push(`/culture/challenges/${r.id}`);
         router.refresh();
@@ -132,6 +166,7 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
       for (const k of changed) {
         if (k === 'squares_text') { body.squares = squares; continue; }
         if (k === 'office_ids') { body.office_ids = [...playing]; continue; }
+        if (k === 'chilis_key') { body.chilis = f.chilis.map((r) => ({ id: r.id || null, week_of: r.week_of, cook_user_id: r.cook_user_id || null, cook_name: r.cook_user_id ? '' : r.cook_name })); continue; }
         body[k] = k === 'office_id' ? (f.office_id || null) : f[k];
         if (TEXT.includes(k)) bases[k] = baseOverride && k in baseOverride ? baseOverride[k] : base[k];
       }
@@ -169,24 +204,28 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
   return (
     <div className="ch-page ch-form-page">
       <div className="proj-head">
-        <h1 className="wi-h"><IconMedal size={24} /> {isEdit ? (bingo ? 'Edit CAGEO' : 'Edit challenge') : 'New challenge'}</h1>
+        <h1 className="wi-h"><IconMedal size={24} /> {isEdit ? (bingo ? 'Edit CAGEO' : chili ? 'Edit chili cook-off' : 'Edit challenge') : 'New challenge'}</h1>
       </div>
       <form className="ch-form ch-panel" onSubmit={(e) => { e.preventDefault(); send(); }} noValidate>
         {!isEdit && (
           <fieldset className="ch-fieldset">
             <legend className="ch-label">Kind of challenge</legend>
             <div className="ch-seg" role="radiogroup">
-              <label className={`ch-seg-opt${!bingo ? ' on' : ''}`}>
-                <input type="radio" name="kind" value="stats" checked={!bingo} onChange={() => pickKind('stats')} /> Stats leaderboard
+              <label className={`ch-seg-opt${stats ? ' on' : ''}`}>
+                <input type="radio" name="kind" value="stats" checked={stats} onChange={() => pickKind('stats')} /> Stats leaderboard
               </label>
               <label className={`ch-seg-opt${bingo ? ' on' : ''}`}>
                 <input type="radio" name="kind" value="bingo" checked={bingo} onChange={() => pickKind('bingo')} /> CAGEO (office bingo)
               </label>
+              <label className={`ch-seg-opt${chili ? ' on' : ''}`}>
+                <input type="radio" name="kind" value="chili" checked={chili} onChange={() => pickKind('chili')} /> Chili cook-off
+              </label>
             </div>
+            {chili && <span className="ch-hint">One chili a week, rated 1 to 10 by everyone, blind and secret. The best average wins, revealed after the last chili.</span>}
             {bingo && <span className="ch-hint">Offices share one 5×5 card and mark one square a day for what their GeoGuessr round earned (honor system). Prizes: first CAGEO (five in a row) and four corners.</span>}
           </fieldset>
         )}
-        {!isEdit && !bingo && (
+        {!isEdit && stats && (
           <div className="ch-ideas">
             <span className="ch-label">Start from an idea</span>
             <div className="ch-ideas-row">
@@ -199,7 +238,7 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
         <label className="ch-field">
           <span className="ch-label">Title</span>
           <input className={`field ch-input${bad.title ? ' ch-bad' : ''}`} maxLength={LIMITS.title} value={f.title}
-            onChange={(e) => set('title', e.target.value)} placeholder={bingo ? 'October CAGEO' : 'October Step Challenge'} />
+            onChange={(e) => set('title', e.target.value)} placeholder={bingo ? 'October CAGEO' : chili ? 'Chili Cook-Off' : 'October Step Challenge'} />
           {bad.title && <span className="ch-field-err">{bad.title}</span>}
         </label>
         <div className="ch-field">
@@ -207,7 +246,7 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
           <NotesEditor key={editorKey} value={f.description} onChange={(v) => set('description', v)}
             placeholder="How it works, what counts, what the winners get…" />
         </div>
-        {!bingo && (<>
+        {stats && (<>
         <div className="ch-form-row">
           <label className="ch-field">
             <span className="ch-label">What people log</span>
@@ -242,6 +281,32 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
           </div>
         </fieldset>
         </>)}
+        {chili && (
+          <div className="ch-field cz-sched">
+            <span className="ch-label">The chilis <span className="ch-opt">(one row per week; any day of that week works, it’s shown as “week of”)</span></span>
+            {f.chilis.map((r, i) => (
+              <div key={r.key} className="cz-sched-row">
+                <span className="cz-sched-n">#{i + 1}</span>
+                <input type="date" aria-label={`Chili ${i + 1} week`} className="field ch-input" value={r.week_of || ''} onChange={(e) => editRow(r.key, { week_of: e.target.value })} />
+                <select aria-label={`Chili ${i + 1} cook`} className="field ch-input" value={r.other ? '__other' : r.cook_user_id}
+                  onChange={(e) => (e.target.value === '__other' ? editRow(r.key, { other: true, cook_user_id: '' }) : editRow(r.key, { other: false, cook_user_id: e.target.value, cook_name: '' }))}>
+                  <option value="">Who’s cooking?</option>
+                  {cooks.map((u) => <option key={u.id} value={u.id}>{u.name}{u.office ? ` (${u.office})` : ''}</option>)}
+                  <option value="__other">Someone else (type a name)</option>
+                </select>
+                {r.other && <input className="field ch-input" aria-label={`Chili ${i + 1} cook name`} placeholder="Cook’s name" maxLength={80} value={r.cook_name} onChange={(e) => editRow(r.key, { cook_name: e.target.value })} />}
+                <button type="button" className="btn btn-plain btn-sm" disabled={r.count > 0} title={r.count > 0 ? 'People already rated this chili, so it stays.' : undefined}
+                  onClick={() => setChiliRows(f.chilis.filter((x) => x.key !== r.key))}>Remove</button>
+              </div>
+            ))}
+            <div className="ch-ideas-row">
+              <button type="button" className="ch-idea" disabled={f.chilis.length >= MAX_CHILIS} onClick={() => setChiliRows([...f.chilis, newRow()])}>+ Add a chili week</button>
+              {range && <span className="ch-hint">Runs {range}; the results reveal the day after.</span>}
+            </div>
+            {bad.chilis && <span className="ch-field-err">{bad.chilis}</span>}
+          </div>
+        )}
+        {!chili && (
         <div className="ch-field">
           <span className="ch-label">Dates</span>
           <div className="ch-form-row ch-dates">
@@ -260,8 +325,9 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
             {range && <span className="ch-hint">{range}</span>}
           </div>
           {(bad.starts_on || bad.ends_on) && <span className="ch-field-err">{bad.starts_on || bad.ends_on}</span>}
-          {datesMoved && !bingo && <span className="ch-hint ch-warn"><IconAlert size={13} /> Entries outside the new dates stop counting (they’re kept, and count again if the dates move back).</span>}
+          {datesMoved && stats && <span className="ch-hint ch-warn"><IconAlert size={13} /> Entries outside the new dates stop counting (they’re kept, and count again if the dates move back).</span>}
         </div>
+        )}
         {bingo && (
           <>
             <fieldset className="ch-fieldset">
@@ -303,18 +369,18 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
         {!bingo && (
         <div className="ch-form-row">
           <label className="ch-field">
-            <span className="ch-label">Who takes part</span>
+            <span className="ch-label">{chili ? 'Who rates' : 'Who takes part'}</span>
             <select className="field ch-input" value={f.office_id} onChange={(e) => set('office_id', e.target.value)}>
               <option value="">The whole company</option>
               {offices.map((o) => <option key={o.id} value={o.id}>{o.name} office only{o.archived ? ' (archived)' : ''}</option>)}
             </select>
           </label>
-          <label className="ch-field">
+          {stats && <label className="ch-field">
             <span className="ch-label">Office and department boards rank by</span>
             <select className="field ch-input" value={f.group_rank} onChange={(e) => set('group_rank', e.target.value)}>
               {Object.entries(GROUP_RANKS).map(([k, g]) => <option key={k} value={k}>{g.label} ({g.hint.toLowerCase()})</option>)}
             </select>
-          </label>
+          </label>}
         </div>
         )}
         <DraftConflict conflict={conflict} labels={LABELS} onOverwrite={overwrite} onDiscard={discard} />
@@ -322,7 +388,7 @@ export default function ChallengeForm({ mode, challenge = null, defaults = null,
         <div className="ch-form-actions">
           <Link href={isEdit ? `/culture/challenges/${challenge.id}` : '/culture/challenges'} prefetch={false} className="btn btn-plain">Cancel</Link>
           <button type="submit" className="btn btn-lime wi" disabled={busy || (isEdit && !changed.length)}>
-            <IconCheck size={15} /> {busy ? 'Saving…' : isEdit ? 'Save changes' : bingo ? 'Create CAGEO' : 'Create challenge'}
+            <IconCheck size={15} /> {busy ? 'Saving…' : isEdit ? 'Save changes' : bingo ? 'Create CAGEO' : chili ? 'Create cook-off' : 'Create challenge'}
           </button>
         </div>
       </form>

@@ -5,6 +5,7 @@ import { nowFromRequestContext } from '@/lib/clock';
 import { isOrganizer } from '@/lib/policy';
 import { chicagoToday } from '@/lib/time';
 import { listChallengeOffices, loadChallengeRow } from '@/lib/queries/challenges';
+import { chiliSchedule, listCookChoices } from '@/lib/queries/chili';
 import { IconMedal } from '@/app/icons';
 import ChallengeForm from '../../_components/ChallengeForm';
 
@@ -36,7 +37,9 @@ export default async function EditChallengePage({ params }) {
   }
   const challenge = await loadChallengeRow(params.id);
   if (!challenge) notFound();
-  const offices = await listChallengeOffices(challenge.office_id, challenge.kind === 'bingo' ? challenge.id : null);
-  return <ChallengeForm key={challenge.updated_at || challenge.id} mode="edit" challenge={challenge} offices={offices}
+  const chili = challenge.kind === 'chili';
+  const [offices, cooks, schedule] = await Promise.all([listChallengeOffices(challenge.office_id, challenge.kind === 'bingo' ? challenge.id : null),
+    chili ? listCookChoices() : [], chili ? chiliSchedule(challenge.id) : []]);
+  return <ChallengeForm key={challenge.updated_at || challenge.id} mode="edit" challenge={challenge} offices={offices} cooks={cooks} schedule={schedule}
     today={chicagoToday(nowFromRequestContext())} />;
 }

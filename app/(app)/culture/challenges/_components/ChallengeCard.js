@@ -3,7 +3,7 @@ import { Headshot } from '@/app/_ui/Headshot';
 import { fmtRange, fmtScore, metricLine, timeLabel } from '@/lib/challenges';
 import { IconBuilding, IconUsers, IconChevronRight, IconMedal } from '@/app/icons';
 import { Medal } from './Medal';
-import { BingoOffices, BingoWinners } from './BingoSummary';
+import { BingoOffices, BingoWinners, ChiliLine } from './BingoSummary';
 
 // One challenge as a card (the /culture/challenges list). A plain module (no hooks), so server pages render it.
 // c = a challenge from lib/queries/challenges.js listChallenges / loadChallengeSummary: the row plus status,
@@ -44,6 +44,8 @@ export function ChallengeCard({ c, today }) {
           <BingoOffices c={c} />
           <BingoWinners c={c} />
         </div>
+      ) : c.kind === 'chili' ? (
+        <div className="ch-card-stats"><ChiliLine c={c} /></div>
       ) : (
       <div className="ch-card-stats">
         <span className="ch-card-stat"><IconUsers size={13} /> {c.participants} {c.participants === 1 ? 'person' : 'people'}</span>
