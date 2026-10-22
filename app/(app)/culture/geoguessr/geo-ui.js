@@ -6,10 +6,16 @@
 // stats"): GeoPage takes canEdit(officeId), and FiveKCounter / GeoTracker take readOnly, which hides the score form,
 // the deletes and the 5K taps for other offices. Everything else below is byte-for-byte the old code.
 // The handlers that feed these components live in GeoClient.js (also verbatim).
+// The third (Neil, 2026-10-22: more stats, "it needs to look clean and the order needs to make sense ... i like hovering
+// over them to see the days score and the weeks average and the monthly average"): GeoTracker's stats block is now
+// GeoMedals at the top (the medal row replaces the color legend) and GeoChartStats under each graph (math in
+// lib/geo-stats.js), and GeoChart shows a hover card instead of the browser's plain tooltip. GeoPage, AddGeoOfficeModal, FiveKCounter,
+// GEO_TIERS and tierColor are unchanged.
 import { useState, useRef } from 'react';
 import { burstConfetti } from '@/app/confetti';
 import { IconGlobe, IconStar } from '@/app/icons';
 import { localISO } from '@/app/_ui/tasks';
+import { geoStats, weeklyAverages, monthlyAverages, tierOf, fmtGeoDay, fmtGeoDate, fmtGeoShort, fmtGeoWeek, fmtGeoMonth, fmtGeoMonthShort } from '@/lib/geo-stats';
 
 // Every GeoGuessr office side by side, each with its full tracker.
 function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJoin, onCreate, canEdit = () => true }) {
@@ -122,69 +128,69 @@ function FiveKCounter({ count, onChange, readOnly = false }) {
   );
 }
 
-// Summary stats for GeoGuessr scores. "Work week" = Monday–Friday; weekly
-// averages group weekday scores by the Monday of their week.
-function geoStats(scores) {
-  const vals = scores.map((s) => Number(s.score)).filter((v) => !isNaN(v));
-  if (!vals.length) return null;
-  const sum = (a) => a.reduce((x, y) => x + y, 0);
-  const high = Math.max(...vals);
-  const low = Math.min(...vals);
-  const mean = sum(vals) / vals.length;
+// The office's numbers (Neil, 2026-10-22): the medal count across the top ("I like the screenshot you have with the
+// bronzes, silvers, golds, and diamonds"), then each graph with its own three numbers under it: the daily graph's
+// highest, lowest and today's score; the weekly graph's highest, lowest and this week's average; the monthly graph's
+// highest, lowest and this month's average. The math is in lib/geo-stats.js.
+const MEDAL_ORDER = ['Bronze', 'Silver', 'Gold', 'Diamond'];
+const MEDAL_RANGE = { Bronze: '5,000+', Silver: '15,000+', Gold: '22,500+', Diamond: '25,000' };
 
-  const parseLocal = (s) => { const p = String(s).split('-').map(Number); return new Date(p[0], (p[1] || 1) - 1, p[2] || 1); };
-  const fmtLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const mondayOf = (d) => { const dow = d.getDay(); const diff = dow === 0 ? 6 : dow - 1; const m = new Date(d); m.setDate(d.getDate() - diff); return m; };
-
-  const weeks = {};
-  scores.forEach((s) => {
-    const v = Number(s.score);
-    if (isNaN(v) || !s.score_date) return;
-    const d = parseLocal(s.score_date);
-    if (isNaN(d.getTime())) return;
-    const dow = d.getDay();
-    if (dow === 0 || dow === 6) return; // work week = Mon–Fri only
-    const key = fmtLocal(mondayOf(d));
-    (weeks[key] = weeks[key] || []).push(v);
-  });
-  const avgs = Object.values(weeks).map((arr) => sum(arr) / arr.length);
-  const bestWeek = avgs.length ? Math.max(...avgs) : null;
-  const worstWeek = avgs.length ? Math.min(...avgs) : null;
-  const curKey = fmtLocal(mondayOf(new Date()));
-  const currentWeek = weeks[curKey] ? sum(weeks[curKey]) / weeks[curKey].length : null;
-
-  return { high, low, mean, bestWeek, worstWeek, currentWeek };
+function GeoStatTile({ label, value, sub, color, muted = false }) {
+  return (
+    <div className={`gx-tile${color ? ' gx-medal' : ''}${muted ? ' gx-zero' : ''}`} style={color ? { '--tier': color } : undefined}>
+      <span className="gx-label">{color && <i aria-hidden />}{label}</span>
+      <span className="gx-val">{value}</span>
+      {sub ? <span className="gx-sub">{sub}</span> : <span className="gx-sub" aria-hidden>&nbsp;</span>}
+    </div>
+  );
 }
 
-// Work-week (Mon–Fri) averages, keyed by the Monday of each week.
-function weeklyAverages(scores) {
-  const parse = (s) => { const p = String(s).split('-').map(Number); return new Date(p[0], (p[1] || 1) - 1, p[2] || 1); };
-  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const monday = (d) => { const dow = d.getDay(); const diff = dow === 0 ? 6 : dow - 1; const m = new Date(d); m.setDate(d.getDate() - diff); return m; };
-  const weeks = {};
-  scores.forEach((s) => {
-    const v = Number(s.score);
-    if (isNaN(v) || !s.score_date) return;
-    const d = parse(s.score_date);
-    if (isNaN(d.getTime())) return;
-    const dow = d.getDay();
-    if (dow === 0 || dow === 6) return;
-    const key = fmt(monday(d));
-    (weeks[key] = weeks[key] || []).push(v);
-  });
-  return Object.keys(weeks).sort().map((k) => ({ id: 'w' + k, score: Math.round(weeks[k].reduce((a, b) => a + b, 0) / weeks[k].length), score_date: k }));
+function GeoMedals({ stats }) {
+  const color = (label) => (GEO_TIERS.find((t) => t.label === label) || {}).color;
+  return (
+    <div className="gx gx-medals">
+      <div className="gx-head">Medals <span>days at each tier</span></div>
+      <div className="gx-row gx-row-4">
+        {MEDAL_ORDER.map((m) => (
+          <GeoStatTile key={m} label={m} value={(stats.medals[m] || 0).toLocaleString()} sub={MEDAL_RANGE[m]} color={color(m)} muted={!stats.medals[m]} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
-// Calendar-month averages, keyed by YYYY-MM.
-function monthlyAverages(scores) {
-  const months = {};
-  scores.forEach((s) => {
-    const v = Number(s.score);
-    if (isNaN(v) || !s.score_date) return;
-    const key = String(s.score_date).slice(0, 7);
-    (months[key] = months[key] || []).push(v);
-  });
-  return Object.keys(months).sort().map((k) => ({ id: 'm' + k, score: Math.round(months[k].reduce((a, b) => a + b, 0) / months[k].length), score_date: k }));
+// The three numbers under one graph.
+function GeoChartStats({ stats, kind, today }) {
+  const year = today.slice(0, 4);
+  const num = (v) => (v == null ? '—' : Math.round(v).toLocaleString());
+  const soFar = (x) => (x ? `${x.n} ${x.n === 1 ? 'day' : 'days'} so far` : 'No scores yet');
+  let tiles;
+  if (kind === 'week') {
+    const weekOf = (w) => (w ? `Week of ${fmtGeoShort(w.week, year)}` : '');
+    tiles = [
+      ['Highest week', num(stats.bestWeek?.score), weekOf(stats.bestWeek)],
+      ['Lowest week', num(stats.worstWeek?.score), weekOf(stats.worstWeek)],
+      ['This week', num(stats.currentWeek?.score), soFar(stats.currentWeek)],
+    ];
+  } else if (kind === 'month') {
+    tiles = [
+      ['Highest month', num(stats.bestMonth?.score), fmtGeoMonthShort(stats.bestMonth?.month)],
+      ['Lowest month', num(stats.worstMonth?.score), fmtGeoMonthShort(stats.worstMonth?.month)],
+      ['This month', num(stats.currentMonth?.score), soFar(stats.currentMonth)],
+    ];
+  } else {
+    const t = stats.today ? tierOf(stats.today.score, GEO_TIERS) : '';
+    tiles = [
+      ['Highest', num(stats.high.score), fmtGeoShort(stats.high.date, year)],
+      ['Lowest', num(stats.low.score), fmtGeoShort(stats.low.date, year)],
+      ['Today', num(stats.today?.score), stats.today ? (t === 'Black' ? 'Under 5,000' : t) : 'No score yet'],
+    ];
+  }
+  return (
+    <div className="gx-row gx-under" data-kind={kind}>
+      {tiles.map(([label, value, sub]) => <GeoStatTile key={label} label={label} value={value} sub={sub} />)}
+    </div>
+  );
 }
 
 function GeoTracker({ scores, onAdd, onDelete, readOnly = false, officeName = '' }) {
@@ -196,8 +202,7 @@ function GeoTracker({ scores, onAdd, onDelete, readOnly = false, officeName = ''
   const sorted = [...scores].sort((a, b) => (a.score_date || '').localeCompare(b.score_date || '') || (Number(a.id) - Number(b.id)));
   const weekly = weeklyAverages(scores);
   const monthly = monthlyAverages(scores);
-  const stats = geoStats(scores);
-  const fmt = (v) => (v == null ? '—' : Math.round(v).toLocaleString());
+  const stats = geoStats(scores, { tiers: GEO_TIERS, today });
   return (
     <>
       {readOnly ? <p className="geo-readonly">Only {officeName || 'this office'}’s people (and admins) add {officeName || 'its'} scores.</p> : <div className="geo-add">
@@ -205,27 +210,16 @@ function GeoTracker({ scores, onAdd, onDelete, readOnly = false, officeName = ''
         <input type="number" className="geo-input" placeholder="Score" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
         <button className="btn btn-ink btn-sm" onClick={submit}>+ Add</button>
       </div>}
-      <div className="geo-chart-title">Daily scores</div>
-      <GeoChart data={sorted} />
+      {stats && <GeoMedals stats={stats} />}
+      <div className="geo-chart-title">Daily scores{stats && <span> · {Math.round(stats.mean).toLocaleString()} all-time avg</span>}</div>
+      <GeoChart data={sorted} kind="day" />
+      {stats && <GeoChartStats stats={stats} kind="day" today={today} />}
       <div className="geo-chart-title">Weekly average <span>(Mon–Fri)</span></div>
-      <GeoChart data={weekly} />
+      <GeoChart data={weekly} kind="week" />
+      {stats && <GeoChartStats stats={stats} kind="week" today={today} />}
       <div className="geo-chart-title">Monthly average</div>
-      <GeoChart data={monthly} />
-      <div className="geo-legend">
-        {[...GEO_TIERS].reverse().map((t) => (
-          <span key={t.label} className="geo-leg"><i style={{ background: t.color }} />{t.label}</span>
-        ))}
-      </div>
-      {stats && (
-        <div className="geo-stats">
-          <div className="geo-stat"><span className="gs-label">High</span><span className="gs-val">{fmt(stats.high)}</span></div>
-          <div className="geo-stat"><span className="gs-label">Low</span><span className="gs-val">{fmt(stats.low)}</span></div>
-          <div className="geo-stat"><span className="gs-label">All-time avg</span><span className="gs-val">{fmt(stats.mean)}</span></div>
-          <div className="geo-stat"><span className="gs-label">This week avg</span><span className="gs-val">{fmt(stats.currentWeek)}</span></div>
-          <div className="geo-stat"><span className="gs-label">Best week avg</span><span className="gs-val">{fmt(stats.bestWeek)}</span></div>
-          <div className="geo-stat"><span className="gs-label">Worst week avg</span><span className="gs-val">{fmt(stats.worstWeek)}</span></div>
-        </div>
-      )}
+      <GeoChart data={monthly} kind="month" />
+      {stats && <GeoChartStats stats={stats} kind="month" today={today} />}
       {sorted.length > 0 && (
         <div className="geo-history">
           <button className="geo-history-toggle" onClick={() => setShowHistory((s) => !s)}>
@@ -261,7 +255,21 @@ function tierColor(v) {
   return '#2f2e2e';
 }
 
-function GeoChart({ data }) {
+// What the hover card says for one bar: the day's score, or the week's / month's average with how many days it covers.
+function geoTip(d, kind) {
+  const v = Number(d.score);
+  const tier = tierOf(v, GEO_TIERS);
+  const medal = tier === 'Black' ? '' : tier;
+  const days = (n) => `${n} ${n === 1 ? 'day' : 'days'}`;
+  if (kind === 'week') return { value: `${v.toLocaleString()} avg`, when: `Week of ${fmtGeoWeek(d.score_date)}`, more: [days(d.n), medal].filter(Boolean).join(' · ') };
+  if (kind === 'month') return { value: `${v.toLocaleString()} avg`, when: fmtGeoMonth(d.score_date), more: [days(d.n), medal].filter(Boolean).join(' · ') };
+  return { value: v.toLocaleString(), when: fmtGeoDay(d.score_date) || 'No date', more: medal };
+}
+
+// Bars colored by medal tier. Hovering a bar (or tapping it on a phone) shows a card with its date and score; the
+// whole column above a bar is the hover target, so short bars are as easy to hit as tall ones.
+function GeoChart({ data, kind = 'day' }) {
+  const [hover, setHover] = useState(null);
   if (!data.length) return <div className="geo-chart-empty">Add a score to start the graph.</div>;
   const W = 520, H = 210;
   const pad = { l: 48, r: 14, t: 14, b: 30 };
@@ -277,8 +285,16 @@ function GeoChart({ data }) {
   const yTicks = [0, 12500, 25000];
   const fmt = (v) => Math.round(v).toLocaleString();
   const baseline = pad.t + ih;
+  const axis = (d) => (kind === 'month' ? fmtGeoMonth(d.score_date) : fmtGeoDate(d.score_date)) || d.score_date || '';
+  const h = hover != null && hover < n ? hover : null;
+  let tip = null;
+  if (h != null) {
+    const cx = pad.l + band * h + band / 2;
+    const top = y(Number(data[h].score));
+    tip = { ...geoTip(data[h], kind), left: (cx / W) * 100, top: Math.min(Math.max(top / H, 0.3), 0.62) * 100, side: cx > W / 2 ? 'left' : 'right' };
+  }
   return (
-    <div className="geo-chart-wrap">
+    <div className="geo-chart-wrap gx-chart" onMouseLeave={() => setHover(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="geo-chart" preserveAspectRatio="xMidYMid meet">
         {yTicks.map((t, i) => (
           <g key={i}>
@@ -291,17 +307,26 @@ function GeoChart({ data }) {
           const cx = pad.l + band * i + band / 2;
           const top = y(v);
           return (
-            <rect key={d.id} x={cx - barW / 2} y={top} width={barW} height={Math.max(0, baseline - top)} rx="2" fill={tierColor(v)}>
-              <title>{d.score_date || ''}: {v.toLocaleString()}</title>
-            </rect>
+            <rect key={d.id} className={h != null && h !== i ? 'gx-dim' : undefined} x={cx - barW / 2} y={top} width={barW} height={Math.max(0, baseline - top)} rx="2" fill={tierColor(v)} />
           );
         })}
-        <text x={pad.l} y={H - 8} textAnchor="start" className="geo-axis">{data[0].score_date || ''}</text>
-        {n > 1 && <text x={W - pad.r} y={H - 8} textAnchor="end" className="geo-axis">{data[n - 1].score_date || ''}</text>}
+        {data.map((d, i) => (
+          <rect key={`hit-${d.id}`} className="gx-hit" x={pad.l + band * i} y={pad.t} width={band} height={ih} fill="transparent"
+            onMouseEnter={() => setHover(i)} onClick={() => setHover(i)} />
+        ))}
+        <text x={pad.l} y={H - 8} textAnchor="start" className="geo-axis">{axis(data[0])}</text>
+        {n > 1 && <text x={W - pad.r} y={H - 8} textAnchor="end" className="geo-axis">{axis(data[n - 1])}</text>}
       </svg>
+      {tip && (
+        <div className={`gx-tip gx-tip-${tip.side}`} style={{ left: `${tip.left}%`, top: `${tip.top}%` }} role="status">
+          <b>{tip.value}</b>
+          <span>{tip.when}</span>
+          {tip.more && <span className="gx-tip-more">{tip.more}</span>}
+        </div>
+      )}
     </div>
   );
 }
 
 export default GeoPage;
-export { GeoPage, AddGeoOfficeModal, FiveKCounter, geoStats, weeklyAverages, monthlyAverages, GeoTracker, GEO_TIERS, tierColor, GeoChart };
+export { GeoPage, AddGeoOfficeModal, FiveKCounter, geoStats, weeklyAverages, monthlyAverages, GeoTracker, GeoMedals, GeoChartStats, GEO_TIERS, tierColor, GeoChart };

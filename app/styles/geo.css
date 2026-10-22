@@ -21,3 +21,38 @@
 .fivek-btn:disabled:hover { filter: saturate(.85); }
 .fivek-btn:disabled:active { transform: none; box-shadow: inset 0 2px 0 rgba(255,255,255,.65), inset 0 -3px 0 rgba(0,0,0,.12), 0 5px 0 #8a6400, 0 10px 22px rgba(224,168,0,.35); }
 .geo-readonly { margin: 4px 0 12px; padding: 8px 12px; border-radius: 8px; background: #f6f6f7; color: var(--muted); font-size: 13px; }
+
+/* GeoGuessr stats (Neil, 2026-10-22): the medal tiles across the top (they carry the tier colors, replacing the old
+   legend), then three tiles under each graph. Every tile is a label, the number and a small line of context (the date,
+   the week, the month, the range). Replaces the old .geo-stats grid. */
+.gx { margin: 4px 0 6px; }
+.gx-under { margin: 8px 0 4px; }
+.gx-head { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 5px; }
+.gx-head span { margin-left: 6px; font-weight: 600; letter-spacing: .02em; text-transform: none; color: var(--muted); }
+.gx-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.gx-row-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.gx-tile { background: #fafbf3; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px 8px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.gx-label { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gx-val { font-size: 18px; font-weight: 800; line-height: 1.2; color: var(--ink); font-variant-numeric: tabular-nums; }
+.gx-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gx-medal { background: #fff; border-top: 3px solid var(--tier); }
+.gx-medal .gx-label i { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: var(--tier); }
+.gx-zero .gx-val { color: #b3b0b1; }
+@media (max-width: 420px) {
+  .gx-row, .gx-row-4 { gap: 6px; }
+  .gx-tile { padding: 6px 7px 7px; }
+  .gx-val { font-size: 16px; }
+  .gx-label { font-size: 9.5px; letter-spacing: .01em; }
+  .gx-medal .gx-label i { display: none; }
+}
+
+/* the charts' hover card: beside the hovered bar (left of it past the middle), the other bars dimmed */
+.geo-chart-wrap.gx-chart { position: relative; overflow: visible; }
+.gx-chart .gx-hit { cursor: pointer; }
+.gx-chart rect.gx-dim { opacity: .38; transition: opacity .12s; }
+.gx-tip { position: absolute; z-index: 5; pointer-events: none; min-width: 112px; max-width: 220px; padding: 7px 10px; border-radius: 8px; background: #2f2e2e; color: #fff; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); display: flex; flex-direction: column; gap: 1px; font-size: 11.5px; line-height: 1.3; white-space: nowrap; }
+.gx-tip b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.gx-tip span { color: rgba(255, 255, 255, .78); }
+.gx-tip .gx-tip-more { color: rgba(255, 255, 255, .6); }
+.gx-tip-right { transform: translate(12px, -50%); }
+.gx-tip-left { transform: translate(calc(-100% - 12px), -50%); }
