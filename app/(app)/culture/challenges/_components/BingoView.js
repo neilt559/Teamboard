@@ -10,16 +10,15 @@ import Crumbs from '@/app/_ui/Crumbs';
 import { FormattedNotes } from '@/app/notes-format';
 import { IconPencil, IconArchive, IconRestore, IconCalendar, IconTrophy, IconCheck, IconBuilding } from '@/app/icons';
 import { fmtDay, fmtRange } from '@/lib/challenges';
-import { CORNERS, LINES, canUndo, lineLabel } from '@/lib/bingo';
+import { CORNERS, LETTERS, LINES, canUndo, lineLabel } from '@/lib/bingo';
 import { StatusChip } from './ChallengeCard';
 
 // The office bingo page (Neil, 2026-10-19; rules in lib/bingo.js). One shared 5x5 card per playing office; each
 // office marks ONE square a day (Central) for what its GeoGuessr round earned, on the honor system. The prizes are
-// First bingo (five in a row, any direction) and Four corners. Your office's card comes first; a square you can
+// First bingo (five in a row, any direction), Four corners and First C-A-G-E-O (a square under every letter, a tie
+// when offices get there the same day). Your office's card comes first; a square you can
 // mark is a button, and marking asks once before it counts. Today's square can be undone by the office (so a slip
 // can be fixed); admins can mark or undo any office's square.
-
-const LETTERS = ['C', 'A', 'G', 'E', 'O'];   // CAGEO: Neil's name for office bingo
 
 function Prize({ label, win, hint }) {
   return (
@@ -28,7 +27,7 @@ function Prize({ label, win, hint }) {
       <span className="bg-prize-main">
         <span className="bg-prize-label">{label}</span>
         {win
-          ? <span className="bg-prize-who"><b>{win.office_name}</b> · {fmtDay(win.play_date, { weekday: true })}{win.line ? ` · ${lineLabel(win.line)}` : ''}</span>
+          ? <span className="bg-prize-who"><b>{win.office_name}</b> · {fmtDay(win.play_date, { weekday: true })}{win.line ? ` · ${lineLabel(win.line)}` : ''}{win.tie ? ' · Tie' : ''}</span>
           : <span className="bg-prize-who muted">{hint}</span>}
       </span>
     </div>
@@ -43,16 +42,18 @@ function Card({ c, o, today, winners, busy, onMark }) {
   const cornersDone = !!o.corners_pick_id;
   const firstBingo = winners.bingo?.office_id === o.id;
   const firstCorners = winners.corners?.office_id === o.id;
+  const firstLetters = !!winners.letters?.office_ids.includes(o.id);
   return (
     <section className={`bg-card${o.mine ? ' is-mine' : ''}${o.can_mark ? ' can-mark' : ''}`} aria-label={`${o.name} CAGEO card`}>
       <header className="bg-card-head">
         <h2 className="bg-card-name"><IconBuilding size={16} /> {o.name}{o.mine && <span className="ch-you-tag">Your office</span>}</h2>
         <span className="bg-card-count"><b>{o.marks}</b> of {squares.length}</span>
       </header>
-      {(o.bingo_pick_id || cornersDone) && (
+      {(o.bingo_pick_id || cornersDone || o.letters_pick_id) && (
         <div className="bg-card-badges">
           {o.bingo_pick_id && <span className={`bg-badge${firstBingo ? ' is-first' : ''}`}>{firstBingo ? 'First CAGEO' : 'CAGEO'}</span>}
           {cornersDone && <span className={`bg-badge${firstCorners ? ' is-first' : ''}`}>{firstCorners ? 'Four corners winner' : 'Four corners'}</span>}
+          {o.letters_pick_id && <span className={`bg-badge${firstLetters ? ' is-first' : ''}`}>{firstLetters ? `First C-A-G-E-O${winners.letters.tie ? ' (tie)' : ''}` : 'C-A-G-E-O'}</span>}
         </div>
       )}
       <div className="bg-grid" role="group" aria-label={`${o.name}: ${o.marks} squares marked`}>
@@ -166,7 +167,9 @@ export default function BingoView({ initial, viewer }) {
       setData((d) => ({ ...d, bingo: r.board }));
       const after = r.board.offices.find((x) => x.id === o.id);
       const won = [r.board.winners.bingo?.office_id === o.id && !board.winners.bingo ? 'CAGEO! First CAGEO' : null,
-        r.board.winners.corners?.office_id === o.id && !board.winners.corners ? 'Four corners' : null].filter(Boolean);
+        r.board.winners.corners?.office_id === o.id && !board.winners.corners ? 'Four corners' : null,
+        r.board.winners.letters?.office_ids.includes(o.id) && !board.winners.letters?.office_ids.includes(o.id)
+          ? (r.board.winners.letters.tie ? 'A share of First C-A-G-E-O' : 'First C-A-G-E-O') : null].filter(Boolean);
       setToast({
         text: won.length ? `${won.join(' and ')} for ${o.name}!` : `Marked for ${o.name}: ${after?.marks ?? ''} of 25.`,
         undo: () => undo(r.pick, { confirm: false }),
@@ -213,6 +216,7 @@ export default function BingoView({ initial, viewer }) {
       <div className="bg-prizes">
         <Prize label="First CAGEO" win={board.winners.bingo} hint="Five in a row: across, down or diagonal." />
         <Prize label="Four corners" win={board.winners.corners} hint="All four corner squares." />
+        <Prize label="First C-A-G-E-O" win={board.winners.letters} hint="A square under every letter. Same day is a tie." />
       </div>
 
       <div id="today" className="bg-today">

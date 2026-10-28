@@ -4,7 +4,7 @@ import { CELLS } from '@/lib/bingo';
 import { fmtAvg } from '@/lib/chili';
 
 // An office bingo challenge on the cards (the challenge list, Home's challenge widget, the /culture cards): each
-// playing office's marked squares as a bar, then the two prizes. A plain module (no hooks), so server pages render
+// playing office's marked squares as a bar, then the three prizes. A plain module (no hooks), so server pages render
 // it. c = a challenge from lib/queries/challenges.js with c.bingo = { offices, winners } (lib/queries/bingo.js).
 
 export function BingoOffices({ c, max = 4 }) {
@@ -19,6 +19,7 @@ export function BingoOffices({ c, max = 4 }) {
           <span className="bg-sum-bar" aria-hidden="true"><i style={{ width: `${Math.round((o.marks / CELLS) * 100)}%` }} /></span>
           <span className="bg-sum-n">{o.marks} of {CELLS}</span>
           {o.bingo && <span className="bg-badge">CAGEO</span>}
+          {o.letters && <span className="bg-badge">C-A-G-E-O</span>}
         </li>
       ))}
     </ul>
@@ -33,7 +34,7 @@ export function BingoWinners({ c, short = false }) {
       {win && !short ? ` (${fmtDay(win.play_date)})` : ''}
     </span>
   );
-  return <span className="bg-sum-wins">{one('First CAGEO', w.bingo)}{one('Four corners', w.corners)}</span>;
+  return <span className="bg-sum-wins">{one('First CAGEO', w.bingo)}{one('Four corners', w.corners)}{one('First C-A-G-E-O', w.letters)}</span>;
 }
 
 // One line for the viewer: today's square for their office(s), or nothing when they aren't playing.

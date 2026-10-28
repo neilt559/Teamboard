@@ -10,7 +10,7 @@
 }
 
 /* ---------- prizes ---------- */
-.bg-prizes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 12px; }
+.bg-prizes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 12px; }
 .bg-prize {
   display: flex; align-items: center; gap: 12px; min-width: 0; padding: 11px 14px; border-radius: 12px;
   background: var(--panel); border: 1px dashed #cfcfd1;
