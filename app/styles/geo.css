@@ -38,17 +38,23 @@
 .gx-medal { background: #fff; border-top: 3px solid var(--tier); }
 .gx-medal .gx-label i { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: var(--tier); }
 .gx-zero .gx-val { color: #b3b0b1; }
+/* a medal's share of all rounds, in the label line after its name: "GOLD – 12%" (2026-10-28) */
+.gx-pct { white-space: pre; }
+@media (max-width: 420px) { .gx-row-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 420px) {
   .gx-row, .gx-row-4 { gap: 6px; }
   .gx-tile { padding: 6px 7px 7px; }
   .gx-val { font-size: 16px; }
   .gx-label { font-size: 9.5px; letter-spacing: .01em; }
-  .gx-medal .gx-label i { display: none; }
 }
 
 /* the charts' hover card: beside the hovered bar (left of it past the middle), the other bars dimmed */
 .geo-chart-wrap.gx-chart { position: relative; overflow: visible; }
 .gx-chart .gx-hit { cursor: pointer; }
+/* the average line: light gray dashes over the bars, "avg 18,929" at its left end (a white halo so it reads over a
+   bar); quiet on purpose, it should not compete with the bars */
+.gx-avg line { stroke: #a3a1a2; stroke-width: 1; stroke-dasharray: 4 4; }
+.gx-avg text { font-size: 9px; font-weight: 600; fill: #8a8889; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
 .gx-chart rect.gx-dim { opacity: .38; transition: opacity .12s; }
 .gx-tip { position: absolute; z-index: 5; pointer-events: none; min-width: 112px; max-width: 220px; padding: 7px 10px; border-radius: 8px; background: #2f2e2e; color: #fff; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); display: flex; flex-direction: column; gap: 1px; font-size: 11.5px; line-height: 1.3; white-space: nowrap; }
 .gx-tip b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }

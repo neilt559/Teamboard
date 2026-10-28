@@ -135,14 +135,24 @@ function FiveKCounter({ count, onChange, readOnly = false }) {
 const MEDAL_ORDER = ['Bronze', 'Silver', 'Gold', 'Diamond'];
 const MEDAL_RANGE = { Bronze: '5,000+', Silver: '15,000+', Gold: '22,500+', Diamond: '25,000' };
 
-function GeoStatTile({ label, value, sub, color, muted = false }) {
+function GeoStatTile({ label, value, sub, color, muted = false, pct = '' }) {
   return (
     <div className={`gx-tile${color ? ' gx-medal' : ''}${muted ? ' gx-zero' : ''}`} style={color ? { '--tier': color } : undefined}>
-      <span className="gx-label">{color && <i aria-hidden />}{label}</span>
+      <span className="gx-label">{color && <i aria-hidden />}{label}{pct ? <span className="gx-pct">– {pct}</span> : null}</span>
       <span className="gx-val">{value}</span>
       {sub ? <span className="gx-sub">{sub}</span> : <span className="gx-sub" aria-hidden>&nbsp;</span>}
     </div>
   );
+}
+
+// Each medal's share of all the office's rounds (Neil, 2026-10-28: "a % ... just something small", then "smaller and
+// maybe like GOLD - 12%"), in the label line after the medal's name (on a phone the medal tiles go two by two so it
+// fits): whole percents,
+// "<1%" for a medal that is there but rounds to 0.
+function medalPct(count, days) {
+  if (!days) return '';
+  const p = (count / days) * 100;
+  return count && p < 0.5 ? '<1%' : `${Math.round(p)}%`;
 }
 
 function GeoMedals({ stats }) {
@@ -152,7 +162,7 @@ function GeoMedals({ stats }) {
       <div className="gx-head">Medals <span>days at each tier</span></div>
       <div className="gx-row gx-row-4">
         {MEDAL_ORDER.map((m) => (
-          <GeoStatTile key={m} label={m} value={(stats.medals[m] || 0).toLocaleString()} sub={MEDAL_RANGE[m]} color={color(m)} muted={!stats.medals[m]} />
+          <GeoStatTile key={m} label={m} value={(stats.medals[m] || 0).toLocaleString()} pct={medalPct(stats.medals[m] || 0, stats.days)} sub={MEDAL_RANGE[m]} color={color(m)} muted={!stats.medals[m]} />
         ))}
       </div>
     </div>
@@ -211,7 +221,7 @@ function GeoTracker({ scores, onAdd, onDelete, readOnly = false, officeName = ''
         <button className="btn btn-ink btn-sm" onClick={submit}>+ Add</button>
       </div>}
       {stats && <GeoMedals stats={stats} />}
-      <div className="geo-chart-title">Daily scores{stats && <span> · {Math.round(stats.mean).toLocaleString()} all-time avg</span>}</div>
+      <div className="geo-chart-title">Daily scores</div>
       <GeoChart data={sorted} kind="day" />
       {stats && <GeoChartStats stats={stats} kind="day" today={today} />}
       <div className="geo-chart-title">Weekly average <span>(Mon–Fri)</span></div>
@@ -267,7 +277,10 @@ function geoTip(d, kind) {
 }
 
 // Bars colored by medal tier. Hovering a bar (or tapping it on a phone) shows a card with its date and score; the
-// whole column above a bar is the hover target, so short bars are as easy to hit as tall ones.
+// whole column above a bar is the hover target, so short bars are as easy to hit as tall ones. A dashed line marks
+// the average of the bars shown (Neil, 2026-10-28: "an average line ... like the 12500 and 25000 but its the
+// average and it changes over time"; then "on the left ... more grayscale. so its not as in your face"), in light gray
+// and labeled at its left end; it moves as scores come in.
 function GeoChart({ data, kind = 'day' }) {
   const [hover, setHover] = useState(null);
   if (!data.length) return <div className="geo-chart-empty">Add a score to start the graph.</div>;
@@ -286,6 +299,8 @@ function GeoChart({ data, kind = 'day' }) {
   const fmt = (v) => Math.round(v).toLocaleString();
   const baseline = pad.t + ih;
   const axis = (d) => (kind === 'month' ? fmtGeoMonth(d.score_date) : fmtGeoDate(d.score_date)) || d.score_date || '';
+  // the average of the bars (weekly and monthly bars use their exact averages, not the rounded ones)
+  const avg = data.reduce((a, d) => a + Number(d.avg ?? d.score), 0) / n;
   const h = hover != null && hover < n ? hover : null;
   let tip = null;
   if (h != null) {
@@ -310,6 +325,10 @@ function GeoChart({ data, kind = 'day' }) {
             <rect key={d.id} className={h != null && h !== i ? 'gx-dim' : undefined} x={cx - barW / 2} y={top} width={barW} height={Math.max(0, baseline - top)} rx="2" fill={tierColor(v)} />
           );
         })}
+        <g className="gx-avg" data-avg={Math.round(avg)}>
+          <line x1={pad.l} y1={y(avg)} x2={W - pad.r} y2={y(avg)} />
+          <text x={pad.l + 4} y={y(avg) - 4} textAnchor="start">avg {fmt(avg)}</text>
+        </g>
         {data.map((d, i) => (
           <rect key={`hit-${d.id}`} className="gx-hit" x={pad.l + band * i} y={pad.t} width={band} height={ih} fill="transparent"
             onMouseEnter={() => setHover(i)} onClick={() => setHover(i)} />
