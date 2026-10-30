@@ -31,7 +31,7 @@ export function BingoWinners({ c, short = false }) {
   const one = (label, win) => (
     <span className={`bg-sum-win${win ? '' : ' is-open'}`}>
       <IconTrophy size={13} /> {label}: {win ? <b>{win.office_name}</b> : 'up for grabs'}
-      {win && !short ? ` (${fmtDay(win.play_date)})` : ''}
+      {win && !short ? ` (${fmtDay(win.play_date)}${win.tie ? ', tie' : ''}${win.tiebreak ? ', won tiebreak' : ''})` : ''}
     </span>
   );
   return <span className="bg-sum-wins">{one('First CAGEO', w.bingo)}{one('Four corners', w.corners)}{one('First C-A-G-E-O', w.letters)}</span>;
