@@ -33,7 +33,7 @@ function GeoPage({ offices, available, geo, onAddGeo, onDeleteGeo, onFiveK, onJo
             <div className="section-head">
               <h2 className="geo-office-name">{o.name}</h2>
             </div>
-            <FiveKCounter count={Number(o.fivek) || 0} onChange={(delta) => onFiveK(o.id, delta)} readOnly={!canEdit(o.id)} />
+            <FiveKCounter count={Number(o.fivek) || 0} onChange={(delta) => onFiveK(o.id, delta)} readOnly={!canEdit(o.id)} rounds={geo.filter((g) => String(g.office_id) === String(o.id)).length} />
             <GeoTracker
               scores={geo.filter((g) => String(g.office_id) === String(o.id))}
               onAdd={(score, date) => onAddGeo(o.id, score, date)}
@@ -88,7 +88,7 @@ function AddGeoOfficeModal({ available, onJoin, onCreate, onClose }) {
 
 // Big celebratory tally of perfect 5,000-point guesses. Tap to add one (with a
 // little burst); "Undo one" takes it back if someone hits it by accident.
-function FiveKCounter({ count, onChange, readOnly = false }) {
+function FiveKCounter({ count, onChange, readOnly = false, rounds = 0 }) {
   const [burst, setBurst] = useState(0);
   const btnRef = useRef(null);
   const hit = () => {
@@ -111,7 +111,7 @@ function FiveKCounter({ count, onChange, readOnly = false }) {
           <span className="fivek-shine" aria-hidden />
           <span className="fivek-top"><IconStar /> 5K Club <IconStar /></span>
           <span key={burst} className={`fivek-count${burst ? ' pop' : ''}`}>{count.toLocaleString()}</span>
-          <span className="fivek-sub">{readOnly ? 'perfect 5,000s' : 'perfect 5,000s — tap when you nail one!'}</span>
+          <span className="fivek-sub">{rounds ? `${(count / (rounds * 5) * 100).toFixed(1)}% of guesses have been a 5K` : 'perfect 5,000s'}</span>
         </button>
         {burst > 0 && (
           <div key={burst} className="fivek-burst" aria-hidden>
