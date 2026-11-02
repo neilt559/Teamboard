@@ -204,3 +204,11 @@
   .cz-sched-row > :not(.cz-sched-n) { grid-column: 2; }
   .cz-sched-row .btn { justify-self: start; min-height: 44px; }
 }
+
+/* The champion race (Neil, 2026-11-02): most prizes at month end, then most squares. */
+.bg-champ { margin: 4px 0 14px; padding: 10px 14px; border: 1px solid var(--line, #e3e3e3); border-radius: 10px; background: var(--card, #fff); }
+.bg-champ.is-won { border-color: #d9b44a; background: #fffaf0; }
+.bg-champ-head { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-weight: 600; flex-wrap: wrap; }
+.bg-champ-head .muted { font-weight: 400; }
+.bg-champ-list { margin: 0; padding-left: 22px; display: flex; flex-wrap: wrap; gap: 4px 22px; }
+.bg-champ-list li { margin: 0; }

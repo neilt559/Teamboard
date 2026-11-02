@@ -10,13 +10,14 @@ import Crumbs from '@/app/_ui/Crumbs';
 import { FormattedNotes } from '@/app/notes-format';
 import { IconPencil, IconArchive, IconRestore, IconCalendar, IconTrophy, IconCheck, IconBuilding } from '@/app/icons';
 import { fmtDay, fmtRange } from '@/lib/challenges';
-import { CORNERS, LETTERS, LINES, canUndo, lineLabel, prizeNote } from '@/lib/bingo';
+import { CORNERS, LETTERS, LINES, canUndo, lineLabel, nextPlayDay, prizeNote } from '@/lib/bingo';
 import { StatusChip } from './ChallengeCard';
 
 // The office bingo page (Neil, 2026-10-19; rules in lib/bingo.js). One shared 5x5 card per playing office; each
 // office marks ONE square a day (Central) for what its GeoGuessr round earned, on the honor system. The prizes are
-// First bingo (five in a row, any direction), Four corners and First C-A-G-E-O (a square under every letter, a tie
-// when offices get there the same day). Your office's card comes first; a square you can
+// First bingo (five in a row, any direction), Four corners and First C-A-G-E-O (a square under every letter); a
+// same-day finish is a tie. Weekdays only. The month's champion has the most prizes, then the most squares
+// (Neil, 2026-11-02). Your office's card comes first; a square you can
 // mark is a button, and marking asks once before it counts. Today's square can be undone by the office (so a slip
 // can be fixed); admins can mark or undo any office's square.
 
@@ -218,6 +219,22 @@ export default function BingoView({ initial, viewer }) {
         <Prize label="First C-A-G-E-O" win={board.winners.letters} hint="A square under every letter." />
       </div>
 
+      {board.offices.length > 1 && (
+        <div className={`bg-champ${board.champion ? ' is-won' : ''}`}>
+          <p className="bg-champ-head">
+            <IconTrophy size={16} />
+            {board.champion
+              ? <span>Champion: <b>{board.champion.office_name}</b>{board.champion.tie ? ' (tie)' : ''}</span>
+              : <span>Champion race <span className="muted">· most wins at month end, then most squares</span></span>}
+          </p>
+          <ol className="bg-champ-list">
+            {(board.standings || []).map((s) => (
+              <li key={s.id}><b>{s.name}</b> <span className="muted">{s.wins} {s.wins === 1 ? 'win' : 'wins'} · {s.marks} {s.marks === 1 ? 'square' : 'squares'}</span></li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       <div id="today" className="bg-today">
         {mine.length === 0 && (
           <p className="bg-today-line muted">
@@ -230,9 +247,11 @@ export default function BingoView({ initial, viewer }) {
             <p key={o.id} className={`bg-today-line${p ? ' is-done' : ''}`}>
               {p ? (
                 <>
-                  <IconCheck size={15} /> <span><b>{o.name}</b> marked today’s square: “{c.squares[p.square]}”{p.picked_by_name ? ` (${p.picked_by_name})` : ''}. Next pick tomorrow.</span>
+                  <IconCheck size={15} /> <span><b>{o.name}</b> marked today’s square: “{c.squares[p.square]}”{p.picked_by_name ? ` (${p.picked_by_name})` : ''}. Next pick {fmtDay(nextPlayDay(today), { weekday: true })}.</span>
                   {canUndo(viewer, c, p, today) && <button type="button" className="btn btn-plain btn-sm bg-today-undo" disabled={busy} onClick={() => undo(p)}>Undo</button>}
                 </>
+              ) : running && board.weekend ? (
+                <span>No CAGEO on weekends. {o.name}’s next square is {fmtDay(nextPlayDay(today), { weekday: true })}.</span>
               ) : running ? (
                 <span><b>{o.name}</b> hasn’t marked a square today. After your GeoGuessr round, tap the square it earned.</span>
               ) : data.status === 'upcoming' ? (
