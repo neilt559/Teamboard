@@ -44,17 +44,20 @@ function Card({ c, o, today, winners, busy, onMark }) {
   const firstBingo = !!winners.bingo?.office_ids.includes(o.id);
   const firstCorners = !!winners.corners?.office_ids.includes(o.id);
   const firstLetters = !!winners.letters?.office_ids.includes(o.id);
+  const firstOf = (k) => !!winners[k]?.office_ids.includes(o.id);
   return (
     <section className={`bg-card${o.mine ? ' is-mine' : ''}${o.can_mark ? ' can-mark' : ''}`} aria-label={`${o.name} CAGEO card`}>
       <header className="bg-card-head">
         <h2 className="bg-card-name"><IconBuilding size={16} /> {o.name}{o.mine && <span className="ch-you-tag">Your office</span>}</h2>
         <span className="bg-card-count"><b>{o.marks}</b> of {squares.length}</span>
       </header>
-      {(o.bingo_pick_id || cornersDone || o.letters_pick_id) && (
+      {(o.bingo_pick_id || cornersDone || o.letters_pick_id || o.plus_pick_id || o.box_pick_id) && (
         <div className="bg-card-badges">
           {o.bingo_pick_id && <span className={`bg-badge${firstBingo ? ' is-first' : ''}`}>{firstBingo ? `First CAGEO${winners.bingo.tie ? ' (tie)' : ''}` : 'CAGEO'}</span>}
           {cornersDone && <span className={`bg-badge${firstCorners ? ' is-first' : ''}`}>{firstCorners ? `Four corners winner${winners.corners.tie ? ' (tie)' : ''}` : 'Four corners'}</span>}
           {o.letters_pick_id && <span className={`bg-badge${firstLetters ? ' is-first' : ''}`}>{firstLetters ? `First C-A-G-E-O${winners.letters.tie ? ' (tie)' : ''}` : 'C-A-G-E-O'}</span>}
+          {o.plus_pick_id && <span className={`bg-badge${firstOf('plus') ? ' is-first' : ''}`}>{firstOf('plus') ? `Plus winner${winners.plus.tie ? ' (tie)' : ''}` : 'Plus'}</span>}
+          {o.box_pick_id && <span className={`bg-badge${firstOf('box') ? ' is-first' : ''}`}>{firstOf('box') ? `Box winner${winners.box.tie ? ' (tie)' : ''}` : 'Box'}</span>}
         </div>
       )}
       <div className="bg-grid" role="group" aria-label={`${o.name}: ${o.marks} squares marked`}>
@@ -169,7 +172,8 @@ export default function BingoView({ initial, viewer }) {
       const after = r.board.offices.find((x) => x.id === o.id);
       const newly = (k, label) => (r.board.winners[k]?.office_ids.includes(o.id) && !board.winners[k]?.office_ids.includes(o.id)
         ? (r.board.winners[k].tie ? `A share of ${label}` : label) : null);
-      const won = [newly('bingo', 'First CAGEO'), newly('corners', 'Four corners'), newly('letters', 'First C-A-G-E-O')].filter(Boolean);
+      const won = [newly('bingo', 'First CAGEO'), newly('corners', 'Four corners'), newly('letters', 'First C-A-G-E-O'),
+        newly('plus', 'Plus'), newly('box', 'Box')].filter(Boolean);
       setToast({
         text: won.length ? `${won.join(' and ')} for ${o.name}!` : `Marked for ${o.name}: ${after?.marks ?? ''} of 25.`,
         undo: () => undo(r.pick, { confirm: false }),
@@ -217,6 +221,8 @@ export default function BingoView({ initial, viewer }) {
         <Prize label="First CAGEO" win={board.winners.bingo} hint="Five in a row: across, down or diagonal." />
         <Prize label="Four corners" win={board.winners.corners} hint="All four corner squares." />
         <Prize label="First C-A-G-E-O" win={board.winners.letters} hint="A square under every letter." />
+        <Prize label="Plus" win={board.winners.plus} hint="The center square and the 4 touching its sides." />
+        <Prize label="Box" win={board.winners.box} hint="All 8 squares around the center." />
       </div>
 
       {board.offices.length > 1 && (

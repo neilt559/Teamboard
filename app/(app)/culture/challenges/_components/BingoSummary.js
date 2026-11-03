@@ -4,7 +4,7 @@ import { CELLS } from '@/lib/bingo';
 import { fmtAvg } from '@/lib/chili';
 
 // An office bingo challenge on the cards (the challenge list, Home's challenge widget, the /culture cards): each
-// playing office's marked squares as a bar, then the three prizes. A plain module (no hooks), so server pages render
+// playing office's marked squares as a bar, then the five prizes. A plain module (no hooks), so server pages render
 // it. c = a challenge from lib/queries/challenges.js with c.bingo = { offices, winners } (lib/queries/bingo.js).
 
 export function BingoOffices({ c, max = 4 }) {
@@ -20,6 +20,8 @@ export function BingoOffices({ c, max = 4 }) {
           <span className="bg-sum-n">{o.marks} of {CELLS}</span>
           {o.bingo && <span className="bg-badge">CAGEO</span>}
           {o.letters && <span className="bg-badge">C-A-G-E-O</span>}
+          {o.plus && <span className="bg-badge">Plus</span>}
+          {o.box && <span className="bg-badge">Box</span>}
         </li>
       ))}
     </ul>
@@ -35,7 +37,7 @@ export function BingoWinners({ c, short = false }) {
     </span>
   );
   const champ = c.bingo?.champion;
-  return <span className="bg-sum-wins">{champ && <span className="bg-sum-win"><IconTrophy size={13} /> Champion: <b>{champ.office_name}</b></span>}{one('First CAGEO', w.bingo)}{one('Four corners', w.corners)}{one('First C-A-G-E-O', w.letters)}</span>;
+  return <span className="bg-sum-wins">{champ && <span className="bg-sum-win"><IconTrophy size={13} /> Champion: <b>{champ.office_name}</b></span>}{one('First CAGEO', w.bingo)}{one('Four corners', w.corners)}{one('First C-A-G-E-O', w.letters)}{one('Plus', w.plus)}{one('Box', w.box)}</span>;
 }
 
 // One line for the viewer: today's square for their office(s), or nothing when they aren't playing.
