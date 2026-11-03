@@ -10,16 +10,21 @@ import Crumbs from '@/app/_ui/Crumbs';
 import { FormattedNotes } from '@/app/notes-format';
 import { IconPencil, IconArchive, IconRestore, IconCalendar, IconTrophy, IconCheck, IconBuilding } from '@/app/icons';
 import { fmtDay, fmtRange } from '@/lib/challenges';
-import { CORNERS, LETTERS, LINES, canUndo, lineLabel, nextPlayDay, prizeNote } from '@/lib/bingo';
+import { CORNERS, LETTERS, LINES, PRIZES, canUndo, nextPlayDay } from '@/lib/bingo';
 import { StatusChip } from './ChallengeCard';
 
 // The office bingo page (Neil, 2026-10-19; rules in lib/bingo.js). One shared 5x5 card per playing office; each
-// office marks ONE square a day (Central) for what its GeoGuessr round earned, on the honor system. The prizes are
-// First bingo (five in a row, any direction), Four corners and First C-A-G-E-O (a square under every letter); a
-// same-day finish is a tie. Weekdays only. The month's champion has the most prizes, then the most squares
-// (Neil, 2026-11-02). Your office's card comes first; a square you can
+// office marks ONE square a day (Central) for what its GeoGuessr round earned, on the honor system. Weekdays only.
+// Five patterns (CAGEO, Four corners, C-A-G-E-O, Plus, Box); every office can complete each one, and the month's
+// champion completed the most, then marked the most squares (Neil, 2026-11-03). Your office's card comes first; a square you can
 // mark is a button, and marking asks once before it counts. Today's square can be undone by the office (so a slip
 // can be fixed); admins can mark or undo any office's square.
+
+export const PATTERN_LABELS = { bingo: 'CAGEO', corners: 'Four corners', letters: 'C-A-G-E-O', plus: 'Plus', box: 'Box' };
+const PATTERN_HINTS = {
+  bingo: 'Five in a row: across, down or diagonal.', corners: 'All four corner squares.', letters: 'A square under every letter.',
+  plus: 'The center square and the 4 touching its sides.', box: 'All 8 squares around the center.',
+};
 
 function Prize({ label, win, hint }) {
   return (
@@ -28,7 +33,7 @@ function Prize({ label, win, hint }) {
       <span className="bg-prize-main">
         <span className="bg-prize-label">{label}</span>
         {win
-          ? <span className="bg-prize-who"><b>{win.office_name}</b> · {fmtDay(win.play_date, { weekday: true })}{win.line ? ` · ${lineLabel(win.line)}` : ''}{prizeNote(win)}</span>
+          ? <span className="bg-prize-who">{win.offices.map((x, i) => <span key={x.id}>{i ? ', ' : ''}<b>{x.name}</b> {fmtDay(x.play_date)}</span>)}</span>
           : <span className="bg-prize-who muted">{hint}</span>}
       </span>
     </div>
@@ -41,23 +46,16 @@ function Card({ c, o, today, winners, busy, onMark }) {
   const inLine = new Set(LINES.filter((l) => o.lines.includes(l.key)).flatMap((l) => l.cells));
   const bingoCells = new Set(o.bingo_line ? LINES.find((l) => l.key === o.bingo_line)?.cells || [] : []);
   const cornersDone = !!o.corners_pick_id;
-  const firstBingo = !!winners.bingo?.office_ids.includes(o.id);
-  const firstCorners = !!winners.corners?.office_ids.includes(o.id);
-  const firstLetters = !!winners.letters?.office_ids.includes(o.id);
-  const firstOf = (k) => !!winners[k]?.office_ids.includes(o.id);
+  const done = PRIZES.filter((k) => winners[k]?.office_ids.includes(o.id));
   return (
     <section className={`bg-card${o.mine ? ' is-mine' : ''}${o.can_mark ? ' can-mark' : ''}`} aria-label={`${o.name} CAGEO card`}>
       <header className="bg-card-head">
         <h2 className="bg-card-name"><IconBuilding size={16} /> {o.name}{o.mine && <span className="ch-you-tag">Your office</span>}</h2>
         <span className="bg-card-count"><b>{o.marks}</b> of {squares.length}</span>
       </header>
-      {(o.bingo_pick_id || cornersDone || o.letters_pick_id || o.plus_pick_id || o.box_pick_id) && (
+      {done.length > 0 && (
         <div className="bg-card-badges">
-          {o.bingo_pick_id && <span className={`bg-badge${firstBingo ? ' is-first' : ''}`}>{firstBingo ? `First CAGEO${winners.bingo.tie ? ' (tie)' : ''}` : 'CAGEO'}</span>}
-          {cornersDone && <span className={`bg-badge${firstCorners ? ' is-first' : ''}`}>{firstCorners ? `Four corners winner${winners.corners.tie ? ' (tie)' : ''}` : 'Four corners'}</span>}
-          {o.letters_pick_id && <span className={`bg-badge${firstLetters ? ' is-first' : ''}`}>{firstLetters ? `First C-A-G-E-O${winners.letters.tie ? ' (tie)' : ''}` : 'C-A-G-E-O'}</span>}
-          {o.plus_pick_id && <span className={`bg-badge${firstOf('plus') ? ' is-first' : ''}`}>{firstOf('plus') ? `Plus winner${winners.plus.tie ? ' (tie)' : ''}` : 'Plus'}</span>}
-          {o.box_pick_id && <span className={`bg-badge${firstOf('box') ? ' is-first' : ''}`}>{firstOf('box') ? `Box winner${winners.box.tie ? ' (tie)' : ''}` : 'Box'}</span>}
+          {done.map((k) => <span key={k} className="bg-badge is-first">{PATTERN_LABELS[k]}</span>)}
         </div>
       )}
       <div className="bg-grid" role="group" aria-label={`${o.name}: ${o.marks} squares marked`}>
@@ -170,12 +168,10 @@ export default function BingoView({ initial, viewer }) {
       const r = await api(`/api/culture/challenges/${c.id}/bingo`, { method: 'POST', body: { office_id: o.id, square } });
       setData((d) => ({ ...d, bingo: r.board }));
       const after = r.board.offices.find((x) => x.id === o.id);
-      const newly = (k, label) => (r.board.winners[k]?.office_ids.includes(o.id) && !board.winners[k]?.office_ids.includes(o.id)
-        ? (r.board.winners[k].tie ? `A share of ${label}` : label) : null);
-      const won = [newly('bingo', 'First CAGEO'), newly('corners', 'Four corners'), newly('letters', 'First C-A-G-E-O'),
-        newly('plus', 'Plus'), newly('box', 'Box')].filter(Boolean);
+      const won = PRIZES.filter((k) => r.board.winners[k]?.office_ids.includes(o.id) && !board.winners[k]?.office_ids.includes(o.id))
+        .map((k) => PATTERN_LABELS[k]);
       setToast({
-        text: won.length ? `${won.join(' and ')} for ${o.name}!` : `Marked for ${o.name}: ${after?.marks ?? ''} of 25.`,
+        text: won.length ? `${won.join(' and ')} complete for ${o.name}!` : `Marked for ${o.name}: ${after?.marks ?? ''} of 25.`,
         undo: () => undo(r.pick, { confirm: false }),
       });
       router.refresh();
@@ -218,11 +214,7 @@ export default function BingoView({ initial, viewer }) {
       )}
 
       <div className="bg-prizes">
-        <Prize label="First CAGEO" win={board.winners.bingo} hint="Five in a row: across, down or diagonal." />
-        <Prize label="Four corners" win={board.winners.corners} hint="All four corner squares." />
-        <Prize label="First C-A-G-E-O" win={board.winners.letters} hint="A square under every letter." />
-        <Prize label="Plus" win={board.winners.plus} hint="The center square and the 4 touching its sides." />
-        <Prize label="Box" win={board.winners.box} hint="All 8 squares around the center." />
+        {PRIZES.map((k) => <Prize key={k} label={PATTERN_LABELS[k]} win={board.winners[k]} hint={PATTERN_HINTS[k]} />)}
       </div>
 
       {board.offices.length > 1 && (
@@ -231,11 +223,11 @@ export default function BingoView({ initial, viewer }) {
             <IconTrophy size={16} />
             {board.champion
               ? <span>Champion: <b>{board.champion.office_name}</b>{board.champion.tie ? ' (tie)' : ''}</span>
-              : <span>Champion race <span className="muted">· most wins at month end, then most squares</span></span>}
+              : <span>Champion race <span className="muted">· most patterns at month end, then most squares</span></span>}
           </p>
           <ol className="bg-champ-list">
             {(board.standings || []).map((s) => (
-              <li key={s.id}><b>{s.name}</b> <span className="muted">{s.wins} {s.wins === 1 ? 'win' : 'wins'} · {s.marks} {s.marks === 1 ? 'square' : 'squares'}</span></li>
+              <li key={s.id}><b>{s.name}</b> <span className="muted">{s.wins} of {PRIZES.length} patterns · {s.marks} {s.marks === 1 ? 'square' : 'squares'}</span></li>
             ))}
           </ol>
         </div>
