@@ -10,7 +10,7 @@ import Crumbs from '@/app/_ui/Crumbs';
 import { FormattedNotes } from '@/app/notes-format';
 import { IconPencil, IconArchive, IconRestore, IconCalendar, IconTrophy, IconCheck, IconBuilding } from '@/app/icons';
 import { fmtDay, fmtRange } from '@/lib/challenges';
-import { CORNERS, LETTERS, LINES, PRIZES, canUndo, nextPlayDay } from '@/lib/bingo';
+import { CORNERS, LETTERS, LINES, PRIZES, canUndo, nextPlayDay, pastPlayDays } from '@/lib/bingo';
 import { StatusChip } from './ChallengeCard';
 
 // The office bingo page (Neil, 2026-10-19; rules in lib/bingo.js). One shared 5x5 card per playing office; each
@@ -40,7 +40,7 @@ function Prize({ label, win, hint }) {
   );
 }
 
-function Card({ c, o, today, winners, busy, onMark }) {
+function Card({ c, o, today, winners, busy, onMark, canMarkHere }) {
   const squares = c.squares || [];
   const pickBy = new Map(o.picks.map((p) => [p.square, p]));
   const inLine = new Set(LINES.filter((l) => o.lines.includes(l.key)).flatMap((l) => l.cells));
@@ -48,7 +48,7 @@ function Card({ c, o, today, winners, busy, onMark }) {
   const cornersDone = !!o.corners_pick_id;
   const done = PRIZES.filter((k) => winners[k]?.office_ids.includes(o.id));
   return (
-    <section className={`bg-card${o.mine ? ' is-mine' : ''}${o.can_mark ? ' can-mark' : ''}`} aria-label={`${o.name} CAGEO card`}>
+    <section className={`bg-card${o.mine ? ' is-mine' : ''}${canMarkHere ? ' can-mark' : ''}`} aria-label={`${o.name} CAGEO card`}>
       <header className="bg-card-head">
         <h2 className="bg-card-name"><IconBuilding size={16} /> {o.name}{o.mine && <span className="ch-you-tag">Your office</span>}</h2>
         <span className="bg-card-count"><b>{o.marks}</b> of {squares.length}</span>
@@ -77,7 +77,7 @@ function Card({ c, o, today, winners, busy, onMark }) {
             </>
           );
           const title = p ? `${label} (marked ${fmtDay(p.play_date, { weekday: true })}${p.picked_by_name ? ` by ${p.picked_by_name}` : ''})` : label;
-          if (!p && o.can_mark) {
+          if (!p && canMarkHere) {
             return (
               <button key={i} type="button" className={`${cls.join(' ')} is-open`} title={`Mark: ${label}`}
                 disabled={busy} data-square={i} onClick={() => onMark(o, i)}>{inner}</button>
@@ -102,6 +102,11 @@ export default function BingoView({ initial, viewer }) {
   const today = data.today;
   const board = data.bingo;
   const mine = board.offices.filter((o) => o.mine);
+  // Admins can mark a missed earlier weekday (Neil, 2026-11-17). markDay = the day being marked ('' = today).
+  const pastDays = viewer.is_admin && !c.archived ? pastPlayDays(c, today) : [];
+  const [markDay, setMarkDay] = useState('');
+  const backfill = !!markDay && pastDays.includes(markDay);
+  const canMarkHere = (o) => (backfill ? !o.picks.some((p) => p.play_date === markDay) : o.can_mark);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -157,16 +162,19 @@ export default function BingoView({ initial, viewer }) {
   };
 
   const mark = async (o, square) => {
-    const lines = [`“${c.squares[square]}”`,
-      `This is ${o.name}’s one square for ${fmtDay(today, { weekday: true })}. Honor system: it should match today’s GeoGuessr round.`];
-    if (!o.mine) lines.push(`You’re not in ${o.name}. You’re marking it as an admin.`);
-    const yes = await ask({ title: `Mark this square for ${o.name}?`, lines, confirmLabel: 'Mark it' });
+    const day = backfill ? markDay : today;
+    const lines = [`“${c.squares[square]}”`, backfill
+      ? `This is ${o.name}’s missed square for ${fmtDay(day, { weekday: true })}. It counts as marked on that day.`
+      : `This is ${o.name}’s one square for ${fmtDay(today, { weekday: true })}. Honor system: it should match today’s GeoGuessr round.`];
+    if (!o.mine || backfill) lines.push(`You’re marking it as an admin.`);
+    const yes = await ask({ title: `Mark this square for ${o.name}${backfill ? ` on ${fmtDay(day, { weekday: true })}` : ''}?`, lines, confirmLabel: 'Mark it' });
     if (!yes) return;
     setBusy(true);
     setErr('');
     try {
-      const r = await api(`/api/culture/challenges/${c.id}/bingo`, { method: 'POST', body: { office_id: o.id, square } });
+      const r = await api(`/api/culture/challenges/${c.id}/bingo`, { method: 'POST', body: { office_id: o.id, square, ...(backfill ? { play_date: day } : {}) } });
       setData((d) => ({ ...d, bingo: r.board }));
+      if (backfill) setMarkDay('');
       const after = r.board.offices.find((x) => x.id === o.id);
       const won = PRIZES.filter((k) => r.board.winners[k]?.office_ids.includes(o.id) && !board.winners[k]?.office_ids.includes(o.id))
         .map((k) => PATTERN_LABELS[k]);
@@ -261,11 +269,21 @@ export default function BingoView({ initial, viewer }) {
           );
         })}
       </div>
+      {pastDays.length > 0 && (
+        <div className={`bg-backfill${backfill ? ' is-on' : ''}`}>
+          <label htmlFor="bg-mark-day">Marking for</label>
+          <select id="bg-mark-day" className="field" value={backfill ? markDay : ''} disabled={busy} onChange={(e) => { setMarkDay(e.target.value); setErr(''); }}>
+            <option value="">Today ({fmtDay(today, { weekday: true })})</option>
+            {pastDays.map((d) => <option key={d} value={d}>{fmtDay(d, { weekday: true })} (missed day)</option>)}
+          </select>
+          <span className="muted">{backfill ? `Admin: tap a square on any card that has nothing for ${fmtDay(markDay, { weekday: true })}.` : 'Admin: pick an earlier day to fill in a missed square.'}</span>
+        </div>
+      )}
       {err && <p className="ch-error" role="alert">{err}</p>}
 
       <div className={`bg-cards bg-cards-${Math.min(board.offices.length, 3)}`}>
         {board.offices.map((o) => (
-          <Card key={o.id} c={c} o={o} today={today} winners={board.winners} busy={busy} onMark={mark} />
+          <Card key={o.id} c={c} o={o} today={today} winners={board.winners} busy={busy} onMark={mark} canMarkHere={canMarkHere(o)} />
         ))}
         {board.offices.length === 0 && <p className="ch-quiet">No offices are playing yet. An organizer can add them with Edit.</p>}
       </div>
