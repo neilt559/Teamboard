@@ -29,12 +29,15 @@ const refusal = (m, entrantId, now) => (m && !m.deleted && m.mode === 'auto'
   ? autoRefusal(m, entrantId, now)
   : manualRefusal(m, entrantId));
 
-// The guard both statements share (design §10(c) "Voting"): $5 = the open round and $6 = this round's close, for
-// auto brackets only (NULL for manual ones, whose branch never reads them).
+// The guard both statements share (design §10(c) "Voting"): $5 = the open round, $6 = this round's close and
+// $7 = the round scheduled today, for auto brackets only (NULL for manual ones, whose branch never reads them).
+// A round ahead of its day is open only while every earlier matchup has a winner (Neil, 2026-11-24).
 const GUARD = `NOT b.archived AND b.deleted_at IS NULL AND m.winner_id IS NULL
   AND ((b.mode = 'manual' AND NOT EXISTS (SELECT 1 FROM bracket_matches p
           WHERE p.bracket_id = m.bracket_id AND p.round < m.round AND p.winner_id IS NULL))
-    OR (b.mode = 'auto' AND m.round = $5::int AND $4::timestamptz < $6::timestamptz))`;
+    OR (b.mode = 'auto' AND m.round = $5::int AND $4::timestamptz < $6::timestamptz
+        AND (m.round <= $7::int OR NOT EXISTS (SELECT 1 FROM bracket_matches p
+          WHERE p.bracket_id = m.bracket_id AND p.round < m.round AND p.winner_id IS NULL))))`;
 
 const VOTE_SQL = `
 INSERT INTO bracket_votes (match_id, user_id, entrant_id, created_at)
@@ -60,7 +63,7 @@ export const POST = handle(async ({ viewer, body, now }) => {
   const no = refusal(m, eid, now);
   if (no) throw no;
   const w = voteWindow(m, now);
-  const params = [mid, String(viewer.id), eid, new Date(now).toISOString(), w.open, w.closeIso];
+  const params = [mid, String(viewer.id), eid, new Date(now).toISOString(), w.open, w.closeIso, w.sched];
   // FOR SHARE blocks the resolver's FOR UPDATE while the vote is written, so a vote either commits before the
   // resolver's snapshot (and is counted: its created_at is before the close) or sees the decided match.
   const res = await transaction([

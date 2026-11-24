@@ -66,7 +66,9 @@ function Match({ m, ctx, placeholders }) {
   const locked = !readOnly && ready && !decided && !open;
   const votable = !readOnly && !editNames && ready && !decided && open;
   const undoable = !readOnly && !editNames && decided && mayUndo && canUndo(m);
-  const lockTitle = auto && startsOn ? `Opens ${roundWeekday(startsOn, m.round)}` : `Voting opens once every ${ROUNDS[Number(m.round) - 1]} matchup has a winner`;
+  const lockTitle = auto && startsOn
+    ? `Opens ${roundWeekday(startsOn, m.round)}, or sooner once every ${ROUNDS[Number(m.round) - 1]} matchup has a winner`
+    : `Voting opens once every ${ROUNDS[Number(m.round) - 1]} matchup has a winner`;
   // Weekly brackets (Release 3): who would advance if voting closed now, by the same tie chain as the resolver.
   let lead = null;
   if (auto && votable) {
@@ -192,7 +194,10 @@ export function BracketBoard({
   const at = (r, i) => matches.find((m) => Number(m.round) === r && Number(m.idx) === i);
   const cr = auto ? (schedule.phase === 'open' ? schedule.open_round : null) : currentRound(matches);
   const canUndo = (m) => {
-    if (auto && (m.decided_by !== 'organizer' || Number(m.round) !== cr)) return false;   // past rounds are final
+    // Past rounds are final. An early win can be re-opened in the round open now, or in today's scheduled round
+    // while a later round has opened early (the server's matchOpenRound rule).
+    const sr = Number(schedule?.scheduled_round ?? cr);
+    if (auto && (m.decided_by !== 'organizer' || cr === null || !(Number(m.round) === cr || (Number(m.round) >= sr && Number(m.round) <= cr)))) return false;
     const nx = nextSlot(m.round, m.idx);
     if (!nx) return true;
     const n = at(nx.round, nx.idx);
@@ -208,7 +213,7 @@ export function BracketBoard({
   // Column header for a round, with a lock while it's waiting its turn.
   const head = (r, cls) => {
     const waiting = !readOnly && (auto ? schedule.phase === 'upcoming' || (cr !== null && r > cr) : cr !== null && r > cr);
-    const why = auto ? `Opens ${roundWeekday(bracket.starts_on, r)}` : `Opens once the ${ROUNDS[r - 1]} is finished`;
+    const why = auto ? `Opens ${roundWeekday(bracket.starts_on, r)}, or sooner once the ${ROUNDS[r - 1]} is all decided` : `Opens once the ${ROUNDS[r - 1]} is finished`;
     return (
       <div className={`bk-col-head ${cls || ''}${waiting ? ' waiting' : ''}`} title={waiting ? why : undefined}>
         {waiting && <IconLock size={11} />}{ROUNDS[r]}
@@ -550,13 +555,17 @@ export default function BracketView({ initial, viewer }) {
     const vo = countFor(m, otherId);
     if (auto) {
       const r = Number(m.round);
+      // The last undecided matchup of its round: deciding it opens the next round right away (Neil, 2026-11-24).
+      const lastOne = !curMatches.some((x) => Number(x.round) === r && !x.winner_id && !same(x.id, m.id));
       setConfirm({
         title: `Decide early: ${w} wins?`,
         lines: [
           <>Votes so far — <b>{w}</b>: {vw} · <b>{o}</b>: {vo}</>,
           vo > vw ? <span className="bk-warn">Heads up: {o} has more votes.</span> : null,
           r >= 4 ? <>{w} will be crowned champion of “{current.name}”.</>
-            : <>{w} moves on to the {ROUNDS[r + 1]}, which still opens {roundWeekday(current.starts_on, r + 1)} as scheduled. You can re-open it until midnight Central.</>,
+            : lastOne
+              ? <>{w} moves on. This is the last {ROUNDS[r]} matchup, so the {ROUNDS[r + 1]} opens for voting right away (it still closes {roundWeekday(current.starts_on, r + 1)} at midnight Central). You can re-open this one until midnight Central.</>
+              : <>{w} moves on to the {ROUNDS[r + 1]}, which opens {roundWeekday(current.starts_on, r + 1)}, or as soon as every {ROUNDS[r]} matchup has a winner. You can re-open it until midnight Central.</>,
         ],
         confirmLabel: 'Yes, decide it now',
         onConfirm: () => declareWinner(m, eid),
@@ -584,7 +593,9 @@ export default function BracketView({ initial, viewer }) {
     if (auto) {
       setConfirm({
         title: 'Re-open this matchup?',
-        lines: [`${w}’s early win is cleared and voting goes on until midnight Central.`],
+        lines: [`${w}’s early win is cleared and voting goes on until midnight Central.`,
+          Number(m.round) < 4 && Number(m.round) < Number(openRound ?? -1)
+            ? `The ${ROUNDS[Number(m.round) + 1]}, which opened early, closes again until this matchup is decided.` : null].filter(Boolean),
         confirmLabel: 'Yes, re-open',
         onConfirm: () => undoWinner(m.id),
       });
@@ -717,10 +728,10 @@ export default function BracketView({ initial, viewer }) {
           return (
             <div className="bk-round-status auto">
               <span className="bk-rs-dot" aria-hidden="true" />
-              <span>Voting open: <b>{ROUNDS[openRound]}</b> · closes tonight at {c.ct}{c.mine ? ` (${c.mine} your time)` : ''}</span>
+              <span>Voting open: <b>{ROUNDS[openRound]}</b>{schedule.early ? ' (opened early)' : ''} · closes {schedule.early ? `${roundWeekday(current.starts_on, openRound)} night` : 'tonight'} at {c.ct}{c.mine ? ` (${c.mine} your time)` : ''}</span>
               {left > 0 && left <= 3_600_000 && <span className="bk-rs-soon">Closes in {untilText(schedule.closes_at, nowEst())}</span>}
               <span className="bk-rs-next"><IconCalendar size={12} /> {openRound < ROUNDS.length - 1
-                ? <>The {ROUNDS[openRound + 1]} opens {roundWeekday(current.starts_on, openRound + 1)}</>
+                ? <>The {ROUNDS[openRound + 1]} opens {roundWeekday(current.starts_on, openRound + 1)}, or sooner once every {ROUNDS[openRound]} matchup has a winner</>
                 : <>The champion shows Saturday</>}</span>
             </div>
           );

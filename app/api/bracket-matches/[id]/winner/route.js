@@ -1,9 +1,9 @@
 import { handle, parseId, bad, notFound, forbidden, HttpError } from '@/lib/http';
 import { query } from '@/lib/db';
 import { isOrganizer } from '@/lib/access';
-import { ROUNDS, nextSlot, scheduledRound, closesAt } from '@/lib/bracket';
+import { ROUNDS, nextSlot, closesAt } from '@/lib/bracket';
 import { advanceDueBrackets } from '@/lib/bracket-auto';
-import { readMatch, voteWindow, autoRefusal } from '../../../brackets/_shared';
+import { readMatch, voteWindow, autoRefusal, matchOpenRound } from '../../../brackets/_shared';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -26,8 +26,9 @@ const FINAL = 'Past rounds are final.';
 // One atomic statement (design §10(c) "Manual crown" and "Decide early"): the guarded UPDATE (not archived or
 // deleted, undecided, both sides set, the entrant is one of them; manual: policy and every earlier round
 // decided; auto: organizers only, the round open now, before its close), the slot fill in the next round (or
-// the champion), and an audit row. Two crowns at once can't both win (rule 25). $6 open round / $7 its close:
-// auto brackets only (NULL for manual ones, whose branch never reads them).
+// the champion), and an audit row. Two crowns at once can't both win (rule 25). $6 open round / $7 its close /
+// $8 the round scheduled today: auto brackets only (NULL for manual ones, whose branch never reads them). A round
+// ahead of its day is open once every earlier matchup has a winner (Neil, 2026-11-24).
 const CROWN_SQL = `
 WITH d AS (
   UPDATE bracket_matches m
@@ -42,7 +43,9 @@ WITH d AS (
      AND ((b.mode = 'manual' AND (b.crown_policy = 'anyone' OR $5::boolean)
            AND NOT EXISTS (SELECT 1 FROM bracket_matches p WHERE p.bracket_id = m.bracket_id AND p.round < m.round AND p.winner_id IS NULL))
        OR (b.mode = 'auto' AND $5::boolean AND b.activated_at IS NOT NULL
-           AND m.round = $6::int AND $4::timestamptz < $7::timestamptz))
+           AND m.round = $6::int AND $4::timestamptz < $7::timestamptz
+           AND (m.round <= $8::int OR NOT EXISTS (SELECT 1 FROM bracket_matches p
+                 WHERE p.bracket_id = m.bracket_id AND p.round < m.round AND p.winner_id IS NULL))))
   RETURNING m.id, m.bracket_id, m.round, m.idx, m.decided_by),
 fill AS (
   UPDATE bracket_matches n
@@ -77,7 +80,7 @@ export const POST = handle(async ({ viewer, params, body, now }) => {
     if (no) throw no;
   }
   const w = voteWindow(pre, now);
-  const r = await query(CROWN_SQL, [id, eid, String(viewer.id), new Date(now).toISOString(), org, w.open, w.closeIso]);
+  const r = await query(CROWN_SQL, [id, eid, String(viewer.id), new Date(now).toISOString(), org, w.open, w.closeIso, w.sched]);
   if (Number(r.rows[0]?.decided || 0) > 0) return { ok: true };
   // Nothing changed: say why (today's 409 text for everything that isn't a permission or mode question).
   const m = await readMatch(id);
@@ -97,7 +100,7 @@ export const POST = handle(async ({ viewer, params, body, now }) => {
 // 25), empty the slot (or clear the champion), then clear the winner. Locking the next match (rising rounds, the
 // same order a crown locks in, so no deadlock) makes a crown of it that commits while this runs visible here: the
 // undo then waits, re-reads it decided and refuses, instead of emptying the slot of a decided match (rule 25).
-// $4 open round / $5 now / $6 its close: auto brackets only (NULL for manual ones).
+// $4 open round / $5 now / $6 its close / $7 the round scheduled today: auto brackets only (NULL for manual ones).
 const UNDO_SQL = `
 WITH m AS (
   SELECT m.id, m.bracket_id, m.round, m.idx, m.winner_id
@@ -105,7 +108,9 @@ WITH m AS (
    WHERE m.id = $1::bigint AND m.winner_id IS NOT NULL AND NOT b.archived AND b.deleted_at IS NULL
      AND ((b.mode = 'manual' AND (b.crown_policy = 'anyone' OR $3::boolean))
        OR (b.mode = 'auto' AND $3::boolean AND m.decided_by = 'organizer' AND m.round = $4::int
-           AND $5::timestamptz < $6::timestamptz))
+           AND $5::timestamptz < $6::timestamptz
+           AND (m.round <= $7::int OR NOT EXISTS (SELECT 1 FROM bracket_matches p
+                 WHERE p.bracket_id = m.bracket_id AND p.round < m.round AND p.winner_id IS NULL))))
    FOR UPDATE OF m),
 nx AS (
   SELECT n.id, n.winner_id FROM bracket_matches n JOIN m ON n.bracket_id = m.bracket_id
@@ -149,7 +154,7 @@ export const DELETE = handle(async ({ viewer, params, now }) => {
     if (!m.winner_id) return null;                                     // nothing to undo
     if (m.mode === 'auto') {
       if (!org) return forbidden(ORG_REOPEN);
-      if (m.decided_by !== 'organizer' || m.round !== scheduledRound(m.starts_on, now) || now >= closesAt(m.starts_on, m.round)) {
+      if (m.decided_by !== 'organizer' || m.round !== matchOpenRound(m, now) || now >= closesAt(m.starts_on, m.round)) {
         return new HttpError(409, FINAL);
       }
     } else if (m.crown_policy !== 'anyone' && !org) {
@@ -165,7 +170,7 @@ export const DELETE = handle(async ({ viewer, params, now }) => {
   if (before) throw before;
   const w = voteWindow(pre, now);
   const nowIso = w.open == null ? null : new Date(now).toISOString();
-  const r = await query(UNDO_SQL, [id, String(viewer.id), org, w.open, nowIso, w.closeIso]);
+  const r = await query(UNDO_SQL, [id, String(viewer.id), org, w.open, nowIso, w.closeIso, w.sched]);
   if (Number(r.rows[0]?.undone || 0) > 0) return { ok: true };
   const after = why(await readMatch(id));                              // someone else got there first
   if (after === null) return { ok: true };

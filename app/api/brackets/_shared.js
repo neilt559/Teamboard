@@ -63,9 +63,19 @@ export async function readMatch(matchId) {
 // brackets { open: the round open today (CT), closeIso: this match's round close }. Manual brackets get NULLs:
 // their starts_on is NULL and the SQL's manual branch never reads these (the live legacy bracket must never
 // compute a close time).
+// sched: the round scheduled for today; the SQL lets a later round through only while every earlier matchup still
+// has a winner (an undo racing a vote can't leave a vote in a round that just closed again).
 export function voteWindow(m, now) {
-  if (!m || m.mode !== 'auto' || !m.starts_on) return { open: null, closeIso: null };
-  return { open: scheduledRound(m.starts_on, now), closeIso: new Date(closesAt(m.starts_on, m.round)).toISOString() };
+  if (!m || m.mode !== 'auto' || !m.starts_on) return { open: null, closeIso: null, sched: null };
+  return { open: matchOpenRound(m, now), closeIso: new Date(closesAt(m.starts_on, m.round)).toISOString(), sched: scheduledRound(m.starts_on, now) };
+}
+
+// The round open now for this match's weekly bracket (lib/bracket.js openRoundAuto): the scheduled round, or this
+// match's round when it is later and every earlier matchup already has a winner (Neil, 2026-11-24). readMatch's
+// earlier_open counts the undecided matchups before this match's round.
+export function matchOpenRound(m, now) {
+  const sr = scheduledRound(m.starts_on, now);
+  return sr >= 0 && sr <= 4 && m.round > sr && m.earlier_open === 0 ? m.round : sr;
 }
 
 // Why an auto bracket's match can't be voted on (or decided early) right now, or null when it can.
@@ -74,7 +84,7 @@ export function voteWindow(m, now) {
 export function autoRefusal(m, entrantId, now, { early = false } = {}) {
   if (!m || m.deleted) return new HttpError(404, 'Matchup not found');
   if (m.archived) return new HttpError(409, 'This bracket is closed.');
-  const open = scheduledRound(m.starts_on, now);
+  const open = matchOpenRound(m, now);
   const name = ROUNDS[m.round];
   const closed = m.round < open || now >= closesAt(m.starts_on, m.round);
   if (m.winner_id) {
@@ -84,7 +94,7 @@ export function autoRefusal(m, entrantId, now, { early = false } = {}) {
     return new HttpError(409, 'An organizer already decided this matchup.');
   }
   if (open < 0) return new HttpError(409, 'Voting opens Monday at 12:00 AM Central.');
-  if (m.round > open) return new HttpError(409, `The ${name} opens ${roundWeekday(m.starts_on, m.round)}.`);
+  if (m.round > open) return new HttpError(409, `The ${name} opens ${roundWeekday(m.starts_on, m.round)}, or sooner once every ${ROUNDS[m.round - 1]} matchup has a winner.`);
   if (closed) return new HttpError(409, early ? 'Past rounds are final.' : `Voting for the ${name} closed at midnight Central.`);
   if (!entrantId) return null;
   if (!m.a_id || !m.b_id) return new HttpError(409, 'This matchup is being set up — try again in a minute.');
